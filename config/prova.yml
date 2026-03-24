@@ -1,0 +1,3 @@
+servizio1:
+  nome: $1
+  messaggi: ciao

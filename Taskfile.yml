@@ -1,0 +1,48 @@
+version: "3"
+
+vars:
+  JAVA_HOME_PATH: "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot"
+  D: "$"
+
+tasks:
+  run-naming:
+    desc: Run the Naming Server (Config Server)
+    cmds:
+      - task: run-pkg
+        vars: { PKG: "com.example.ttfcloud.namingserver", PROFILES: "naming,native" }
+
+  run-exchange:
+    desc: Run the Exchange Service
+    cmds:
+      - task: run-pkg
+        vars: { PKG: "com.example.ttfcloud.exchangeservice", PROFILES: "exchange" }
+
+  run-convertion:
+    desc: Run the Convertion Service
+    cmds:
+      - task: run-pkg
+        vars: { PKG: "com.example.ttfcloud.convertionservice", PROFILES: "convertion" }
+
+  run-all:
+    desc: Run all services in parallel
+    deps: [run-naming, run-exchange, run-convertion]
+
+  run-pkg:
+    internal: true
+    dir: demo
+    vars:
+      CLASS: '{{default "Main" .CLASS}}'
+      ARGS: '{{default "" .ARGS}}'
+    cmds:
+      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& mvnw.cmd spring-boot:run {{.ARGS}} -Dspring-boot.run.main-class={{.PKG}}.{{.CLASS}} -Dspring-boot.run.profiles={{.PROFILES}}"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw spring-boot:run {{.ARGS}} -Dspring-boot.run.main-class={{.PKG}}.{{.CLASS}} -Dspring-boot.run.profiles={{.PROFILES}}{{end}}'
+
+  build:
+    desc: "Package the application."
+    dir: demo
+    cmds:
+      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& mvnw.cmd clean install -DskipTests"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw clean install -DskipTests{{end}}'
+
+  clean-ports:
+    desc: "Kill all Java processes (Spring Boot)"
+    cmds:
+      - '{{if eq OS "windows"}}cmd /c "taskkill /F /IM java.exe /T 2>nul || ver >nul"{{else}}fuser -k 8888/tcp 8000/tcp 8100/tcp{{end}}'

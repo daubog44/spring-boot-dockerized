@@ -1,0 +1,24 @@
+services:
+  multicanale:
+    container_name: demo-multicanale
+    build:
+      context: .
+      args:
+        PKG: ${PKG:-com.example.web}
+        CLASS: ${CLASS:-Main}
+        PKG_PATH: ${PKG_PATH:-com/example/web}
+    ports:
+      - "8081:8080"
+      
+    environment:
+      # Spring Boot maps these OS environment variables directly over application.yml values
+      - TTF_EMAIL_SMTP=smtp.docker.com
+      - TTF_EMAIL_PORT=1025
+      - TTF_EMAIL_USERNAME=docker_test_user
+      - TTF_EMAIL_PASSWORD=supersecret_docker
+      - TTF_SMS_SERVER=sms.docker.com
+      - TTF_SMS_TOKEN=docker_token_123
+
+    # Important: Required to keep standard input open for your Scanner(System.in)
+    stdin_open: true
+    tty: true
