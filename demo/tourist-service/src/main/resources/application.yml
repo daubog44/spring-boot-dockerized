@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: tourist-service
+  jackson:
+    default-property-inclusion: non_null
+server:
+  port: ${SERVER_PORT:8081}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+eureka:
+  client:
+    jersey:
+      enabled: false
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    webclient:
+      enabled: false
+  instance:
+    prefer-ip-address: true
+tourist:
+  api:
+    base-url: ${TOURIST_API_BASE_URL:https://tourism.opendatahub.com}
+    default-language: ${TOURIST_DEFAULT_LANGUAGE:it}
+    default-limit: ${TOURIST_DEFAULT_LIMIT:10}
+    default-radius: ${TOURIST_DEFAULT_RADIUS:10000}

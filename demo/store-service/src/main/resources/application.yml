@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: store-service
+  datasource:
+    url: ${STORE_DB_URL:jdbc:postgresql://localhost:5432/event_suggestions}
+    username: ${STORE_DB_USERNAME:exam}
+    password: ${STORE_DB_PASSWORD:exam}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+server:
+  port: ${SERVER_PORT:8083}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+eureka:
+  client:
+    jersey:
+      enabled: false
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    webclient:
+      enabled: false
+  instance:
+    prefer-ip-address: true

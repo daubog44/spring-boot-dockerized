@@ -1,9 +1,0 @@
-server:
-  port: 8888
-spring:
-  application.name: configserver
-  cloud:
-    config:
-      server:
-        native:
-          search-locations: C:\Users\Utente\OneDrive - ITS Tech Talent Factory\Desktop\dev\java\spring-boot-dockerized-main\config

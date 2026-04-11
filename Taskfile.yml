@@ -2,47 +2,81 @@ version: "3"
 
 vars:
   JAVA_HOME_PATH: "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot"
-  D: "$"
 
 tasks:
-  run-naming:
-    desc: Run the Naming Server (Config Server)
+  run-eureka:
+    desc: Run the Eureka server locally
     cmds:
-      - task: run-pkg
-        vars: { PKG: "com.example.ttfcloud.namingserver", PROFILES: "naming,native" }
+      - task: run-module
+        vars:
+          MODULE: "naming-server"
 
-  run-exchange:
-    desc: Run the Exchange Service
+  run-tourist:
+    desc: Run the tourist wrapper locally
     cmds:
-      - task: run-pkg
-        vars: { PKG: "com.example.ttfcloud.exchangeservice", PROFILES: "exchange" }
+      - task: run-module
+        vars:
+          MODULE: "tourist-service"
 
-  run-convertion:
-    desc: Run the Convertion Service
+  run-random:
+    desc: Run the random service locally
     cmds:
-      - task: run-pkg
-        vars: { PKG: "com.example.ttfcloud.convertionservice", PROFILES: "convertion" }
+      - task: run-module
+        vars:
+          MODULE: "random-service"
 
-  run-all:
-    desc: Run all services in parallel
-    deps: [run-naming, run-exchange, run-convertion]
+  run-store:
+    desc: Run the store service locally
+    cmds:
+      - task: run-module
+        vars:
+          MODULE: "store-service"
 
-  run-pkg:
-    internal: true
+  run-ui:
+    desc: Run the UI locally
+    cmds:
+      - task: run-module
+        vars:
+          MODULE: "event-ui"
+
+  run-db:
+    desc: Start only PostgreSQL via Docker
     dir: demo
-    vars:
-      CLASS: '{{default "Main" .CLASS}}'
-      ARGS: '{{default "" .ARGS}}'
     cmds:
-      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& mvnw.cmd spring-boot:run {{.ARGS}} -Dspring-boot.run.main-class={{.PKG}}.{{.CLASS}} -Dspring-boot.run.profiles={{.PROFILES}}"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw spring-boot:run {{.ARGS}} -Dspring-boot.run.main-class={{.PKG}}.{{.CLASS}} -Dspring-boot.run.profiles={{.PROFILES}}{{end}}'
+      - docker compose up -d postgres
+
+  docker-up:
+    desc: Build and start the full exam stack
+    dir: demo
+    cmds:
+      - docker compose up --build -d
+
+  docker-down:
+    desc: Stop the full exam stack
+    dir: demo
+    cmds:
+      - docker compose down -v --remove-orphans
+
+  docker-logs:
+    desc: Tail compose logs
+    dir: demo
+    cmds:
+      - docker compose logs -f
 
   build:
-    desc: "Package the application."
+    desc: Package all Maven modules
     dir: demo
     cmds:
-      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& mvnw.cmd clean install -DskipTests"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw clean install -DskipTests{{end}}'
+      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& mvnw.cmd clean package -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw clean package -Dmaven.test.skip=true{{end}}'
 
   clean-ports:
-    desc: "Kill all Java processes (Spring Boot)"
+    desc: Kill Java processes
     cmds:
-      - '{{if eq OS "windows"}}cmd /c "taskkill /F /IM java.exe /T 2>nul || ver >nul"{{else}}fuser -k 8888/tcp 8000/tcp 8100/tcp{{end}}'
+      - '{{if eq OS "windows"}}cmd /c "taskkill /F /IM java.exe /T 2>nul || ver >nul"{{else}}pkill -f java || true{{end}}'
+
+  run-module:
+    internal: true
+    dir: 'demo/{{.MODULE}}'
+    cmds:
+      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& ..\\mvnw.cmd -f ..\\pom.xml -pl {{.MODULE}} -am install -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ../mvnw -f ../pom.xml -pl {{.MODULE}} -am install -Dmaven.test.skip=true{{end}}'
+      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& ..\\mvnw.cmd spring-boot:run"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ../mvnw spring-boot:run{{end}}'

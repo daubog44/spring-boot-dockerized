@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: event-ui
+  thymeleaf:
+    cache: false
+  jackson:
+    default-property-inclusion: non_null
+server:
+  port: ${SERVER_PORT:8080}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+eureka:
+  client:
+    jersey:
+      enabled: false
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    registry-fetch-interval-seconds: ${UI_EUREKA_FETCH_INTERVAL_SECONDS:5}
+    webclient:
+      enabled: false
+  instance:
+    prefer-ip-address: true
+ui:
+  history-limit: ${UI_HISTORY_LIMIT:10}
+  discovery-attempts: ${UI_DISCOVERY_ATTEMPTS:12}
+  discovery-delay-millis: ${UI_DISCOVERY_DELAY_MILLIS:1000}
+  service-ids:
+    tourist: tourist-service
+    random: random-service
+    store: store-service

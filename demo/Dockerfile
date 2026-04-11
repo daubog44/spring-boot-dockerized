@@ -1,32 +1,33 @@
-# Stage 1: Build the JAR
 FROM eclipse-temurin:25-jdk AS builder
-WORKDIR /app
+WORKDIR /workspace
 
-# Copy Maven wrapper and POM
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
+COPY common-dto/pom.xml common-dto/pom.xml
+COPY naming-server/pom.xml naming-server/pom.xml
+COPY tourist-service/pom.xml tourist-service/pom.xml
+COPY random-service/pom.xml random-service/pom.xml
+COPY store-service/pom.xml store-service/pom.xml
+COPY event-ui/pom.xml event-ui/pom.xml
 
-# Download dependencies to cache them
-RUN ./mvnw dependency:go-offline -B || true
+ARG MODULE="event-ui"
 
-# Copy the actual source code
-COPY src src
+RUN chmod +x mvnw
+RUN ./mvnw -B -pl ${MODULE} -am dependency:go-offline
 
-# Build Arguments to specify which package to isolate
-ARG PKG="com.example.multicanalces"
-ARG CLASS="Main"
-ARG PKG_PATH="com/example/multicanalces"
+COPY common-dto common-dto
+COPY naming-server naming-server
+COPY tourist-service tourist-service
+COPY random-service random-service
+COPY store-service store-service
+COPY event-ui event-ui
+COPY tailwind.config.js tailwind.config.js
 
-# Package the application filtering by the specified package
-RUN ./mvnw clean install -Dstart-class=${PKG}.${CLASS} -Dpkg.include=${PKG_PATH}/**/* -DskipTests
+RUN ./mvnw -B -pl ${MODULE} -am clean package -Dmaven.test.skip=true
 
-# Stage 2: Create the runtime image
 FROM eclipse-temurin:25-jre
 WORKDIR /app
-
-# Copy only the compiled JAR from the builder
-COPY --from=builder /app/target/demo-0.0.1-SNAPSHOT.jar app.jar
-
-# Start the application
+ARG MODULE="event-ui"
+COPY --from=builder /workspace/${MODULE}/target/${MODULE}-0.0.1-SNAPSHOT.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -1,24 +1,84 @@
 services:
-  multicanale:
-    container_name: demo-multicanale
+  postgres:
+    image: postgres:18.3-alpine
+    container_name: exam-postgres
+    environment:
+      POSTGRES_DB: event_suggestions
+      POSTGRES_USER: exam
+      POSTGRES_PASSWORD: exam
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  eureka-server:
+    container_name: exam-eureka
     build:
       context: .
       args:
-        PKG: ${PKG:-com.example.web}
-        CLASS: ${CLASS:-Main}
-        PKG_PATH: ${PKG_PATH:-com/example/web}
-    ports:
-      - "8081:8080"
-      
+        MODULE: naming-server
     environment:
-      # Spring Boot maps these OS environment variables directly over application.yml values
-      - TTF_EMAIL_SMTP=smtp.docker.com
-      - TTF_EMAIL_PORT=1025
-      - TTF_EMAIL_USERNAME=docker_test_user
-      - TTF_EMAIL_PASSWORD=supersecret_docker
-      - TTF_SMS_SERVER=sms.docker.com
-      - TTF_SMS_TOKEN=docker_token_123
+      SERVER_PORT: 8761
+    ports:
+      - "8761:8761"
 
-    # Important: Required to keep standard input open for your Scanner(System.in)
-    stdin_open: true
-    tty: true
+  tourist-service:
+    container_name: exam-tourist-service
+    build:
+      context: .
+      args:
+        MODULE: tourist-service
+    environment:
+      SERVER_PORT: 8081
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      TOURIST_API_BASE_URL: https://tourism.opendatahub.com
+    depends_on:
+      - eureka-server
+
+  random-service:
+    container_name: exam-random-service
+    build:
+      context: .
+      args:
+        MODULE: random-service
+    environment:
+      SERVER_PORT: 8082
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+
+  store-service:
+    container_name: exam-store-service
+    build:
+      context: .
+      args:
+        MODULE: store-service
+    environment:
+      SERVER_PORT: 8083
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      STORE_DB_URL: jdbc:postgresql://postgres:5432/event_suggestions
+      STORE_DB_USERNAME: exam
+      STORE_DB_PASSWORD: exam
+    depends_on:
+      - postgres
+      - eureka-server
+
+  ui-service:
+    container_name: exam-ui-service
+    build:
+      context: .
+      args:
+        MODULE: event-ui
+    environment:
+      SERVER_PORT: 8080
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+      - tourist-service
+      - random-service
+      - store-service
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-data:
