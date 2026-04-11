@@ -125,6 +125,9 @@ cd spring-boot-dockerized
 task docker-up
 ```
 
+Nota:
+al primo avvio `task docker-up` puo` richiedere alcuni minuti per scaricare dipendenze Maven e immagini Docker.
+
 URL da aprire:
 
 - `http://localhost:8080`

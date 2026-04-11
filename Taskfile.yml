@@ -49,7 +49,12 @@ tasks:
     desc: Build and start the full exam stack
     dir: demo
     cmds:
-      - docker compose up --build -d
+      - docker compose build eureka-server
+      - docker compose build tourist-service
+      - docker compose build random-service
+      - docker compose build store-service
+      - docker compose build ui-service
+      - docker compose up -d
 
   docker-down:
     desc: Stop the full exam stack
