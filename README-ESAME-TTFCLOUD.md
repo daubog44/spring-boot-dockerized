@@ -35,14 +35,14 @@ Package principali:
 
 ## Multi-Module Maven
 
-Il progetto ora usa un parent Maven aggregatore in [demo/pom.xml](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/demo/pom.xml) e sei moduli separati:
+Il progetto ora usa un parent Maven aggregatore in [demo/pom.xml](./demo/pom.xml) e sei moduli separati:
 
-- [common-dto](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/demo/common-dto)
-- [naming-server](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/demo/naming-server)
-- [tourist-service](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/demo/tourist-service)
-- [random-service](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/demo/random-service)
-- [store-service](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/demo/store-service)
-- [event-ui](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/demo/event-ui)
+- [common-dto](./demo/common-dto)
+- [naming-server](./demo/naming-server)
+- [tourist-service](./demo/tourist-service)
+- [random-service](./demo/random-service)
+- [store-service](./demo/store-service)
+- [event-ui](./demo/event-ui)
 
 Cosa cambia davvero:
 
@@ -139,7 +139,7 @@ Se vuoi usare anche i task locali oltre a Docker:
 
 1. installa Java 25
 2. installa Task
-3. verifica che il percorso configurato in [Taskfile.yml](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/Taskfile.yml) per `JAVA_HOME_PATH` sia valido sul tuo host
+3. verifica che il percorso configurato in [Taskfile.yml](./Taskfile.yml) per `JAVA_HOME_PATH` sia valido sul tuo host
 
 Sul mio setup il Taskfile usa:
 
@@ -347,9 +347,9 @@ In piu` il fallback server-side usa `Post/Redirect/Get`, quindi il refresh del b
 
 File coinvolti:
 
-- [UiController.java](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/demo/event-ui/src/main/java/com/example/ttfcloud_esame/ui/UiController.java)
-- [event-suggestion.html](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/demo/event-ui/src/main/resources/templates/event-suggestion.html)
-- [event-roulette.js](C:/Users/Utente/OneDrive%20-%20ITS%20Tech%20Talent%20Factory/Desktop/dev/spring-boot-dockerized/demo/event-ui/src/main/resources/static/js/event-roulette.js)
+- [UiController.java](./demo/event-ui/src/main/java/com/example/ttfcloud_esame/ui/UiController.java)
+- [event-suggestion.html](./demo/event-ui/src/main/resources/templates/event-suggestion.html)
+- [event-roulette.js](./demo/event-ui/src/main/resources/static/js/event-roulette.js)
 
 ## Note da dire all'esame
 

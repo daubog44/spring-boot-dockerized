@@ -1,7 +1,7 @@
 version: "3"
 
 vars:
-  JAVA_HOME_PATH: "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot"
+  JAVA_HOME_PATH: '{{.JAVA_HOME | default "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot"}}'
 
 tasks:
   run-eureka:
