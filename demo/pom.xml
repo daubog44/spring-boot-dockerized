@@ -21,6 +21,10 @@
     <modules>
         <module>common-dto</module>
         <module>naming-server</module>
+        <module>product-service</module>
+        <module>crm-service</module>
+        <module>wms-service</module>
+        <module>wms-ui</module>
         <module>tourist-service</module>
         <module>random-service</module>
         <module>store-service</module>

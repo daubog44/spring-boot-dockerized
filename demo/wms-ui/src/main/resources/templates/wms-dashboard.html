@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>WMS Magazzino Spostati S.r.l. - Dashboard</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #38bdf8; text-align: center; margin-bottom: 25px; }
+        .alert-success { background-color: #15803d; color: #f0fdf4; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .alert-error { background-color: #b91c1c; color: #fef2f2; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; }
+        .card h2 { color: #f43f5e; margin-top: 0; }
+        form label { display: block; margin-top: 10px; color: #94a3b8; font-size: 0.9em; }
+        form input, form select, form button { width: 100%; padding: 10px; margin-top: 5px; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: #fff; box-sizing: border-box; }
+        form button { background: #2563eb; color: white; border: none; font-weight: bold; margin-top: 15px; cursor: pointer; }
+        form button:hover { background: #1d4ed8; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background-color: #334155; color: #38bdf8; }
+        tr:hover { background-color: #0f172a; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
+        .badge-free { background: #065f46; color: #34d399; }
+        .badge-occupied { background: #991b1b; color: #fca5a5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 WMS Magazzino "Spostati S.r.l."</h1>
+
+        <div th:if="${successMessage}" class="alert-success" th:text="${successMessage}"></div>
+        <div th:if="${errorMessage}" class="alert-error" th:text="${errorMessage}"></div>
+
+        <!-- SEZIONE FILTRO ED ELENCO GIACENZE -->
+        <div class="card" style="margin-bottom: 30px;">
+            <h2>📊 Visualizzazione Giacenze per Armadio</h2>
+            <form method="get" action="/">
+                <label for="cabinetId">Seleziona Armadio:</label>
+                <select id="cabinetId" name="cabinetId" onchange="this.form.submit()">
+                    <option value="">-- Tutti gli Armadi --</option>
+                    <option th:each="cab : ${cabinets}" 
+                            th:value="${cab.id}" 
+                            th:text="${cab.name + ' (Fila ' + cab.row + ', Col ' + cab.col + ')'}"
+                            th:selected="${cab.id == selectedCabinetId}"></option>
+                </select>
+            </form>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ubicazione ID</th>
+                        <th>Posizione Armadio</th>
+                        <th>Prodotto Stoccato</th>
+                        <th>Cliente CRM</th>
+                        <th>Pezzi</th>
+                        <th>Ingombro (Occupato / Max)</th>
+                        <th>Stato</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="loc : ${locations}">
+                        <td th:text="${'# ' + loc.id}">#1</td>
+                        <td th:text="${'Fila ' + loc.cabinetRow + ', Col ' + loc.cabinetCol}">Fila 1, Col 1</td>
+                        <td th:text="${loc.productName != null ? loc.productName : 'Vuota'}">Scatola cartone</td>
+                        <td th:text="${loc.customerName != null ? loc.customerName : 'Nessuno'}">Logistica Express</td>
+                        <td th:text="${loc.quantity}">4</td>
+                        <td th:text="${loc.currentIngombro + ' / ' + loc.maxIngombro}">40 / 100</td>
+                        <td>
+                            <span th:if="${loc.quantity > 0}" class="badge badge-occupied">OCCUPATA</span>
+                            <span th:if="${loc.quantity == 0}" class="badge badge-free">LIBERA</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card-grid">
+            <!-- FORM MOVIMENTAZIONE MERCI -->
+            <div class="card">
+                <h2>🔄 Movimentazione Merci</h2>
+                <form method="post" action="/movement">
+                    <label for="sourceLocationId">Ubicazione di Partenza:</label>
+                    <select id="sourceLocationId" name="sourceLocationId" required>
+                        <option value="">-- Seleziona Sorgente --</option>
+                        <option th:each="l : ${locations}" 
+                                th:if="${l.quantity > 0}"
+                                th:value="${l.id}" 
+                                th:text="${'Ubicazione #' + l.id + ' - ' + l.productName + ' (' + l.quantity + ' pezzi)'}"></option>
+                    </select>
+
+                    <label for="destLocationId">Ubicazione di Destinazione:</label>
+                    <select id="destLocationId" name="destLocationId" required>
+                        <option value="">-- Seleziona Destinazione --</option>
+                        <option th:each="l : ${locations}" 
+                                th:value="${l.id}" 
+                                th:text="${'Ubicazione #' + l.id + ' (Libero: ' + (l.maxIngombro - l.currentIngombro) + ')'}"></option>
+                    </select>
+
+                    <label for="quantity">Quantità Pezzi da Spostare:</label>
+                    <input type="number" id="quantity" name="quantity" min="1" value="1" required />
+
+                    <button type="submit">Esegui Spostamento Merci</button>
+                </form>
+            </div>
+
+            <!-- ALGORITMO UBICAZIONE PIU' VICINA -->
+            <div class="card">
+                <h2>🔍 Algoritmo Ricerca Ubicazione Più Vicina</h2>
+                <form method="post" action="/nearest-location">
+                    <label for="sourceLocAlg">Ubicazione Sorgente U:</label>
+                    <select id="sourceLocAlg" name="sourceLocationId" required>
+                        <option value="">-- Seleziona Sorgente --</option>
+                        <option th:each="l : ${locations}" 
+                                th:if="${l.quantity > 0}"
+                                th:value="${l.id}" 
+                                th:text="${'Ubicazione #' + l.id + ' - ' + l.productName}"></option>
+                    </select>
+
+                    <label for="quantAlg">Quantità Q Pezzi:</label>
+                    <input type="number" id="quantAlg" name="quantity" min="1" value="1" required />
+
+                    <button type="submit" style="background: #059669;">Calcola Ubicazione Vicina (Manhattan)</button>
+                </form>
+
+                <div th:if="${nearestResponse}" style="margin-top: 15px; padding: 10px; background: #0f172a; border-radius: 6px;">
+                    <h3 style="color: #34d399; margin: 0 0 5px 0;">Risultato Algoritmo:</h3>
+                    <p th:text="${nearestResponse.message}"></p>
+                    <div th:if="${nearestResponse.nearestLocation != null}">
+                        <p><strong>Ubicazione Trovata:</strong> #<span th:text="${nearestResponse.nearestLocation.id}"></span></p>
+                        <p><strong>Armadio:</strong> Fila <span th:text="${nearestResponse.nearestLocation.cabinetRow}"></span>, Col <span th:text="${nearestResponse.nearestLocation.cabinetCol}"></span></p>
+                        <p><strong>Distanza Manhattan:</strong> <span th:text="${nearestResponse.distance}"></span> unità</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

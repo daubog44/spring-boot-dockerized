@@ -1,0 +1,33 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: PRODUCT-SERVICE
+
+  datasource:
+    url: ${PRODUCT_DB_URL:jdbc:h2:mem:productdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${PRODUCT_DB_USERNAME:sa}
+    password: ${PRODUCT_DB_PASSWORD:}
+    driver-class-name: ${PRODUCT_DB_DRIVER:org.h2.Driver}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

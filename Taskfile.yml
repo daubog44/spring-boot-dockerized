@@ -11,33 +11,33 @@ tasks:
         vars:
           MODULE: "naming-server"
 
-  run-tourist:
-    desc: Run the tourist wrapper locally
+  run-product:
+    desc: Run the Product catalog service locally
     cmds:
       - task: run-module
         vars:
-          MODULE: "tourist-service"
+          MODULE: "product-service"
 
-  run-random:
-    desc: Run the random service locally
+  run-crm:
+    desc: Run the CRM mock service locally
     cmds:
       - task: run-module
         vars:
-          MODULE: "random-service"
+          MODULE: "crm-service"
 
-  run-store:
-    desc: Run the store service locally
+  run-wms:
+    desc: Run the WMS backend service locally
     cmds:
       - task: run-module
         vars:
-          MODULE: "store-service"
+          MODULE: "wms-service"
 
-  run-ui:
-    desc: Run the UI locally
+  run-wms-ui:
+    desc: Run the WMS Web UI locally
     cmds:
       - task: run-module
         vars:
-          MODULE: "event-ui"
+          MODULE: "wms-ui"
 
   run-db:
     desc: Start only PostgreSQL via Docker
@@ -46,14 +46,10 @@ tasks:
       - docker compose up -d postgres
 
   docker-up:
-    desc: Build and start the full exam stack
+    desc: Build and start the full WMS exam stack
     dir: demo
     cmds:
-      - docker compose build eureka-server
-      - docker compose build tourist-service
-      - docker compose build random-service
-      - docker compose build store-service
-      - docker compose build ui-service
+      - docker compose build
       - docker compose up -d
 
   docker-down:
@@ -78,6 +74,11 @@ tasks:
     desc: Kill Java processes
     cmds:
       - '{{if eq OS "windows"}}cmd /c "taskkill /F /IM java.exe /T 2>nul || ver >nul"{{else}}pkill -f java || true{{end}}'
+
+  test-e2e:
+    desc: Run automated E2E test script
+    cmds:
+      - powershell -ExecutionPolicy Bypass -File ./test_e2e_wms.ps1
 
   run-module:
     internal: true

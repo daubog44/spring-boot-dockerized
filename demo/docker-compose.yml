@@ -32,28 +32,27 @@ services:
       timeout: 5s
       retries: 10
 
-  tourist-service:
-    container_name: exam-tourist-service
+  product-service:
+    container_name: exam-product-service
     build:
       context: .
       args:
-        MODULE: tourist-service
+        MODULE: product-service
     environment:
       SERVER_PORT: 8081
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
-      TOURIST_API_BASE_URL: https://tourism.opendatahub.com
     ports:
       - "8081:8081"
     depends_on:
       eureka-server:
         condition: service_healthy
 
-  random-service:
-    container_name: exam-random-service
+  crm-service:
+    container_name: exam-crm-service
     build:
       context: .
       args:
-        MODULE: random-service
+        MODULE: crm-service
     environment:
       SERVER_PORT: 8082
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
@@ -63,32 +62,27 @@ services:
       eureka-server:
         condition: service_healthy
 
-  store-service:
-    container_name: exam-store-service
+  wms-service:
+    container_name: exam-wms-service
     build:
       context: .
       args:
-        MODULE: store-service
+        MODULE: wms-service
     environment:
       SERVER_PORT: 8083
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
-      STORE_DB_URL: jdbc:postgresql://postgres:5432/event_suggestions
-      STORE_DB_USERNAME: exam
-      STORE_DB_PASSWORD: exam
     ports:
       - "8083:8083"
     depends_on:
-      postgres:
-        condition: service_healthy
       eureka-server:
         condition: service_healthy
 
-  ui-service:
-    container_name: exam-ui-service
+  wms-ui:
+    container_name: exam-wms-ui
     build:
       context: .
       args:
-        MODULE: event-ui
+        MODULE: wms-ui
     environment:
       SERVER_PORT: 8080
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
@@ -97,11 +91,11 @@ services:
     depends_on:
       eureka-server:
         condition: service_healthy
-      tourist-service:
+      product-service:
         condition: service_started
-      random-service:
+      crm-service:
         condition: service_started
-      store-service:
+      wms-service:
         condition: service_started
 
 volumes:

@@ -1,0 +1,33 @@
+server:
+  port: ${SERVER_PORT:8083}
+
+spring:
+  application:
+    name: WMS-SERVICE
+
+  datasource:
+    url: ${WMS_DB_URL:jdbc:h2:mem:wmsdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${WMS_DB_USERNAME:sa}
+    password: ${WMS_DB_PASSWORD:}
+    driver-class-name: ${WMS_DB_DRIVER:org.h2.Driver}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
