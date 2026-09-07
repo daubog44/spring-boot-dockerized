@@ -24,7 +24,7 @@ tasks:
   dev-down:
     desc: "STOP SVILUPPO: ferma i servizi locali e libera le porte"
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-down.ps1{{else}}bash ./scripts/dev-down.sh{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-down.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/dev-down.sh {{.CLI_ARGS}}{{end}}'
 
   logs:
     desc: "Segue i log di tutti i servizi in un terminale solo (task logs -- wms per uno)"

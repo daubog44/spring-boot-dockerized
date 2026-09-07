@@ -19,10 +19,16 @@
 
 .PARAMETER UiPort
     Porta della UI, se la 8080 e' occupata da un'altra applicazione.
+
+.PARAMETER KeepForeign
+    Non chiudere le applicazioni estranee rimaste sulle porte dello stack:
+    le segnala soltanto, e l'avvio si ferma. Serve quando su una di quelle
+    porte gira qualcosa che ti serve ancora.
 #>
 param(
     [switch]$NoBuild,
-    [int]$UiPort = 8080
+    [int]$UiPort = 8080,
+    [switch]$KeepForeign
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,12 +70,14 @@ New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 
 # --- Pulizia iniziale ---------------------------------------------------------
 
-# Un `task dev` lanciato due volte, o dopo un crash, troverebbe le porte
-# occupate dai propri stessi processi: li fermiamo prima di ricominciare.
+# Le porte dello stack devono essere libere, e liberarle e' un lavoro nostro,
+# non tuo: fermiamo i servizi di un avvio precedente, i container dell'esame e
+# qualunque applicazione estranea le stia tenendo. Restano fuori solo i processi
+# di sistema e l'infrastruttura Docker.
 Write-Host ''
-Write-Host '==> Pulizia degli avanzi dell''avvio precedente...' -ForegroundColor Cyan
-$cleaned = Stop-DevStack -LogDir $logDir
-if ($cleaned -eq 0) { Write-Host '  niente da fermare.' }
+Write-Host '==> Libero le porte dello stack...' -ForegroundColor Cyan
+$cleaned = Stop-DevStack -LogDir $logDir -RepoRoot $repoRoot -KeepForeign:$KeepForeign
+if ($cleaned -eq 0) { Write-Host '  erano gia libere.' }
 
 # Log e wrapper degli avvii precedenti: `task logs` segue tutto quello che
 # trova qui, quindi un log rimasto da un'altra traccia (dopo un cambio di
@@ -98,38 +106,27 @@ foreach ($svc in $services) {
     }
 }
 
-if ($inDocker.Count -gt 0) {
-    Write-Host ''
-    Write-Host 'Lo stack e'' gia'' in esecuzione nei container.' -ForegroundColor Red
-    Write-Host ("Porte occupate: {0}" -f (($inDocker | ForEach-Object { "$($_.Name):$($_.Port)" }) -join ', '))
-    Write-Host 'Scegli uno dei due modi di lavorare:' -ForegroundColor Yellow
-    Write-Host '  task docker-down    # spegni i container, poi task dev'
-    Write-Host '  task docker-logs    # oppure resta sui container'
-    exit 1
-}
-
-if ($blocked.Count -gt 0) {
+# Se qualcosa e' ancora in ascolto dopo la pulizia, e' un caso che non possiamo
+# risolvere da soli: un processo di sistema, i container se Docker non risponde,
+# o un'applicazione che hai protetto con -KeepForeign.
+$stillBusy = @($inDocker + $blocked + $hijacked)
+if ($stillBusy.Count -gt 0) {
     Write-Host ''
     Write-Host 'Porte ancora occupate dopo la pulizia:' -ForegroundColor Red
-    foreach ($svc in $blocked) {
+    foreach ($svc in $stillBusy) {
         Write-Host "  $($svc.Name):$($svc.Port) -> $(Format-Owner -Port $svc.Port)"
     }
-    Write-Host 'Sono processi che non abbiamo avviato noi.' -ForegroundColor Yellow
+    Write-Host ''
+    if ($inDocker.Count -gt 0) {
+        Write-Host 'Sono i container dell''esame e non sono riuscito a fermarli:' -ForegroundColor Yellow
+        Write-Host '  task docker-down    # poi rilancia task dev'
+    } else {
+        Write-Host 'Tomcat non riesce a fare il bind in questa situazione e il servizio muore' -ForegroundColor Yellow
+        Write-Host "con 'Web server failed to start. Port N was already in use'." -ForegroundColor Yellow
+        Write-Host 'Chiudi tu quel processo, oppure sposta la UI su un''altra porta:' -ForegroundColor Yellow
+        Write-Host '  task dev -- -UiPort 9080'
+    }
     Write-Host '  task status         # per vedere chi occupa cosa'
-    exit 1
-}
-
-if ($hijacked.Count -gt 0) {
-    Write-Host ''
-    Write-Host 'Porte occupate su 127.0.0.1 da applicazioni estranee allo stack:' -ForegroundColor Red
-    foreach ($svc in $hijacked) {
-        Write-Host "  $($svc.Name):$($svc.Port) -> $(Format-Owner -Port $svc.Port)"
-    }
-    Write-Host ''
-    Write-Host 'Tomcat non riesce a fare il bind in questa situazione e il servizio muore' -ForegroundColor Yellow
-    Write-Host "con 'Web server failed to start. Port N was already in use'." -ForegroundColor Yellow
-    Write-Host 'Chiudi quel processo, oppure sposta la UI su un''altra porta:' -ForegroundColor Yellow
-    Write-Host '  task dev -- -UiPort 9080'
     exit 1
 }
 
@@ -226,7 +223,10 @@ try {
             if (-not (Wait-ForPort -Port $svc.Port)) {
                 Write-Host "Eureka non risponde sulla porta $($svc.Port)." -ForegroundColor Red
                 Show-LogTail -Name $svc.Name
-                return
+                # `exit` esegue comunque il blocco finally: `return` invece
+                # uscirebbe dallo script saltando il codice che segue, e
+                # `task dev` riporterebbe successo su un avvio fallito.
+                exit 1
             }
             Write-Host '==> Eureka pronto.' -ForegroundColor Green
         }
@@ -248,7 +248,7 @@ try {
         Write-Host ''
         Write-Host "Servizi non partiti: $($failed -join ', ')." -ForegroundColor Red
         foreach ($name in $failed) { Show-LogTail -Name $name }
-        return
+        exit 1
     }
 
     $startedOk = $true
@@ -258,11 +258,10 @@ try {
     if (-not $startedOk) {
         Write-Host ''
         Write-Host '==> Avvio non riuscito: fermo i servizi gia'' partiti...' -ForegroundColor Yellow
-        Stop-DevStack -LogDir $logDir | Out-Null
+        # Qui vogliamo solo ritirare quello che abbiamo avviato noi.
+        Stop-DevStack -LogDir $logDir -KeepForeign | Out-Null
     }
 }
-
-if (-not $startedOk) { exit 1 }
 
 Write-Host ''
 Write-Host 'Stack locale avviato.' -ForegroundColor Green

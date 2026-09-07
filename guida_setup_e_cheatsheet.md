@@ -26,7 +26,7 @@ java --version
 
 ### A. Sviluppo Locale con Hot Reload (CONSIGLIATO MENTRE SVILUPPI)
 
-Un solo comando libera le porte da eventuali avanzi, compila tutto e avvia Eureka, `product-service`, `crm-service`, `wms-service` e `wms-ui`:
+Un solo comando libera le porte (chiudendo chi le tiene occupate), compila tutto e avvia Eureka, `product-service`, `crm-service`, `wms-service` e `wms-ui`:
 
 ```bash
 task dev
@@ -87,7 +87,7 @@ Per ripartire da un database vuoto (rimuove anche i volumi):
 task docker-reset
 ```
 
-> ℹ️ Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale prima di partire, e `task dev` si rifiuta di partire se i container sono accesi, dicendoti quale dei due spegnere.
+> ℹ️ Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale prima di partire, e `task dev` spegne da solo i container (con `docker compose down`, i dati del database restano).
 
 ---
 
@@ -170,22 +170,22 @@ Prima di tutto, guarda chi la occupa:
 task status
 ```
 
-`task dev` fa già pulizia da solo all'avvio, quindi gli avanzi dei suoi processi non sono un problema. Se restano appesi comunque:
+Nella maggior parte dei casi non devi fare niente: **`task dev` libera lui le porte all'avvio**, chiudendo i suoi servizi rimasti appesi, i container dell'esame e le applicazioni estranee in ascolto. Restano intoccati solo i processi di sistema e l'infrastruttura di Docker, che ti vengono segnalati.
+
+Per liberarle senza avviare nulla:
 ```bash
 task dev-down
 ```
-Se hai lo stack Docker attivo:
-```bash
-task docker-down
-```
-Come ultima risorsa, termina tutti i processi Java della macchina — **anche quelli estranei al progetto**:
+Come ultima risorsa, termina tutti i processi Java della macchina — **anche quelli estranei al progetto, IDE compreso**:
 ```bash
 task kill-java
 ```
 
-Se invece la porta è tenuta da un'applicazione **estranea** al progetto, `task dev` si ferma e ti dice quale processo la occupa. Tomcat non riesce a fare il bind nemmeno quando l'altro processo ascolta solo su `127.0.0.1`: il servizio muore con `Web server failed to start. Port N was already in use`. E se lo stack è nei container, la porta è pubblicata ma `http://localhost:8080` continua a rispondere dall'altra applicazione, perché su Windows il bind più specifico vince. Chiudi quel processo, oppure sposta la UI:
+Perché conta: Tomcat non riesce a fare il bind nemmeno quando l'altro processo ascolta solo su `127.0.0.1`, e il servizio muore con `Web server failed to start. Port N was already in use`. E se lo stack è nei container, la porta è pubblicata ma `http://localhost:8080` continua a rispondere dall'altra applicazione, perché su Windows il bind più specifico vince.
+
+Se su una di quelle porte gira qualcosa che ti serve viva, dillo e sposta la UI:
 ```bash
-task dev -- -UiPort 9080
+task dev -- -KeepForeign -UiPort 9080
 ```
 Ricordati di passare la stessa porta al collaudo: `task test-e2e -- -UiPort 9080`.
 

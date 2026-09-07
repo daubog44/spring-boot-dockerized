@@ -6,6 +6,7 @@ Questo branch contiene la **soluzione d'esame completa e collaudata** per la tra
 
 ## 📚 Documentazione & Guide per l'Esame
 
+- **[🚨 Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. Parti da qui.
 - [📖 Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
 - [📘 Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md)
 - [🛠️ Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
@@ -55,7 +56,7 @@ Nomi con cui i servizi si registrano su Eureka: `PRODUCT-SERVICE`, `CRM-SERVICE`
 task dev
 ```
 
-Prima ferma quello che fosse rimasto acceso da un avvio precedente e libera le porte, poi compila tutti i moduli una volta sola, avvia Eureka, ne attende la porta e infine lancia gli altri quattro servizi. Al termine stampa la mappa degli URL.
+Prima **libera le porte**: ferma i servizi di un avvio precedente, spegne i container dell'esame se sono loro a tenerle e chiude le applicazioni estranee rimaste in ascolto (non tocca i processi di sistema né l'infrastruttura di Docker). Poi compila tutti i moduli una volta sola, avvia Eureka, ne attende la porta e infine lancia gli altri quattro servizi.
 
 **Un terminale solo, nessuna finestra sparsa**: i servizi girano in background e scrivono in `.dev-logs/`. Per vedere cosa fanno:
 
@@ -79,7 +80,7 @@ Il servizio interessato si riavvia da solo in pochi secondi, senza rilanciare nu
 task dev-down
 ```
 
-Termina solo i processi Java dello stack: le altre applicazioni in ascolto sulle stesse porte non vengono toccate.
+Libera le porte esattamente come fa `task dev` all'avvio: usano la stessa funzione, quindi non possono comportarsi in modo diverso.
 
 **Quando qualcosa non risponde**, prima di ogni altra cosa:
 
@@ -89,7 +90,7 @@ task status
 
 Dice chi occupa ognuna delle porte (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
 
-> 💡 Se una porta è occupata da un'applicazione estranea, `task dev` si ferma prima di partire e ti dice quale processo la tiene. Per spostare la sola UI su un'altra porta: `task dev -- -UiPort 9080`.
+> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: `task dev -- -KeepForeign -UiPort 9080`. Senza `-KeepForeign` viene chiusa.
 
 **Per la demo finale**, usa lo stack containerizzato, che è quello che presenterai:
 
@@ -97,7 +98,7 @@ Dice chi occupa ognuna delle porte (un tuo servizio, i container, o un'applicazi
 task docker-up
 ```
 
-Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale prima di partire, e `task dev` si rifiuta di partire se i container sono accesi, dicendoti quale dei due spegnere.
+Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale prima di partire, e `task dev` spegne da solo i container (con `docker compose down`, i dati del database restano).
 
 ### Elenco completo dei task
 
@@ -167,7 +168,7 @@ Causa: un'altra applicazione della macchina è in ascolto su `127.0.0.1:8080`. S
 task status
 ```
 
-Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. Chiudi il processo indicato, oppure sposta la UI: `task dev -- -UiPort 9080` (e poi collauda con `task test-e2e -- -UiPort 9080`).
+Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. `task dev` chiude da solo quel processo al prossimo avvio; se invece ti serve tenerlo vivo, sposta la UI con `task dev -- -KeepForeign -UiPort 9080` (e poi collauda con `task test-e2e -- -UiPort 9080`).
 
 ### Altri controlli utili
 

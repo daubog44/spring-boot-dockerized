@@ -331,7 +331,7 @@ task docker-down
 
 Per ripartire da un database vuoto: `task docker-reset`.
 
-> ℹ️ Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale, e `task dev` si rifiuta di partire se i container sono accesi.
+> ℹ️ Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale, e `task dev` spegne da solo i container.
 
 ### Collaudo automatizzato
 
