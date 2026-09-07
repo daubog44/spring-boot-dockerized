@@ -55,7 +55,15 @@ Nomi con cui i servizi si registrano su Eureka: `PRODUCT-SERVICE`, `CRM-SERVICE`
 task dev
 ```
 
-Compila tutti i moduli una volta sola, avvia Eureka, ne attende la porta e poi lancia i quattro servizi, ognuno nella propria finestra. Al termine stampa la mappa degli URL. I log finiscono anche in `.dev-logs/`.
+Prima ferma quello che fosse rimasto acceso da un avvio precedente e libera le porte, poi compila tutti i moduli una volta sola, avvia Eureka, ne attende la porta e infine lancia gli altri quattro servizi. Al termine stampa la mappa degli URL.
+
+**Un terminale solo, nessuna finestra sparsa**: i servizi girano in background e scrivono in `.dev-logs/`. Per vedere cosa fanno:
+
+```bash
+task logs
+```
+
+Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (`wms | ...`) e di un colore diverso. `Ctrl+C` chiude solo la vista, i servizi restano su. Per seguirne uno solo: `task logs -- wms`.
 
 **Hot reload**: ogni servizio gira con `spring-boot-devtools`. Dopo aver modificato del codice:
 
@@ -73,6 +81,14 @@ task dev-down
 
 Termina solo i processi Java dello stack: le altre applicazioni in ascolto sulle stesse porte non vengono toccate.
 
+**Quando qualcosa non risponde**, prima di ogni altra cosa:
+
+```bash
+task status
+```
+
+Dice chi occupa ognuna delle porte (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
+
 > 💡 Se una porta è occupata da un'applicazione estranea, `task dev` si ferma prima di partire e ti dice quale processo la tiene. Per spostare la sola UI su un'altra porta: `task dev -- -UiPort 9080`.
 
 **Per la demo finale**, usa lo stack containerizzato, che è quello che presenterai:
@@ -81,19 +97,33 @@ Termina solo i processi Java dello stack: le altre applicazioni in ascolto sulle
 task docker-up
 ```
 
-> ⚠️ Non tenere attivi contemporaneamente `task dev` e `task docker-up`: usano le stesse porte. Fai `task dev-down` prima di `task docker-up`, e viceversa.
+Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale prima di partire, e `task dev` si rifiuta di partire se i container sono accesi, dicendoti quale dei due spegnere.
 
 ### Elenco completo dei task
 
-- `task dev`: Compila e avvia l'intero stack in locale con hot reload.
-- `task dev-down`: Ferma lo stack locale.
+Il comando `task` da solo stampa questo elenco.
+
+Sviluppo:
+
+- `task dev`: Pulisce, compila e avvia l'intero stack in locale con hot reload.
+- `task dev-down`: Ferma i servizi locali e libera le porte.
+- `task logs`: Segue i log di tutti i servizi in un terminale solo (`task logs -- wms` per uno).
+- `task status`: Chi occupa le porte, quali container girano, cosa è registrato su Eureka.
 - `task compile`: Ricompila e fa ripartire i servizi già avviati.
-- `task build`: Compila tutti i moduli Maven tramite wrapper (`mvnw`).
+- `task build`: Compila e impacchetta tutti i moduli Maven tramite wrapper (`mvnw`).
+
+Container:
+
 - `task docker-up`: Avvia l'intero stack WMS su Docker Compose con healthcheck.
-- `task docker-down`: Arresta tutti i container e pulisce le risorse.
+- `task docker-down`: Ferma i container. **I dati del database restano.**
+- `task docker-reset`: Ferma i container **ed elimina i volumi**: database ricreato da zero.
 - `task docker-logs`: Monitora i log di tutti i microservizi.
-- `task test-e2e`: Esegue lo script di collaudo automatizzato [`test_e2e_wms.ps1`](./test_e2e_wms.ps1).
-- `task clean-ports`: Termina **tutti** i processi Java della macchina (più drastico di `dev-down`).
+
+Collaudo e pulizia:
+
+- `task test-e2e`: Esegue lo script di collaudo automatizzato [`test_e2e_wms.ps1`](./test_e2e_wms.ps1). Si può lanciare anche a stack acceso: se ne accorge e compila senza `clean`, per non far cadere i servizi.
+- `task clean-ports`: Come `dev-down`, libera le porte dello stack.
+- `task kill-java`: Ultima spiaggia, termina **tutti** i processi Java della macchina, anche quelli estranei al progetto.
 
 Avvio manuale dei singoli moduli, se ti serve isolarne uno: `task run-eureka`, `task run-product`, `task run-crm`, `task run-wms`, `task run-wms-ui`, `task run-db`.
 
@@ -126,6 +156,18 @@ Per capire *perché* un healthcheck non passa, leggi l'output delle probe:
 ```bash
 docker inspect exam-eureka --format "{{json .State.Health}}"
 ```
+
+### Su `http://localhost:8080` risponde qualcos'altro
+
+Sintomo: il browser mostra una pagina che non è la tua (`Method Not Allowed`, un errore di un altro server, una app che non c'entra), anche se i servizi risultano avviati.
+
+Causa: un'altra applicazione della macchina è in ascolto su `127.0.0.1:8080`. Su Windows il bind più specifico vince su quello generico, quindi `http://localhost:8080` finisce a quel processo anche quando Docker pubblica la porta su `0.0.0.0`. Se invece è lo stack locale a dover partire, Tomcat non riesce nemmeno a fare il bind e il servizio muore con `Web server failed to start. Port 8080 was already in use`.
+
+```bash
+task status
+```
+
+Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. Chiudi il processo indicato, oppure sposta la UI: `task dev -- -UiPort 9080` (e poi collauda con `task test-e2e -- -UiPort 9080`).
 
 ### Altri controlli utili
 

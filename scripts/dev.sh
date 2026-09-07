@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # Avvia l'intero stack in locale con un solo comando, con hot reload.
-# Equivalente POSIX di scripts/dev.ps1.
+# Equivalente POSIX di scripts/dev.ps1: nessuna finestra per servizio, l'output
+# va in .dev-logs/<servizio>.log e si segue con `task logs`.
 set -euo pipefail
 
-# Porta della UI: -UiPort/--ui-port N, per allinearsi a dev.ps1 (il Taskfile passa
-# gli stessi argomenti a entrambi gli script).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/dev-lib.sh
+. "$SCRIPT_DIR/dev-lib.sh"
+
+# Porta della UI: -UiPort/--ui-port N, per allinearsi a dev.ps1 (il Taskfile
+# passa gli stessi argomenti a entrambi gli script).
 UI_PORT=8080
+NO_BUILD=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -UiPort|--ui-port) UI_PORT="$2"; shift 2 ;;
@@ -14,10 +20,11 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(dev_repo_root)"
 DEMO_DIR="$REPO_ROOT/demo"
-LOG_DIR="$REPO_ROOT/.dev-logs"
-PID_FILE="$LOG_DIR/dev.pids"
+LOG_DIR="$(dev_log_dir)"
+
+# --- Configurazione dello stack (l'unica parte che cambia da traccia a traccia) ---
 
 # Ordine di avvio: Eureka per primo, poi i servizi che vi si registrano.
 SERVICES=(
@@ -28,24 +35,23 @@ SERVICES=(
   "wms-ui:wms-ui:$UI_PORT"
 )
 
-port_in_use() {
-  local port="$1"
-  if command -v nc >/dev/null 2>&1; then
-    nc -z 127.0.0.1 "$port" >/dev/null 2>&1
-  else
-    (exec 3<>"/dev/tcp/127.0.0.1/$port") >/dev/null 2>&1
-  fi
-}
+# I servizi di questa traccia usano H2 in memoria: nessun database da avviare.
+USES_POSTGRES=0
 
-wait_for_port() {
-  local port="$1" timeout="${2:-120}" elapsed=0
-  while [ "$elapsed" -lt "$timeout" ]; do
-    if port_in_use "$port"; then return 0; fi
-    sleep 1
-    elapsed=$((elapsed + 1))
-  done
-  return 1
-}
+mkdir -p "$LOG_DIR"
+
+# --- Pulizia iniziale ---------------------------------------------------------
+
+# Un `task dev` lanciato due volte, o dopo un crash, troverebbe le porte
+# occupate dai propri stessi processi: li fermiamo prima di ricominciare.
+echo ""
+echo "==> Pulizia degli avanzi dell'avvio precedente..."
+cleaned="$(stop_dev_stack "$LOG_DIR")"
+[ "$cleaned" -eq 0 ] && echo "  niente da fermare."
+
+# Log degli avvii precedenti: `task logs` segue tutto quello che trova qui,
+# quindi un log rimasto da un'altra traccia comparirebbe insieme a quelli veri.
+rm -f "$LOG_DIR"/*.log
 
 # --- Controllo porte occupate -------------------------------------------------
 
@@ -55,43 +61,79 @@ for svc in "${SERVICES[@]}"; do
   if port_in_use "$port"; then busy="$busy $name:$port"; fi
 done
 if [ -n "$busy" ]; then
-  echo "Porte gia in uso:$busy" >&2
-  echo "Lo stack Docker e ancora attivo, oppure sono rimasti processi Java appesi." >&2
-  echo "  task docker-down    # se hai avviato i container" >&2
-  echo "  task dev-down       # se sono processi Java locali" >&2
+  echo "Porte ancora occupate dopo la pulizia:$busy" >&2
+  echo "Sono processi che non abbiamo avviato noi (container Docker, o altro)." >&2
+  echo "  task docker-down    # se sono i container dell'esame" >&2
+  echo "  task status         # per vedere chi occupa cosa" >&2
   exit 1
 fi
 
 # --- Build unica --------------------------------------------------------------
 
-if [ -z "${NO_BUILD:-}" ]; then
+if [ -z "$NO_BUILD" ]; then
   echo "==> Compilazione di tutti i moduli (una sola volta)..."
   (cd "$DEMO_DIR" && ./mvnw -q install -Dmaven.test.skip=true)
   echo "==> Compilazione completata."
 fi
 
+# --- PostgreSQL ---------------------------------------------------------------
+
+if [ "$USES_POSTGRES" -eq 1 ]; then
+  echo "==> Avvio PostgreSQL su Docker..."
+  (cd "$DEMO_DIR" && docker compose up -d postgres)
+  if ! wait_for_port 5432 60; then
+    echo "PostgreSQL non risponde sulla porta 5432." >&2
+    exit 1
+  fi
+  # Segnaposto per dev-down: fermiamo il container solo se l'abbiamo avviato noi.
+  echo 1 >"$LOG_DIR/dev.postgres"
+  echo "==> PostgreSQL pronto."
+fi
+
 # --- Avvio ordinato -----------------------------------------------------------
 
-mkdir -p "$LOG_DIR"
-: >"$PID_FILE"
-# Registra le porte realmente usate, cosi' dev-down sa quali processi fermare.
+: >"$LOG_DIR/dev.pids"
+# Registra le porte realmente usate, cosi' la pulizia sa quali liberare.
 : >"$LOG_DIR/dev.ports"
+# I nomi, nell'ordine di avvio: `task logs` li segue in quest'ordine.
+: >"$LOG_DIR/dev.services"
 for svc in "${SERVICES[@]}"; do
-  IFS=':' read -r _n _m p <<<"$svc"
+  IFS=':' read -r n _m p <<<"$svc"
   echo "$p" >>"$LOG_DIR/dev.ports"
+  echo "$n" >>"$LOG_DIR/dev.services"
 done
+
+started_ok=0
+cleanup_on_failure() {
+  if [ "$started_ok" -eq 0 ]; then
+    echo ""
+    echo "==> Avvio non riuscito: fermo i servizi gia' partiti..." >&2
+    stop_dev_stack "$LOG_DIR" >/dev/null
+  fi
+}
+# Vale anche per Ctrl+C: non lasciamo mezzo stack acceso a occupare le porte.
+trap cleanup_on_failure EXIT
+
+show_log_tail() {
+  local name="$1"
+  [ -f "$LOG_DIR/$name.log" ] || return 0
+  echo ""
+  echo "--- ultime righe di $name.log ---" >&2
+  tail -n 25 "$LOG_DIR/$name.log" >&2
+}
 
 for svc in "${SERVICES[@]}"; do
   IFS=':' read -r name module port <<<"$svc"
   echo "==> Avvio $name sulla porta $port..."
   (cd "$DEMO_DIR/$module" && ../mvnw spring-boot:run "-Dspring-boot.run.arguments=--server.port=$port") >"$LOG_DIR/$name.log" 2>&1 &
-  echo "$! $name" >>"$PID_FILE"
+  echo "$! $name" >>"$LOG_DIR/dev.pids"
 
   # Eureka deve essere in ascolto prima che gli altri tentino di registrarsi,
   # altrimenti la prima registrazione slitta di un intero ciclo di heartbeat.
   if [ "$name" = "eureka" ]; then
     if ! wait_for_port "$port"; then
-      echo "Eureka non risponde sulla porta $port: vedi $LOG_DIR/eureka.log" >&2
+      echo "Eureka non risponde sulla porta $port." >&2
+      show_log_tail eureka
       exit 1
     fi
     echo "==> Eureka pronto."
@@ -114,13 +156,16 @@ for svc in "${SERVICES[@]}"; do
   fi
 done
 
-echo ""
 if [ -n "$failed" ]; then
-  echo "Servizi non partiti:$failed. Leggi i log in $LOG_DIR." >&2
+  echo "Servizi non partiti:$failed" >&2
+  for name in $failed; do show_log_tail "$name"; done
   exit 1
 fi
 
+started_ok=1
+
 cat <<EOF
+
 Stack locale avviato.
 
   UI WMS            http://localhost:$UI_PORT
@@ -129,9 +174,11 @@ Stack locale avviato.
   Swagger crm       http://localhost:8082/swagger-ui.html
   Swagger wms       http://localhost:8083/swagger-ui.html
 
-Log dei servizi in $LOG_DIR
-Hot reload attivo: dopo una modifica lancia \`task compile\` e il servizio si riavvia da solo.
-Per fermare tutto: task dev-down
+  task logs         segue i log di tutti i servizi (Ctrl+C per uscire)
+  task logs -- wms  solo quel servizio
+  task status       chi occupa le porte
+  task dev-down     ferma tutto
 
+Hot reload attivo: dopo una modifica lancia \`task compile\` e il servizio si riavvia da solo.
 Nota: i client Feign impiegano 10-15 secondi ad aggiornare il registro Eureka.
 EOF

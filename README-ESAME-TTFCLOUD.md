@@ -285,7 +285,15 @@ Il Taskfile usa come `JAVA_HOME_PATH` il percorso `C:/Program Files/Microsoft/jd
 task dev
 ```
 
-Compila tutti i moduli una volta sola, avvia Eureka, ne attende la porta e poi lancia i quattro servizi, ognuno nella propria finestra. I log finiscono anche in `.dev-logs/`.
+Libera le porte da eventuali avanzi, compila tutti i moduli una volta sola, avvia Eureka, ne attende la porta e poi lancia gli altri quattro servizi. Girano in background, in un terminale solo: l'output va in `.dev-logs/`.
+
+Per seguire i log di tutti insieme, ogni riga prefissata dal nome del servizio:
+
+```bash
+task logs
+```
+
+`Ctrl+C` chiude solo la vista. Per uno solo: `task logs -- wms`.
 
 Dopo una modifica al codice:
 
@@ -295,11 +303,13 @@ task compile
 
 Il servizio interessato si riavvia da solo grazie a `spring-boot-devtools`.
 
-Per fermare lo stack locale:
+Per fermare lo stack locale e liberare le porte:
 
 ```bash
 task dev-down
 ```
+
+Se qualcosa non risponde, `task status` dice chi occupa ogni porta, quali container girano e cosa si è registrato su Eureka.
 
 ### Demo (quello che presenti alla commissione)
 
@@ -313,13 +323,15 @@ Per i log:
 task docker-logs
 ```
 
-Per arrestare tutto:
+Per arrestare i container conservando i dati del database:
 
 ```bash
 task docker-down
 ```
 
-> ⚠️ Locale e Docker usano le stesse porte: non tenerli attivi insieme.
+Per ripartire da un database vuoto: `task docker-reset`.
+
+> ℹ️ Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale, e `task dev` si rifiuta di partire se i container sono accesi.
 
 ### Collaudo automatizzato
 
@@ -333,15 +345,20 @@ Esegue [`test_e2e_wms.ps1`](./test_e2e_wms.ps1), che percorre il flusso completo
 
 | Task | Cosa fa |
 | :--- | :--- |
-| `task dev` | Compila e avvia l'intero stack in locale con hot reload |
-| `task dev-down` | Ferma lo stack locale |
+| `task` | Elenca tutti i task disponibili |
+| `task dev` | Pulisce, compila e avvia l'intero stack in locale con hot reload |
+| `task dev-down` | Ferma i servizi locali e libera le porte |
+| `task logs` | Segue i log di tutti i servizi in un terminale solo |
+| `task status` | Chi occupa le porte, quali container girano, cosa è su Eureka |
 | `task compile` | Ricompila e fa ripartire i servizi già avviati |
 | `task build` | Compila tutti i moduli Maven |
 | `task docker-up` | Avvia lo stack containerizzato |
-| `task docker-down` | Arresta i container e pulisce le risorse |
+| `task docker-down` | Arresta i container, conservando i dati del database |
+| `task docker-reset` | Arresta i container ed elimina i volumi |
 | `task docker-logs` | Segue i log dei container |
 | `task test-e2e` | Esegue lo script di collaudo |
-| `task clean-ports` | Termina tutti i processi Java della macchina |
+| `task clean-ports` | Come `dev-down`, libera le porte dello stack |
+| `task kill-java` | Ultima spiaggia: termina tutti i processi Java della macchina |
 | `task run-eureka` · `run-product` · `run-crm` · `run-wms` · `run-wms-ui` | Avvio manuale di un singolo modulo |
 | `task run-db` | Avvia solo PostgreSQL (non necessario: i servizi usano H2) |
 

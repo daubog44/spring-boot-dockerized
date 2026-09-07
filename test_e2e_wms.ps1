@@ -1,4 +1,4 @@
-# ===================================================================
+﻿# ===================================================================
 # SCRIPT DI TEST E2E AUTOMATIZZATO - TRACCIA WMS "SPOSTATI S.R.L."
 # ===================================================================
 
@@ -16,16 +16,33 @@ Write-Host "============================================================" -Foreg
 Write-Host ""
 
 $baseDir = Get-Location
+. (Join-Path $PSScriptRoot 'scripts\dev-lib.ps1')
 
 # -------------------------------------------------------------------
 # STAGE 1: VERIFICA COMPILAZIONE MAVEN MULTI-MODULO
 # -------------------------------------------------------------------
 Write-Host "[STEP 1/4] Esecuzione Maven Package Multi-Modulo..." -ForegroundColor Yellow
 $demoDir = Join-Path $baseDir "demo"
-Push-Location $demoDir
 
+# Quali servizi locali sono accesi in questo momento. Se ce ne sono, il `clean`
+# cancellerebbe le classi sotto i piedi di spring-boot-devtools: il riavvio
+# automatico partirebbe con il classpath a meta' e il servizio morirebbe con
+# "APPLICATION FAILED TO START ... required a bean that could not be found".
+$logDir = Get-DevLogDir
+$runningPorts = @()
+foreach ($port in (Get-DevPorts -LogDir $logDir)) {
+    if (Get-PortListeners -Port $port | Where-Object { $_.IsOurs }) { $runningPorts += $port }
+}
+
+$goals = "clean package"
+if ($runningPorts.Count -gt 0) {
+    $goals = "package"
+    Write-Host "  ℹ️ Stack locale acceso: compilo senza 'clean' per non farlo cadere." -ForegroundColor Cyan
+}
+
+Push-Location $demoDir
 try {
-    $mvnResult = cmd /c ".\mvnw.cmd clean package -Dmaven.test.skip=true"
+    $mvnResult = cmd /c ".\mvnw.cmd $goals -Dmaven.test.skip=true"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Fallimento nella compilazione Maven!" -ForegroundColor Red
         Pop-Location
@@ -34,6 +51,21 @@ try {
     Write-Host "✅ Maven Package eseguito con successo per tutti i 10 moduli!" -ForegroundColor Green
 } finally {
     Pop-Location
+}
+
+# La ricompilazione fa ripartire i servizi via devtools: senza questa attesa i
+# controlli sugli endpoint li troverebbero ancora in fase di riavvio.
+if ($runningPorts.Count -gt 0) {
+    Write-Host "  🔄 Attendo il riavvio automatico dei servizi (devtools)..." -ForegroundColor Cyan
+    $notBack = @()
+    foreach ($port in $runningPorts) {
+        if (-not (Wait-ForPort -Port $port -TimeoutSeconds 120)) { $notBack += $port }
+    }
+    if ($notBack.Count -gt 0) {
+        Write-Host "  ⚠️ Non sono tornati su dopo il riavvio: $($notBack -join ', '). Controlla 'task logs'." -ForegroundColor Yellow
+    } else {
+        Write-Host "  ✅ Tutti i servizi sono tornati in ascolto." -ForegroundColor Green
+    }
 }
 
 Write-Host ""
