@@ -10,10 +10,6 @@ COPY product-service/pom.xml product-service/pom.xml
 COPY crm-service/pom.xml crm-service/pom.xml
 COPY wms-service/pom.xml wms-service/pom.xml
 COPY wms-ui/pom.xml wms-ui/pom.xml
-COPY tourist-service/pom.xml tourist-service/pom.xml
-COPY random-service/pom.xml random-service/pom.xml
-COPY store-service/pom.xml store-service/pom.xml
-COPY event-ui/pom.xml event-ui/pom.xml
 
 ARG MODULE="wms-ui"
 

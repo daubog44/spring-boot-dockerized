@@ -293,7 +293,7 @@ Per seguire i log di tutti insieme, ogni riga prefissata dal nome del servizio:
 task logs
 ```
 
-`Ctrl+C` chiude solo la vista. Per uno solo: `task logs -- wms`.
+`Ctrl+C` chiude solo la vista. Per uno solo: `task logs SERVICE=wms`.
 
 Dopo una modifica al codice:
 
@@ -339,7 +339,7 @@ Per ripartire da un database vuoto: `task docker-reset`.
 task test-e2e
 ```
 
-Esegue [`test_e2e_wms.ps1`](./test_e2e_wms.ps1), che percorre il flusso completo sui servizi avviati. Se hai spostato la UI su un'altra porta, passala anche qui: `task test-e2e -- -UiPort 9080`.
+Esegue [`test_e2e_wms.ps1`](./test_e2e_wms.ps1), che percorre il flusso completo sui servizi avviati. Se hai spostato la UI su un'altra porta, passala anche qui: `task test-e2e UI_PORT=9080`.
 
 ## Task disponibili
 

@@ -21,12 +21,12 @@
     Nuova porta.
 
 .EXAMPLE
-    task set-port -- -Module wms-ui -Port 9080
-    task set-port -- -Module wms-service -Port 8090
+    task set-port SERVICE=wms-ui PORT=9080
+    task set-port SERVICE=wms-service PORT=8090
 #>
 param(
-    [Parameter(Mandatory = $true)][string]$Module,
-    [Parameter(Mandatory = $true)][int]$Port
+    [string]$Module = '',
+    [int]$Port = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,6 +36,9 @@ $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
 $moduleDir = Join-Path $demoDir $Module
 
+if (-not $Module -or $Port -eq 0) {
+    throw "Uso: task set-port SERVICE=<modulo> PORT=<porta>"
+}
 if (-not (Test-Path (Join-Path $moduleDir 'pom.xml'))) {
     $available = (Get-ChildItem -Path $demoDir -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'pom.xml') } | ForEach-Object { $_.Name }) -join ', '
     throw "Modulo '$Module' non trovato. Moduli disponibili: $available"

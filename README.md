@@ -64,7 +64,7 @@ Prima **libera le porte**: ferma i servizi di un avvio precedente, spegne i cont
 task logs
 ```
 
-Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (`wms | ...`) e di un colore diverso. `Ctrl+C` chiude solo la vista, i servizi restano su. Per seguirne uno solo: `task logs -- wms`.
+Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (`wms | ...`) e di un colore diverso. `Ctrl+C` chiude solo la vista, i servizi restano su. Per seguirne uno solo: `task logs SERVICE=wms`.
 
 **Hot reload**: ogni servizio gira con `spring-boot-devtools`. Dopo aver modificato del codice:
 
@@ -90,7 +90,7 @@ task status
 
 Dice chi occupa ognuna delle porte (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
 
-> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: `task dev -- -KeepForeign -UiPort 9080`. Senza `-KeepForeign` viene chiusa.
+> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: `task dev KEEPFOREIGN=1 UI_PORT=9080`. Senza `-KeepForeign` viene chiusa.
 
 **Per la demo finale**, usa lo stack containerizzato, che è quello che presenterai:
 
@@ -108,7 +108,7 @@ Sviluppo:
 
 - `task dev`: Pulisce, compila e avvia l'intero stack in locale con hot reload.
 - `task dev-down`: Ferma i servizi locali e libera le porte.
-- `task logs`: Segue i log di tutti i servizi in un terminale solo (`task logs -- wms` per uno).
+- `task logs`: Segue i log di tutti i servizi in un terminale solo (`task logs SERVICE=wms` per uno).
 - `task status`: Chi occupa le porte, quali container girano, cosa è registrato su Eureka.
 - `task compile`: Ricompila e fa ripartire i servizi già avviati.
 - `task build`: Compila e impacchetta tutti i moduli Maven tramite wrapper (`mvnw`).
@@ -168,7 +168,7 @@ Causa: un'altra applicazione della macchina è in ascolto su `127.0.0.1:8080`. S
 task status
 ```
 
-Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. `task dev` chiude da solo quel processo al prossimo avvio; se invece ti serve tenerlo vivo, sposta la UI con `task dev -- -KeepForeign -UiPort 9080` (e poi collauda con `task test-e2e -- -UiPort 9080`).
+Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. `task dev` chiude da solo quel processo al prossimo avvio; se invece ti serve tenerlo vivo, sposta la UI con `task dev KEEPFOREIGN=1 UI_PORT=9080` (e poi collauda con `task test-e2e UI_PORT=9080`).
 
 ### Altri controlli utili
 

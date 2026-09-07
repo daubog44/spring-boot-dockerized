@@ -3,23 +3,48 @@ version: "3"
 vars:
   JAVA_HOME_PATH: '{{.JAVA_HOME | default "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot"}}'
 
+# Ogni comando si usa con variabili NOME=valore, mai con trattini:
+#   task new-service NAME=ordini-service
+#   task add-dep SERVICE=wms-service DEPS=security,mail
+#   task logs SERVICE=wms
+# `task help` stampa tutto, `task --summary <comando>` il dettaglio di uno.
+
 tasks:
   default:
-    desc: Elenca i comandi disponibili
+    desc: Stampa la guida ai comandi (come task help)
     silent: true
     cmds:
-      - task --list
+      - task: help
+
+  help:
+    desc: Guida ai comandi, con le variabili di ognuno e gli esempi
+    silent: true
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/help.ps1{{else}}bash ./scripts/help.sh{{end}}'
 
   # --- Sviluppo quotidiano ----------------------------------------------------
 
   dev:
     desc: "AVVIO SVILUPPO: pulisce, compila e avvia tutto lo stack in background con hot reload"
+    summary: |
+      Libera le porte, compila tutti i moduli e avvia lo stack in background,
+      con hot reload. Restituisce il prompt: i log si seguono con `task logs`.
+
+      Variabili (tutte facoltative):
+        UI_PORT=<porta>   sposta la UI solo per questo avvio
+        NOBUILD=1         salta la compilazione iniziale
+        KEEPFOREIGN=1     non chiudere le applicazioni estranee sulle porte
+
+      Esempi:
+        task dev
+        task dev UI_PORT=9080
+        task dev NOBUILD=1
     env:
       # Lo stesso JDK usato da `task build`: se il percorso non esiste lo script
       # lo ignora e usa il java del PATH.
       JAVA_HOME: '{{.JAVA_HOME_PATH}}'
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/dev.sh {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev.ps1{{if .UI_PORT}} -UiPort {{.UI_PORT}}{{end}}{{if .NOBUILD}} -NoBuild{{end}}{{if .KEEPFOREIGN}} -KeepForeign{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/dev.sh{{if .UI_PORT}} --ui-port {{.UI_PORT}}{{end}}{{if .NOBUILD}} --no-build{{end}}{{if .KEEPFOREIGN}} --keep-foreign{{end}} {{.CLI_ARGS}}{{end}}'
 
   dev-down:
     desc: "STOP SVILUPPO: ferma i servizi locali e libera le porte"
@@ -27,9 +52,22 @@ tasks:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-down.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/dev-down.sh {{.CLI_ARGS}}{{end}}'
 
   logs:
-    desc: "Segue i log di tutti i servizi in un terminale solo (task logs -- wms per uno)"
+    desc: "Segue i log dei servizi in un terminale solo (task logs SERVICE=wms per uno)"
+    summary: |
+      Segue in tempo reale i log dei servizi avviati da `task dev`, tutti in un
+      terminale solo, ogni riga prefissata dal nome del servizio.
+      Ctrl+C chiude solo questa vista: i servizi restano accesi.
+
+      Variabili (tutte facoltative):
+        SERVICE=<nome>    un servizio solo (il nome breve, come in task status)
+        TAIL=<righe>      quante righe di storico mostrare (default 30)
+
+      Esempi:
+        task logs
+        task logs SERVICE=wms
+        task logs SERVICE=wms TAIL=200
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/logs.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/logs.sh {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/logs.ps1{{if .SERVICE}} {{.SERVICE}}{{end}}{{if .TAIL}} -Tail {{.TAIL}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/logs.sh{{if .SERVICE}} {{.SERVICE}}{{end}}{{if .TAIL}} --tail {{.TAIL}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   status:
     desc: "Chi occupa le porte, quali container girano, cosa e' registrato su Eureka"
@@ -48,19 +86,116 @@ tasks:
   # allineati: vedi GIORNO-ESAME.md, sezione "Modifiche strutturali".
 
   new-service:
-    desc: "Crea un microservizio nuovo e lo collega a tutto (task new-service -- -Name ordini-service [-Ui] [-Port N])"
+    desc: "Crea un microservizio nuovo e lo collega a tutto (task new-service NAME=ordini-service)"
+    summary: |
+      Crea un modulo nuovo e lo collega dove serve: <modules> del pom
+      aggregatore, COPY nel Dockerfile, blocco in docker-compose.yml e lista
+      dei servizi di `task dev`. Genera pom, Main, application.yml e un
+      endpoint /api/ping (o una pagina, con UI=1).
+
+      Variabili:
+        NAME=<nome-modulo>   OBBLIGATORIA, minuscole e trattini
+        PORT=<porta>         facoltativa: di default la prima libera
+        UI=1                 modulo Thymeleaf invece di un servizio REST
+        NODB=1               servizio senza JPA, H2 e PostgreSQL
+
+      Esempi:
+        task new-service NAME=ordini-service
+        task new-service NAME=report-ui UI=1
+        task new-service NAME=calcolo-service NODB=1 PORT=8090
+
+      Dopo serve `task dev` (non `task compile`): il modulo nuovo non e'
+      ancora in esecuzione.
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-service.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/new-service.sh {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-service.ps1{{if .NAME}} -Name {{.NAME}}{{end}}{{if .PORT}} -Port {{.PORT}}{{end}}{{if .UI}} -Ui{{end}}{{if .NODB}} -NoDb{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-service.sh{{if .NAME}} --name {{.NAME}}{{end}}{{if .PORT}} --port {{.PORT}}{{end}}{{if .UI}} --ui{{end}}{{if .NODB}} --no-db{{end}} {{.CLI_ARGS}}{{end}}'
 
   add-dep:
-    desc: "Aggiunge dipendenze al pom di un modulo (task add-dep -- -Module wms-service -Deps security,mail; elenco: -List)"
+    desc: "Aggiunge dipendenze al pom di un modulo (task add-dep SERVICE=wms-service DEPS=security,mail)"
+    summary: |
+      Inserisce dipendenze nel pom.xml di un modulo. Le versioni non si
+      scrivono: le decide il pom padre (Spring Boot e il BOM di Spring Cloud).
+
+      Variabili:
+        SERVICE=<modulo>     OBBLIGATORIA, la cartella sotto demo/
+        DEPS=<a,b,c>         OBBLIGATORIA, nomi brevi separati da virgole,
+                             oppure coordinate gruppo:artefatto[:versione]
+        LIST=1               stampa i nomi brevi conosciuti ed esce
+
+      Esempi:
+        task add-dep LIST=1
+        task add-dep SERVICE=wms-service DEPS=security,mail
+        task add-dep SERVICE=wms-service DEPS=org.apache.commons:commons-lang3:3.17.0
+
+      Dopo serve `task dev` (non `task compile`): il classpath di un servizio
+      e' fissato quando parte.
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/add-dep.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/add-dep.sh {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/add-dep.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .DEPS}} -Deps {{.DEPS}}{{end}}{{if .LIST}} -List{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/add-dep.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .DEPS}} --deps {{.DEPS}}{{end}}{{if .LIST}} --list{{end}} {{.CLI_ARGS}}{{end}}'
 
   set-port:
-    desc: "Sposta un modulo su un'altra porta, ovunque sia scritta (task set-port -- -Module wms-ui -Port 9080)"
+    desc: "Sposta un modulo su un'altra porta, ovunque sia scritta (task set-port SERVICE=wms-ui PORT=9080)"
+    summary: |
+      Cambia la porta di un modulo in tutti e quattro i posti in cui e'
+      scritta: application.yml, docker-compose.yml (variabile d'ambiente e
+      pubblicazione) e lista dei servizi di dev.ps1 e dev.sh. Se sposti
+      naming-server aggiorna anche il defaultZone di Eureka di tutti.
+
+      Variabili:
+        SERVICE=<modulo>   OBBLIGATORIA, la cartella sotto demo/
+        PORT=<porta>       OBBLIGATORIA
+
+      Esempi:
+        task set-port SERVICE=wms-ui PORT=9080
+        task set-port SERVICE=naming-server PORT=8762
+
+      Per una prova al volo, senza toccare i file: task dev UI_PORT=9080
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/set-port.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/set-port.sh {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/set-port.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .PORT}} -Port {{.PORT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/set-port.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .PORT}} --port {{.PORT}}{{end}} {{.CLI_ARGS}}{{end}}'
+
+  remove-service:
+    desc: "Toglie un modulo dal progetto e da tutti i file che lo nominano (task remove-service SERVICE=<modulo>)"
+    summary: |
+      L'inverso di new-service: cancella la cartella del modulo e lo toglie dai
+      <modules>, dal Dockerfile, dal docker-compose e dalle liste dei servizi.
+      Avvisa se qualche altro modulo lo chiamava.
+
+      Variabili:
+        SERVICE=<modulo>   OBBLIGATORIA, la cartella sotto demo/
+
+      Esempio:
+        task remove-service SERVICE=ordini-service
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/remove-service.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/remove-service.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{end}}'
+
+  check:
+    desc: "Controlla che il progetto sia coerente: moduli, porte, Docker, lista dei servizi"
+    summary: |
+      Verifica, senza avviare niente, che le parti che devono restare
+      d'accordo lo siano davvero: ogni modulo dichiarato nel pom aggregatore
+      esiste, ogni servizio della lista di `task dev` ha il suo modulo e la
+      porta che dichiara nel suo application.yml, ogni modulo ha la sua COPY
+      nel Dockerfile e il suo blocco in docker-compose.yml.
+
+      Lanciala dopo una modifica fatta a mano, e prima della demo.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/check.ps1{{else}}bash ./scripts/check.sh{{end}}'
+
+  test:
+    desc: "Collauda gli strumenti del template (new-service, add-dep, set-port) in una copia usa-e-getta"
+    summary: |
+      Esegue la suite di prove degli strumenti su una copia temporanea del
+      repository: il progetto vero non viene toccato. Verifica che i moduli
+      generati siano XML valido e coerenti in tutti i file, che le dipendenze
+      non si duplichino, che gli errori d'uso falliscano davvero, e che
+      `task check` passi.
+
+      Variabili:
+        FULL=1   compila anche con Maven il modulo generato (piu' lento)
+
+      Esempi:
+        task test
+        task test FULL=1
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/self-test.ps1{{if .FULL}} -Full{{end}}{{else}}bash ./scripts/self-test.sh{{if .FULL}} --full{{end}}{{end}}'
 
   # --- Stack in container -----------------------------------------------------
 
@@ -105,9 +240,19 @@ tasks:
       - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& .\mvnw.cmd clean package -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw clean package -Dmaven.test.skip=true{{end}}'
 
   test-e2e:
-    desc: "Collaudo end-to-end (serve lo stack acceso; task test-e2e -- -UiPort 9080)"
+    desc: "Collaudo end-to-end sui servizi accesi (task test-e2e UI_PORT=9080 se hai spostato la UI)"
+    summary: |
+      Percorre il flusso completo sui servizi accesi: si puo' lanciare a stack
+      acceso, si accorge da solo se deve aspettare un riavvio.
+
+      Variabili (facoltative):
+        UI_PORT=<porta>   se hai spostato la UI
+
+      Esempi:
+        task test-e2e
+        task test-e2e UI_PORT=9080
     cmds:
-      - powershell -ExecutionPolicy Bypass -File ./test_e2e_wms.ps1 {{.CLI_ARGS}}
+      - 'powershell -ExecutionPolicy Bypass -File ./test_e2e_wms.ps1{{if .UI_PORT}} -UiPort {{.UI_PORT}}{{end}} {{.CLI_ARGS}}'
 
   # --- Pulizia ----------------------------------------------------------------
 
