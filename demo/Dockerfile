@@ -27,6 +27,7 @@ COPY tailwind.config.js tailwind.config.js
 RUN ./mvnw -B -pl ${MODULE} -am clean package -Dmaven.test.skip=true
 
 FROM eclipse-temurin:25-jre
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ARG MODULE="event-ui"
 COPY --from=builder /workspace/${MODULE}/target/${MODULE}-0.0.1-SNAPSHOT.jar app.jar
