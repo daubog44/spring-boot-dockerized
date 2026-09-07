@@ -207,17 +207,23 @@ Servizi registrati:
 
 ## Task disponibili
 
-Task verificati:
+Sviluppo con hot reload:
 
-- `task build`
+- `task dev` — avvia PostgreSQL, compila una volta e lancia Eureka e i quattro servizi, ognuno nella propria finestra
+- `task compile` — ricompila: i servizi toccati si riavviano da soli grazie a `spring-boot-devtools`
+- `task dev-down` — ferma lo stack locale (PostgreSQL resta attivo)
+
+Stack containerizzato:
+
 - `task docker-up`
-
-Task utili:
-
 - `task docker-down`
 - `task docker-logs`
+
+Utilità:
+
+- `task build`
 - `task run-db`
-- `task clean-ports`
+- `task clean-ports` (termina **tutti** i processi Java della macchina, più drastico di `dev-down`)
 
 Task per singolo servizio:
 
