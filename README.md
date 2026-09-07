@@ -17,6 +17,7 @@ Questo repository è un **Template Multi-Modulo Maven d'Esame** pronto all'uso. 
 
 - **`main`** (questo branch): **Template d'Esame Pulito & Neutro** pronto all'uso con Eureka Discovery, OpenFeign, PostgreSQL/H2, Swagger UI e scheletro multi-modulo.
 - **[`solution/wms`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: **Soluzione d'Esame Completa & Collaudata al 100%** per la traccia **WMS Magazzino "Spostati S.r.l."** (6 microservizi, algoritmo di calcolo distanza Manhattan, DTO condivisi e script di collaudo automatizzato PowerShell `test_e2e_wms.ps1`).
+- **[`example/tourist-events`](https://github.com/daubog44/spring-boot-dockerized/tree/example/tourist-events)**: **Esempio d'Esame Svolto** per la traccia **Eventi/Turismo** (wrapper OpenFeign dell'API OpenDataHub, estrazione casuale e storico suggerimenti persistito su PostgreSQL).
 
 ---
 
@@ -32,6 +33,10 @@ Il progetto è organizzato come un aggregatore Multi-Module Maven dentro la cart
    - `store-service` (Porta `8083`) - Esempio di microservizio REST con persistenza DB PostgreSQL/H2.
 4. **`event-ui`**: Applicazione Web UI Thymeleaf / Frontend (Porta `8080`).
 
+> ⚠️ Il container Docker della UI si chiama `ui-service` nel `docker-compose.yml`, mentre il modulo Maven è `event-ui`.
+
+Nel template, `store-service` è già collegato a PostgreSQL tramite le variabili d'ambiente impostate nel `docker-compose.yml` (`STORE_DB_URL`, `STORE_DB_USERNAME`, `STORE_DB_PASSWORD`); gli altri moduli non hanno persistenza.
+
 > 💡 **Nota per il Giorno dell'Esame**: Puoi rinominare, adattare o aggiungere nuovi moduli all'interno di `demo` in base al contesto della traccia assegnata (es. trasformare `store-service` nel servizio anagrafica WMS o Catasto).
 
 ---
@@ -44,12 +49,15 @@ Il progetto è organizzato come un aggregatore Multi-Module Maven dentro la cart
 - `task docker-logs`: Monitora i log di tutti i microservizi.
 - `task clean-ports`: Termina eventuali processi Java rimasti pendenti.
 
+Avvio locale dei singoli moduli (senza Docker): `task run-eureka`, `task run-tourist`, `task run-random`, `task run-store`, `task run-ui`, `task run-db`.
+
 ---
 
 ## 🌐 Mappa delle Porte ed Interfacce OpenAPI / Swagger UI
 
 - **UI Applicativa**: `http://localhost:8080`
 - **Dashboard Eureka**: `http://localhost:8761`
+- **PostgreSQL**: `localhost:5432` (db `event_suggestions`, utente `exam`, password `exam`)
 - **Swagger UI Tourist Service**: `http://localhost:8081/swagger-ui.html`
 - **Swagger UI Random Service**: `http://localhost:8082/swagger-ui.html`
 - **Swagger UI Store Service**: `http://localhost:8083/swagger-ui.html`
