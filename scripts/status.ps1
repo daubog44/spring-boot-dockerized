@@ -13,20 +13,24 @@ $ErrorActionPreference = 'Continue'
 
 $logDir = Get-DevLogDir
 
-# Nome atteso per ogni porta (cambia da traccia a traccia). Le chiavi sono
-# stringhe: su un dizionario ordinato una chiave numerica verrebbe interpretata
-# come posizione nell'elenco invece che come chiave.
-$portNames = [ordered]@{
+# I nomi arrivano dall'ultimo `task dev`, quindi seguono da soli le porte
+# configurate in dev.ps1 (compreso -UiPort). Le chiavi sono stringhe: su un
+# dizionario ordinato una chiave numerica verrebbe interpretata come posizione
+# nell'elenco invece che come chiave.
+$portNames = Get-DevServiceMap -LogDir $logDir
+
+# Ripiego per quando .dev-logs non c'e' ancora (subito dopo un clone).
+$fallbackNames = [ordered]@{
     '8761' = 'eureka'
     '8081' = 'product'
     '8082' = 'crm'
     '8083' = 'wms'
     '8080' = 'wms-ui'
 }
-
-# Se l'ultimo avvio ha spostato la UI con -UiPort, mostriamo anche quella porta.
 foreach ($port in (Get-DevPorts -LogDir $logDir)) {
-    if (-not $portNames.Contains([string]$port)) { $portNames[[string]$port] = 'wms-ui (-UiPort)' }
+    $key = [string]$port
+    if ($portNames.Contains($key)) { continue }
+    if ($fallbackNames.Contains($key)) { $portNames[$key] = $fallbackNames[$key] } else { $portNames[$key] = '?' }
 }
 
 $format = '  {0,-6} {1,-16} {2,-11} {3,-18} {4}'

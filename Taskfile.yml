@@ -42,6 +42,26 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& .\mvnw.cmd -q install -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw -q install -Dmaven.test.skip=true{{end}}'
 
+  # --- Modifiche strutturali --------------------------------------------------
+  # Aggiungere un modulo o una dipendenza, o spostare una porta, tocca piu' file
+  # che devono restare d'accordo fra loro. Questi tre comandi li tengono
+  # allineati: vedi GIORNO-ESAME.md, sezione "Modifiche strutturali".
+
+  new-service:
+    desc: "Crea un microservizio nuovo e lo collega a tutto (task new-service -- -Name ordini-service [-Ui] [-Port N])"
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-service.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/new-service.sh {{.CLI_ARGS}}{{end}}'
+
+  add-dep:
+    desc: "Aggiunge dipendenze al pom di un modulo (task add-dep -- -Module wms-service -Deps security,mail; elenco: -List)"
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/add-dep.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/add-dep.sh {{.CLI_ARGS}}{{end}}'
+
+  set-port:
+    desc: "Sposta un modulo su un'altra porta, ovunque sia scritta (task set-port -- -Module wms-ui -Port 9080)"
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/set-port.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/set-port.sh {{.CLI_ARGS}}{{end}}'
+
   # --- Stack in container -----------------------------------------------------
 
   docker-up:

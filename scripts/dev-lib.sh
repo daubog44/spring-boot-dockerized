@@ -68,10 +68,12 @@ wait_for_port() {
 # Libera davvero le porte dello stack: termina i nostri processi java, spegne i
 # container dell'esame e chiude le applicazioni estranee rimaste in ascolto.
 # Restano intoccati i processi di sistema e l'infrastruttura di Docker.
-# Uso: stop_dev_stack <log_dir> [quiet] [repo_root] [keep_foreign]
+# Uso: stop_dev_stack <log_dir> [quiet] [repo_root] [keep_foreign] [extra_ports]
+# extra_ports: porte della configurazione di chi chiama (dev.sh passa le sue),
+# cosi' cambiarle in un posto solo basta anche per la pulizia.
 # Stampa il numero di processi fermati sullo stdout.
 stop_dev_stack() {
-  local log_dir="$1" quiet="${2:-}" repo_root="${3:-}" keep_foreign="${4:-}"
+  local log_dir="$1" quiet="${2:-}" repo_root="${3:-}" keep_foreign="${4:-}" extra_ports="${5:-}"
   local stopped=0 pid name port
 
   if [ -f "$log_dir/dev.pids" ]; then
@@ -90,7 +92,7 @@ stop_dev_stack() {
   # di un avvio precedente, i container dell'esame, le applicazioni estranee.
   # L'obiettivo e' che dopo questa funzione le porte siano libere.
   local docker_holds_ports=0 pname
-  for port in $(dev_ports "$log_dir"); do
+  for port in $(printf '%s\n%s\n' "$(dev_ports "$log_dir")" "$(echo "$extra_ports" | tr ' ' '\n')" | grep -E '^[0-9]+$' | sort -u); do
     for pid in $(port_pids "$port"); do
       pname="$(process_name "$pid")"
       case "$pname" in
