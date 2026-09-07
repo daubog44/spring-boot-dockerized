@@ -164,7 +164,7 @@ $leftovers = @()
 foreach ($file in (Get-ChildItem -Path $repoRoot -Recurse -File -Include '*.ps1', '*.sh', '*.md', '*.yml', '*.yaml' -ErrorAction SilentlyContinue)) {
     if ($file.FullName -match '\\(\.git|\.dev-logs|target|node_modules|\.task)\\') { continue }
     if ($file.FullName -eq $compose) { continue }
-    if ($file.DirectoryName -eq $PSScriptRoot -and $file.Name -in @('dev.ps1', 'dev.sh', 'status.ps1', 'status.sh', 'dev-lib.ps1', 'dev-lib.sh')) { continue }
+    if ($file.DirectoryName -eq $PSScriptRoot -and $file.Name -in @('dev.ps1', 'dev.sh', 'status.ps1', 'status.sh', 'dev-lib.ps1', 'dev-lib.sh', 'scaffold-lib.ps1', 'new-service.ps1', 'new-service.sh', 'add-dep.ps1', 'add-dep.sh', 'set-port.ps1', 'set-port.sh')) { continue }
     $hits = Select-String -Path $file.FullName -Pattern "\b$oldPort\b" -ErrorAction SilentlyContinue
     foreach ($hit in $hits) {
         $leftovers += ("    {0}:{1}" -f $file.FullName.Substring($repoRoot.Length + 1), $hit.LineNumber)
