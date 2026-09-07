@@ -31,14 +31,12 @@ LOG_DIR="$(dev_log_dir)"
 # Ordine di avvio: Eureka per primo, poi i servizi che vi si registrano.
 SERVICES=(
   "eureka:naming-server:8761"
-  "tourist:tourist-service:8081"
-  "random:random-service:8082"
-  "store:store-service:8083"
-  "ui:event-ui:$UI_PORT"
 )
 
-# store-service punta a jdbc:postgresql://localhost:5432 e non parte senza database.
-USES_POSTGRES=1
+# Metti 1 se un tuo servizio punta a jdbc:postgresql://localhost:5432: `task dev`
+# avviera' il PostgreSQL di docker-compose.yml e ne aspettera' la porta. I
+# servizi creati da `task new-service` usano H2 in memoria.
+USES_POSTGRES=0
 
 mkdir -p "$LOG_DIR"
 

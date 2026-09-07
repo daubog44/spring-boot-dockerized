@@ -1,137 +1,162 @@
-# Spring Boot Dockerized - Template d'Esame ITS
+# Spring Boot Dockerized — Template d'esame ITS
 
-Questo repository è un **Template Multi-Modulo Maven d'Esame** pronto all'uso. È progettato per consentirti di sviluppare rapidamente qualsiasi traccia d'esame (WMS, Catasto, Prenotazione Ospedaliera, Eventi/Turismo, ecc.) basata su **Spring Boot**, **Spring Cloud Eureka**, **OpenFeign**, **OpenAPI/Swagger UI**, **PostgreSQL** e **Docker Compose**.
+Template **vuoto** per una prova finale a microservizi: c'è l'impalcatura già
+configurata e collaudata (Eureka, OpenFeign, OpenAPI/Swagger, PostgreSQL, Docker
+Compose, hot reload), **non** c'è nessun servizio d'esempio da smontare.
 
----
+I servizi della traccia li generi con un comando:
 
-## 📚 Documentazione & Guide per l'Esame
+```bash
+task new-service NAME=ordini-service
+```
 
-- **[🚨 Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. Parti da qui.
-- [📖 Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
-- [📘 Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md)
-- [🛠️ Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
-- [📝 Documentazione Specifica Esame (README-ESAME-TTFCLOUD.md)](./README-ESAME-TTFCLOUD.md)
-
----
-
-## 🌿 Branch e Soluzioni d'Esame Svolte
-
-- **`main`** (questo branch): **Template d'Esame Pulito & Neutro** pronto all'uso con Eureka Discovery, OpenFeign, PostgreSQL/H2, Swagger UI e scheletro multi-modulo.
-- **[`solution/wms`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: **Soluzione d'Esame Completa & Collaudata al 100%** per la traccia **WMS Magazzino "Spostati S.r.l."** (6 microservizi, algoritmo di calcolo distanza Manhattan, DTO condivisi e script di collaudo automatizzato PowerShell `test_e2e_wms.ps1`).
-- **[`example/tourist-events`](https://github.com/daubog44/spring-boot-dockerized/tree/example/tourist-events)**: **Esempio d'Esame Svolto** per la traccia **Eventi/Turismo** (wrapper OpenFeign dell'API OpenDataHub, estrazione casuale e storico suggerimenti persistito su PostgreSQL).
+che crea il modulo *e* lo collega dove serve — pom aggregatore, Dockerfile,
+docker-compose, lista di avvio — senza che tu debba ricordarti nessuno dei sei
+posti.
 
 ---
 
-## 🏗️ Architettura del Template Multi-Modulo
+## Documentazione
 
-Il progetto è organizzato come un aggregatore Multi-Module Maven dentro la cartella `demo`:
+- **[Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. **Parti da qui.**
+- [Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
+- [Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md)
+- [Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
 
-1. **`naming-server`**: Server Eureka Naming Server (Porta `8761`).
-2. **`common-dto`**: Modulo libreria con le classi DTO condivise tra i microservizi.
-3. **Microservizi Modello / Scheletro**:
-   - `tourist-service` (Porta `8081`) - Esempio di wrapper / servizio REST esterno.
-   - `random-service` (Porta `8082`) - Esempio di microservizio ausiliario / generatore.
-   - `store-service` (Porta `8083`) - Esempio di microservizio REST con persistenza DB PostgreSQL/H2.
-4. **`event-ui`**: Applicazione Web UI Thymeleaf / Frontend (Porta `8080`).
-
-> ⚠️ Il container Docker della UI si chiama `ui-service` nel `docker-compose.yml`, mentre il modulo Maven è `event-ui`.
-
-Nel template, `store-service` è già collegato a PostgreSQL tramite le variabili d'ambiente impostate nel `docker-compose.yml` (`STORE_DB_URL`, `STORE_DB_USERNAME`, `STORE_DB_PASSWORD`); gli altri moduli non hanno persistenza.
-
-> 💡 **Nota per il Giorno dell'Esame**: Puoi rinominare, adattare o aggiungere nuovi moduli all'interno di `demo` in base al contesto della traccia assegnata (es. trasformare `store-service` nel servizio anagrafica WMS o Catasto).
+Dal terminale, la guida ai comandi è `task help` (o `task` da solo); il
+dettaglio di un comando singolo, con le sue variabili, è
+`task --summary <comando>`.
 
 ---
 
-## ⚡ Come lavorare durante l'esame
+## Branch
 
-**Per sviluppare, un comando solo:**
+- **`main`** (questo): il template vuoto. È da qui che si parte a ogni traccia.
+- **[`solution/wms`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: soluzione completa della traccia **WMS magazzino** (product, crm, wms, wms-ui, calcolo distanza Manhattan, DTO condivisi, collaudo end-to-end).
+- **[`example/tourist-events`](https://github.com/daubog44/spring-boot-dockerized/tree/example/tourist-events)**: esempio svolto della traccia **eventi/turismo** (wrapper OpenFeign di OpenDataHub, estrazione casuale, storico su PostgreSQL).
+
+I due branch svolti servono da riferimento: non serve copiarli, serve
+guardarli quando non ricordi come si fa una cosa.
+
+---
+
+## Cosa c'è nel template
+
+Aggregatore Maven multi-modulo dentro `demo/`:
+
+| Modulo | A cosa serve |
+| :--- | :--- |
+| `naming-server` | Eureka Server, porta `8761`. I servizi si registrano qui e si chiamano per nome. |
+| `common-dto` | Le classi condivise fra i servizi (DTO). Un modulo solo, così non si duplicano. |
+
+E, già pronto e configurato per i moduli che creerai:
+
+- **Spring Boot 4.0.5** e **Spring Cloud 2025.1.1** con le versioni gestite dal pom padre: nei moduli le dipendenze si scrivono senza versione.
+- **spring-boot-devtools** ereditato da tutti i moduli: hot reload dopo `task compile`.
+- **springdoc-openapi**: ogni servizio espone `/swagger-ui.html`.
+- **PostgreSQL** in `docker-compose.yml` (database `esame`, utente e password `exam`), pronto se un servizio ne ha bisogno; i moduli generati partono con H2 in memoria.
+- **Dockerfile unico** parametrico sul modulo: un'immagine per servizio, senza un Dockerfile per cartella.
+
+---
+
+## Come si lavora
+
+Una volta sola, all'inizio:
 
 ```bash
 task dev
 ```
 
-Prima **libera le porte**: ferma i servizi di un avvio precedente, spegne i container dell'esame se sono loro a tenerle e chiude le applicazioni estranee rimaste in ascolto (non tocca i processi di sistema né l'infrastruttura di Docker). Poi avvia PostgreSQL su Docker, compila tutti i moduli una volta sola, lancia Eureka, ne attende la porta e infine avvia gli altri quattro servizi.
+Libera le porte, compila e avvia in background quello che c'è, con hot reload.
+Restituisce il prompt: niente finestre sparse da inseguire.
 
-**Un terminale solo, nessuna finestra sparsa**: i servizi girano in background e scrivono in `.dev-logs/`. Per vedere cosa fanno:
+Poi il ciclo della giornata:
+
+> scrivi il codice → `task compile` → il servizio si riavvia da solo
+
+I log di tutti i servizi, in un terminale solo:
 
 ```bash
 task logs
 ```
 
-Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (`store | ...`) e di un colore diverso. `Ctrl+C` chiude solo la vista, i servizi restano su. Per seguirne uno solo: `task logs -- store`.
-
-**Hot reload**: ogni servizio gira con `spring-boot-devtools`. Dopo aver modificato del codice:
-
-```bash
-task compile
-```
-
-Il servizio interessato si riavvia da solo in pochi secondi. In VS Code, con la build automatica attiva, il riavvio parte già al salvataggio.
-
-**Per fermare tutto:**
-
-```bash
-task dev-down
-```
-
-Libera le porte esattamente come fa `task dev` all'avvio: usano la stessa funzione, quindi non possono comportarsi in modo diverso. Ferma anche il container PostgreSQL avviato da `task dev` (il volume resta, i dati non si perdono).
-
-**Quando qualcosa non risponde**, prima di ogni altra cosa:
+Quando qualcosa non risponde, prima di formulare ipotesi:
 
 ```bash
 task status
 ```
 
-Dice chi occupa ognuna delle porte (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
+Dice porta per porta chi è in ascolto — un tuo servizio, i container, o
+un'applicazione estranea — e cosa si è registrato su Eureka.
 
-> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: `task dev -- -KeepForeign -UiPort 9080`. Senza `-KeepForeign` viene chiusa.
+### Quando cambia la struttura
 
-**Per la demo finale**, usa lo stack containerizzato, che è quello che presenterai:
+Aggiungere un modulo o una dipendenza, o spostare una porta, tocca più file che
+devono restare d'accordo. Un comando per ognuna di queste cose:
+
+```bash
+task new-service NAME=ordini-service
+```
+
+```bash
+task add-dep SERVICE=ordini-service DEPS=security,mail
+```
+
+```bash
+task set-port SERVICE=ordini-service PORT=8090
+```
+
+```bash
+task remove-service SERVICE=ordini-service
+```
+
+Tutti si usano con variabili `NOME=valore`, mai con trattini. Dopo una
+dipendenza o un modulo nuovo ci vuole `task dev`: `task compile` non basta,
+perché il classpath di un servizio è fissato quando parte.
+
+Due comandi di controllo:
+
+```bash
+task check
+```
+
+Verifica, senza avviare niente, che moduli, porte, Dockerfile, compose e liste
+di avvio dicano la stessa cosa.
+
+```bash
+task test
+```
+
+Collauda gli strumenti stessi su una copia usa-e-getta del progetto. Lancialo
+appena ti siedi: se passa, sai che funzionano quando ti serviranno.
+
+### Per la demo
 
 ```bash
 task docker-up
 ```
 
-Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale prima di partire, e `task dev` spegne da solo i container (con `docker compose down`, i dati del database restano).
-
-### Elenco completo dei task
-
-Il comando `task` da solo stampa questo elenco.
-
-Sviluppo:
-
-- `task dev`: Pulisce, compila e avvia l'intero stack in locale con hot reload.
-- `task dev-down`: Ferma i servizi locali e libera le porte.
-- `task logs`: Segue i log di tutti i servizi in un terminale solo (`task logs -- store` per uno).
-- `task status`: Chi occupa le porte, quali container girano, cosa è registrato su Eureka.
-- `task compile`: Ricompila e fa ripartire i servizi già avviati.
-- `task build`: Compila e impacchetta tutti i moduli Maven tramite wrapper (`mvnw`).
-
-Container:
-
-- `task docker-up`: Avvia l'intero cluster di microservizi su Docker Compose con healthcheck.
-- `task docker-down`: Ferma i container. **I dati del database restano.**
-- `task docker-reset`: Ferma i container **ed elimina i volumi**: database ricreato da zero.
-- `task docker-logs`: Monitora i log di tutti i microservizi.
-
-Pulizia:
-
-- `task clean-ports`: Come `dev-down`, libera le porte dello stack.
-- `task kill-java`: Ultima spiaggia, termina **tutti** i processi Java della macchina, anche quelli estranei al progetto.
-
-Avvio manuale dei singoli moduli, se ti serve isolarne uno: `task run-eureka`, `task run-tourist`, `task run-random`, `task run-store`, `task run-ui`, `task run-db`.
+Lo stack in container, che è quello che presenterai. Non devi fermare niente
+prima: `docker-up` spegne da solo lo stack locale, e `task dev` spegne da solo i
+container. Alla fine `task docker-down` (i dati del database restano;
+`docker-reset` invece li cancella).
 
 ---
 
-## 🌐 Mappa delle Porte ed Interfacce OpenAPI / Swagger UI
+## Porte
 
-- **UI Applicativa**: `http://localhost:8080`
-- **Dashboard Eureka**: `http://localhost:8761`
-- **PostgreSQL**: `localhost:5432` (db `event_suggestions`, utente `exam`, password `exam`)
-- **Swagger UI Tourist Service**: `http://localhost:8081/swagger-ui.html`
-- **Swagger UI Random Service**: `http://localhost:8082/swagger-ui.html`
-- **Swagger UI Store Service**: `http://localhost:8083/swagger-ui.html`
-- **Swagger UI Event UI**: `http://localhost:8080/swagger-ui.html`
+| Indirizzo | Cosa |
+| :--- | :--- |
+| `http://localhost:8761` | Dashboard Eureka |
+| `localhost:5432` | PostgreSQL (db `esame`, utente `exam`, password `exam`) |
+| `http://localhost:<porta>/swagger-ui.html` | Swagger di un servizio |
+
+Le porte dei servizi che crei le assegna `task new-service` (la prima libera
+dopo l'ultima usata) e le stampa `task dev` alla fine dell'avvio. Per cambiarne
+una: `task set-port SERVICE=<modulo> PORT=<porta>`.
+
+> Se su una porta gira un'applicazione che ti serve viva, dillo:
+> `task dev KEEPFOREIGN=1 UI_PORT=9080`. Senza `KEEPFOREIGN=1` viene chiusa.
 
 ---
 
@@ -161,7 +186,7 @@ Causa: un'altra applicazione della macchina è in ascolto su `127.0.0.1:8080`. S
 task status
 ```
 
-Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. `task dev` chiude da solo quel processo al prossimo avvio; se invece ti serve tenerlo vivo, sposta la UI con `task dev -- -KeepForeign -UiPort 9080`.
+Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. `task dev` chiude da solo quel processo al prossimo avvio; se invece ti serve tenerlo vivo, sposta la UI con `task dev KEEPFOREIGN=1 UI_PORT=9080`.
 
 ### Altri controlli utili
 

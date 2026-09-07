@@ -5,9 +5,9 @@
 # Le versioni non vanno quasi mai scritte: le governa il pom padre
 # (spring-boot-starter-parent) e il BOM di Spring Cloud che importa.
 #
-#   task add-dep -- --module wms-service --deps security,mail
-#   task add-dep -- --module product-service --deps 'org.apache.commons:commons-lang3:3.17.0'
-#   task add-dep -- --list
+#   task add-dep SERVICE=wms-service DEPS=security,mail
+#   task add-dep SERVICE=product-service DEPS=org.apache.commons:commons-lang3:3.17.0
+#   task add-dep LIST=1
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,7 +79,7 @@ if [ "$LIST" = "1" ]; then
     printf '  %-16s%s:%s%s\n' "$id" "$group" "$artifact" "$extra"
   done
   echo ""
-  echo "Non in elenco? Passa le coordinate: --deps 'gruppo:artefatto:versione'"
+  echo "Non in elenco? Passa le coordinate: DEPS=gruppo:artefatto:versione"
   echo ""
   echo "devtools non serve aggiungerlo: e' nel pom padre, quindi ce l'hanno gia' tutti i moduli."
   echo ""
@@ -87,7 +87,7 @@ if [ "$LIST" = "1" ]; then
 fi
 
 if [ -z "$MODULE" ] || [ -z "$DEPS" ]; then
-  echo "Uso: task add-dep -- --module <modulo> --deps <dip1,dip2>   (elenco: task add-dep -- --list)" >&2
+  echo "Uso: task add-dep SERVICE=<modulo> DEPS=<dip1,dip2>   (elenco: task add-dep LIST=1)" >&2
   exit 1
 fi
 
@@ -123,7 +123,7 @@ for raw in "${REQUESTED[@]}"; do
     scope=""
     optional=""
   else
-    echo "Dipendenza sconosciuta: '$id'. Vedi l'elenco con: task add-dep -- --list (oppure passa gruppo:artefatto:versione)" >&2
+    echo "Dipendenza sconosciuta: '$id'. Vedi l'elenco con: task add-dep LIST=1 (oppure passa gruppo:artefatto:versione)" >&2
     exit 1
   fi
 

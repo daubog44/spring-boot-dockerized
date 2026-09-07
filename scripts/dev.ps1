@@ -43,14 +43,13 @@ $logDir = Get-DevLogDir
 # Ordine di avvio: Eureka per primo, poi i servizi che vi si registrano.
 $services = @(
     [pscustomobject]@{ Name = 'eureka';      Module = 'naming-server';   Port = 8761 }
-    [pscustomobject]@{ Name = 'tourist';     Module = 'tourist-service'; Port = 8081 }
-    [pscustomobject]@{ Name = 'random';      Module = 'random-service';  Port = 8082 }
-    [pscustomobject]@{ Name = 'store';       Module = 'store-service';   Port = 8083 }
-    [pscustomobject]@{ Name = 'ui';          Module = 'event-ui';        Port = $UiPort }
 )
 
-# store-service punta a jdbc:postgresql://localhost:5432 e non parte senza database.
-$usesPostgres = $true
+# Metti $true se un tuo servizio punta a jdbc:postgresql://localhost:5432:
+# `task dev` avviera' il PostgreSQL di docker-compose.yml e ne aspettera' la
+# porta. I servizi creati da `task new-service` usano H2 in memoria, quindi
+# finche' non lo cambi tu non serve.
+$usesPostgres = $false
 
 # --- Controlli preliminari ----------------------------------------------------
 

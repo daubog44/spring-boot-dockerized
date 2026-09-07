@@ -7,7 +7,7 @@
 # servizi di dev.ps1 e dev.sh. Il codice Java non contiene porte: i servizi si
 # chiamano per nome via Eureka e Feign.
 #
-#   task set-port -- --module wms-ui --port 9080
+#   task set-port SERVICE=wms-ui PORT=9080
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$MODULE" ] || [ -z "$PORT" ]; then
-  echo "Uso: task set-port -- --module <modulo> --port <porta>" >&2
+  echo "Uso: task set-port SERVICE=<modulo> PORT=<porta>" >&2
   exit 1
 fi
 

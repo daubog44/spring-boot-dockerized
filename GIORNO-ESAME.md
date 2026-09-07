@@ -32,24 +32,45 @@ task dev-down
 Se questi due comandi funzionano, il resto della giornata è in discesa. Se
 falliscono, hai ancora tutto il tempo per capire perché.
 
+Poi, una volta sola, un giro di prova degli strumenti (dura una decina di
+secondi e non tocca il progetto):
+
+```bash
+task test
+```
+
+Se passa, sai che `new-service`, `add-dep` e `set-port` funzionano su questa
+macchina: quando ti serviranno, non dovrai scoprirlo.
+
 > Le porte le libera `task dev` da solo, chiudendo quello che le tiene occupate:
 > non devi controllare niente prima.
-
-Solo adesso apri la traccia e decidi come adattare i moduli scheletro
-(`tourist-service`, `random-service`, `store-service`, `event-ui`).
 
 ---
 
 ## Fase 1 — Sviluppo: il ciclo che ripeterai tutto il giorno
 
-Una volta sola, all'inizio:
+Questo branch è il template vuoto: c'è Eureka, il modulo `common-dto` per le
+classi condivise, e nient'altro. I servizi della traccia li crei tu, un
+comando per uno:
+
+```bash
+task new-service NAME=ordini-service
+```
+
+```bash
+task new-service NAME=ordini-ui UI=1
+```
+
+Il primo ti dà un servizio REST (con JPA, H2 e Swagger già collegati), il
+secondo una UI Thymeleaf. Entrambi si registrano su Eureka e possono chiamarsi
+per nome con Feign. Poi:
 
 ```bash
 task dev
 ```
 
-Avvia PostgreSQL su Docker, compila tutto e lancia i servizi **in background**,
-restituendoti il prompt. Nessuna finestra sparsa da inseguire.
+Compila tutto, avvia i servizi **in background** e ti restituisce il prompt.
+Nessuna finestra sparsa da inseguire.
 
 In un **secondo** terminale, se vuoi vedere cosa succede:
 
@@ -59,7 +80,7 @@ task logs
 
 Ogni riga è prefissata dal nome del servizio e colorata. `Ctrl+C` chiude solo
 questa vista: i servizi restano accesi. Per seguirne uno solo:
-`task logs -- store`.
+`task logs SERVICE=<nome>`, con il nome breve che vedi in `task status`.
 
 Poi il ciclo è **solo questo**:
 
@@ -86,15 +107,19 @@ un'applicazione estranea. E cosa si è registrato su Eureka.
 
 ---
 
-## Modifiche strutturali: dipendenze, porte, moduli nuovi
+## Modifiche strutturali: dipendenze, porte, moduli
 
-Tre cose non le copre il ciclo `task compile`, perché toccano più file che
-devono restare d'accordo fra loro. Per ognuna c'è un comando.
+Queste cose non le copre il ciclo `task compile`, perché toccano più file che
+devono restare d'accordo fra loro. Per ognuna c'è un comando, e tutti si usano
+allo stesso modo: **variabili `NOME=valore`, senza trattini**.
+
+`task help` (o `task` da solo) stampa l'elenco; `task --summary <comando>` il
+dettaglio di uno.
 
 ### Aggiungere una dipendenza a un microservizio
 
 ```bash
-task add-dep -- -Module tourist-service -Deps security,mail
+task add-dep SERVICE=ordini-service DEPS=security,mail
 ```
 
 Le versioni **non si scrivono**: le decide il `pom.xml` padre, che eredita da
@@ -105,11 +130,11 @@ I nomi brevi riconosciuti (`web`, `data-jpa`, `security`, `feign`, `kafka`,
 `postgresql`, ...) li stampa:
 
 ```bash
-task add-dep -- -List
+task add-dep LIST=1
 ```
 
 Se ti serve qualcosa che non è in elenco, passa le coordinate per esteso:
-`task add-dep -- -Module tourist-service -Deps 'org.apache.commons:commons-lang3:3.17.0'`.
+`task add-dep SERVICE=ordini-service DEPS=org.apache.commons:commons-lang3:3.17.0`.
 
 > **Poi serve `task dev`, non `task compile`.** Il classpath di un servizio è
 > fissato quando parte: un jar nuovo lo vede solo un riavvio vero. Vale per
@@ -121,7 +146,7 @@ i moduli — è lui a dare l'hot reload dopo `task compile`.
 ### Cambiare una porta
 
 ```bash
-task set-port -- -Module event-ui -Port 9080
+task set-port SERVICE=ordini-service PORT=8090
 ```
 
 Una porta è scritta in quattro punti: l'`application.yml` del modulo,
@@ -134,23 +159,50 @@ Il **codice Java non contiene porte**: i servizi si chiamano per nome via
 Eureka e Feign, quindi spostare una porta non rompe nessuna chiamata. Anche
 spostare Eureka funziona: il comando aggiorna il `defaultZone` di tutti.
 
-Per una prova al volo, senza toccare i file, resta `task dev -- -UiPort 9080`.
+Per una prova al volo, senza toccare i file, resta `task dev UI_PORT=9080`.
 
 ### Aggiungere un microservizio
 
 ```bash
-task new-service -- -Name ordini-service
+task new-service NAME=ordini-service
 ```
 
 Crea il modulo (pom, `Main`, `application.yml`, un endpoint `/api/ping`) e lo
 collega dove serve: `<modules>` del pom aggregatore, `COPY` nel `Dockerfile`,
 blocco in `docker-compose.yml`, lista dei servizi di `task dev`. La porta è la
-prima libera, se non la passi tu con `-Port`.
+prima libera, se non la passi tu con `PORT=`.
 
-Varianti: `-Ui` per un modulo Thymeleaf invece di un servizio REST, `-NoDb`
+Varianti: `UI=1` per un modulo Thymeleaf invece di un servizio REST, `NODB=1`
 per un servizio senza JPA.
 
 Poi `task dev`, e il servizio nuovo si registra su Eureka con gli altri.
+
+### Togliere un microservizio
+
+```bash
+task remove-service SERVICE=ordini-service
+```
+
+L'inverso di `new-service`: cancella la cartella e toglie il modulo dagli
+stessi sei posti. Ti avvisa se qualche altro modulo lo chiamava.
+
+### Controllare che sia rimasto tutto a posto
+
+```bash
+task check
+```
+
+Non avvia niente: legge i file e verifica che moduli, porte, `Dockerfile`,
+`docker-compose.yml` e liste dei servizi dicano la stessa cosa. Usalo dopo una
+modifica fatta a mano, e prima della demo.
+
+```bash
+task test
+```
+
+Collauda gli strumenti stessi su una copia usa-e-getta del progetto (il
+progetto vero non viene toccato): serve a sapere che funzionano **prima** di
+averne bisogno. Con `task test FULL=1` compila anche il modulo generato.
 
 ### Cambiare configurazione (`application.yml`)
 
@@ -161,15 +213,17 @@ non è codice ricompilato, quindi l'hot reload non lo rilegge.
 
 ## Fase 2 — Collaudo, prima di chiamare la commissione
 
-Controlla che i servizi si vedano fra loro, non solo che siano accesi:
-`task status` deve elencarli tutti e quattro nel registro Eureka.
+```bash
+task check
+```
 
-Poi prova gli endpoint veri, uno per servizio. Il modo più comodo è Swagger UI
-(`http://localhost:8081/swagger-ui.html` e compagni), che mostra lo schema
-esatto delle richieste, oppure `curl` dal terminale.
+Poi controlla che i servizi si vedano fra loro, non solo che siano accesi:
+`task status` deve elencarli tutti nel registro Eureka.
 
-Infine apri la UI e percorri il flusso completo come lo mostrerai: è l'unico
-collaudo che conta davvero.
+Prova gli endpoint veri, uno per servizio: il modo più comodo è Swagger UI
+(`http://localhost:<porta>/swagger-ui.html`), che mostra lo schema esatto
+delle richieste. Infine percorri il flusso completo dalla UI, come lo mostrerai
+alla commissione: è l'unico collaudo che conta davvero.
 
 ---
 
@@ -181,18 +235,19 @@ Non devi fermare niente prima: `task docker-up` spegne da solo lo stack locale.
 task docker-up
 ```
 
-Aspetta che `task status` mostri i quattro servizi registrati su Eureka, poi
+Aspetta che `task status` mostri i tuoi servizi registrati su Eureka, poi
 apri nell'ordine:
 
-1. `http://localhost:8080` — l'applicazione
+1. la tua UI — l'applicazione (l'indirizzo lo stampa `task dev`)
 2. `http://localhost:8761` — la dashboard Eureka, per far vedere il discovery
-3. `http://localhost:8081/swagger-ui.html` — i contratti OpenAPI
+3. lo Swagger di un servizio — i contratti OpenAPI
 
 Se ti chiedono della **resilienza**, spegni un servizio davanti a loro e
-ricarica la pagina.
+ricarica la dashboard: resta in piedi con i segnaposto invece di andare in
+errore.
 
 ```bash
-docker stop exam-random-service
+docker stop exam-<nome-servizio>
 ```
 
 Alla fine:
@@ -207,12 +262,12 @@ task docker-down
 
 | Sintomo | Cosa fare |
 | :--- | :--- |
-| Un servizio non risponde | `task status`, poi `task logs -- <servizio>` |
+| Un servizio non risponde | `task status`, poi `task logs SERVICE=<servizio>` |
 | "Port N was already in use" | `task dev`: chiude lui chi tiene la porta |
-| Su `localhost:8080` risponde un'altra app | `task dev` la chiude; se ti serve viva, `task dev -- -KeepForeign -UiPort 9080` |
+| Su `localhost:8080` risponde un'altra app | `task dev` la chiude; se ti serve viva, `task dev KEEPFOREIGN=1 UI_PORT=9080` |
 | Hai modificato il codice e non cambia niente | `task compile` (e controlla che non ci siano errori di compilazione) |
 | Hai aggiunto una dipendenza e non la vede | `task dev`: il classpath si fissa all'avvio, `task compile` non basta |
-| Il servizio è morto dopo una modifica | `task logs -- <servizio>`, poi `task dev` per ripartire pulito |
+| Il servizio è morto dopo una modifica | `task logs SERVICE=<servizio>`, poi `task dev` per ripartire pulito |
 | I container non partono | `task docker-down`, poi `task docker-up` |
 | Il database ha dati sporchi | `task docker-reset`, poi `task docker-up` — **cancella i dati** |
 | È tutto ingarbugliato | `task dev-down`, poi `task dev`. **Non** `task kill-java`: chiude anche l'IDE |
@@ -228,31 +283,37 @@ task docker-down
 
 | Comando | Cosa fa |
 | :--- | :--- |
-| `task dev` | Libera le porte, avvia PostgreSQL, compila e avvia tutto in background con hot reload |
+| `task dev` | Libera le porte, compila e avvia tutto in background con hot reload |
 | `task logs` | Segue i log di tutti i servizi in un terminale solo |
 | `task compile` | Ricompila: i servizi toccati si riavviano da soli |
 | `task status` | Chi occupa le porte, container attivi, registro Eureka |
-| `task dev-down` | Ferma i servizi locali e il PostgreSQL avviato da `task dev`, e libera le porte |
-| `task add-dep` | Aggiunge dipendenze al pom di un modulo (`-List` per l'elenco) |
+| `task dev-down` | Ferma i servizi locali e libera le porte |
+| `task add-dep` | Aggiunge dipendenze al pom di un modulo (`LIST=1` per l'elenco) |
 | `task set-port` | Sposta un modulo su un'altra porta, ovunque sia scritta |
 | `task new-service` | Crea un microservizio nuovo e lo collega a tutto |
+| `task remove-service` | Toglie un modulo dal progetto e da tutti i file |
+| `task check` | Moduli, porte, Docker e liste sono coerenti? |
+| `task test` | Collauda gli strumenti su una copia usa-e-getta |
+| `task help` | Questa guida, dal terminale |
 | `task docker-up` | Costruisce le immagini e avvia lo stack in container |
 | `task docker-down` | Ferma i container, **conservando** i dati del database |
 | `task docker-reset` | Ferma i container **ed elimina** i volumi |
 | `task docker-logs` | Segue i log dei container |
 | `task build` | Compila e impacchetta tutti i moduli Maven |
-| `task run-db` | Avvia il solo PostgreSQL |
-| `task run-eureka` · `run-tourist` · `run-random` · `run-store` · `run-ui` | Avvia un solo modulo, in primo piano |
+| `task run SERVICE=<modulo>` | Avvia un solo modulo, in primo piano |
+| `task run-eureka` | Avvia il solo Eureka, in primo piano |
 | `task kill-java` | Ultima spiaggia: termina **tutti** i java della macchina |
 
 ### Opzioni utili
 
-| Opzione | Quando |
+Si passano come variabili, senza trattini.
+
+| Variabile | Quando |
 | :--- | :--- |
-| `task dev -- -UiPort 9080` | Vuoi la UI su un'altra porta |
-| `task dev -- -NoBuild` | Hai già compilato e vuoi solo riavviare |
-| `task dev -- -KeepForeign` | Su una porta gira qualcosa che ti serve viva: non chiuderla |
-| `task logs -- store` | Un servizio solo |
+| `task dev UI_PORT=9080` | Vuoi la UI su un'altra porta |
+| `task dev NOBUILD=1` | Hai già compilato e vuoi solo riavviare |
+| `task dev KEEPFOREIGN=1` | Su una porta gira qualcosa che ti serve viva: non chiuderla |
+| `task logs SERVICE=<nome>` | Un servizio solo |
 
 ---
 
@@ -268,7 +329,6 @@ Serve saperlo solo se qualcosa va storto:
 2. Cancella i log del giro precedente, così `task logs` non ti mostra roba
    vecchia.
 3. Compila tutti i moduli, una volta sola.
-4. Avvia PostgreSQL su Docker e ne attende la porta.
-5. Avvia Eureka e **aspetta** che sia in ascolto, poi tutti gli altri.
-6. Se qualcosa non parte, stampa le ultime righe del log del colpevole e
+4. Avvia Eureka e **aspetta** che sia in ascolto, poi tutti gli altri.
+5. Se qualcosa non parte, stampa le ultime righe del log del colpevole e
    **ritira quello che aveva avviato**, invece di lasciare mezzo stack acceso.

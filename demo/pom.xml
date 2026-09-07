@@ -21,10 +21,6 @@
     <modules>
         <module>common-dto</module>
         <module>naming-server</module>
-        <module>tourist-service</module>
-        <module>random-service</module>
-        <module>store-service</module>
-        <module>event-ui</module>
     </modules>
 
     <properties>
