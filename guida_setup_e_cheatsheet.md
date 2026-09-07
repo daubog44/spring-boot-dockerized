@@ -176,9 +176,15 @@ docker compose up -d
 Reset completo del volume del database:
 ```bash
 task docker-down
-docker volume rm demo_postgres-data 2>nul
+```
+```bash
+docker volume rm demo_postgres-data
+```
+```bash
 task docker-up
 ```
+
+> ℹ️ Il volume è montato su `/var/lib/postgresql`, non sul percorso legacy `/var/lib/postgresql/data`: dalla versione 18 l'immagine tiene i dati in `/var/lib/postgresql/<versione>/docker`, e col mount vecchio il volume restava vuoto e il container non partiva.
 
 ### 🚨 Emergenza 4: "Eureka registra i servizi ma i Feign Client danno 500"
 I client Eureka richiedono qualche secondo per aggiornare il registro locale delle istanze (cache heartbeat). Attendi 10-15 secondi dall'avvio completo del cluster prima di effettuare la prima richiesta HTTP.

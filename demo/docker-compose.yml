@@ -14,7 +14,10 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # postgres:18+ tiene i dati in /var/lib/postgresql/<versione>/docker: montando
+      # il percorso legacy /var/lib/postgresql/data il volume restava vuoto e il
+      # container si rifiutava di partire.
+      - postgres-data:/var/lib/postgresql
 
   eureka-server:
     container_name: exam-eureka
