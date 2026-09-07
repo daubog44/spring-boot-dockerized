@@ -1,0 +1,5 @@
+# Gli script POSIX devono restare a fine riga LF anche quando il repository
+# viene clonato su Windows con core.autocrlf=true: con CRLF la shell legge
+# "#!/usr/bin/env bash\r" e risponde "bad interpreter: No such file or directory".
+*.sh text eol=lf
+mvnw text eol=lf

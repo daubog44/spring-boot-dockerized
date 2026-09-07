@@ -4,56 +4,37 @@ vars:
   JAVA_HOME_PATH: '{{.JAVA_HOME | default "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot"}}'
 
 tasks:
-  run-eureka:
-    desc: Run the Eureka server locally
+  default:
+    desc: Elenca i comandi disponibili
+    silent: true
     cmds:
-      - task: run-module
-        vars:
-          MODULE: "naming-server"
+      - task --list
 
-  run-tourist:
-    desc: Run the tourist wrapper locally
-    cmds:
-      - task: run-module
-        vars:
-          MODULE: "tourist-service"
-
-  run-random:
-    desc: Run the random service locally
-    cmds:
-      - task: run-module
-        vars:
-          MODULE: "random-service"
-
-  run-store:
-    desc: Run the store service locally
-    cmds:
-      - task: run-module
-        vars:
-          MODULE: "store-service"
-
-  run-ui:
-    desc: Run the UI locally
-    cmds:
-      - task: run-module
-        vars:
-          MODULE: "event-ui"
-
-  run-db:
-    desc: Start only PostgreSQL via Docker
-    dir: demo
-    cmds:
-      - docker compose up -d postgres
+  # --- Sviluppo quotidiano ----------------------------------------------------
 
   dev:
-    desc: "AVVIO SVILUPPO: compila e avvia l'intero stack in locale con hot reload"
+    desc: "AVVIO SVILUPPO: pulisce, compila e avvia tutto lo stack in background con hot reload"
+    env:
+      # Lo stesso JDK usato da `task build`: se il percorso non esiste lo script
+      # lo ignora e usa il java del PATH.
+      JAVA_HOME: '{{.JAVA_HOME_PATH}}'
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/dev.sh {{.CLI_ARGS}}{{end}}'
 
   dev-down:
-    desc: Ferma lo stack locale avviato con `task dev`
+    desc: "STOP SVILUPPO: ferma i servizi locali e libera le porte"
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-down.ps1{{else}}bash ./scripts/dev-down.sh{{end}}'
+
+  logs:
+    desc: "Segue i log di tutti i servizi in un terminale solo (task logs -- store per uno)"
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/logs.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/logs.sh {{.CLI_ARGS}}{{end}}'
+
+  status:
+    desc: "Chi occupa le porte, quali container girano, cosa e' registrato su Eureka"
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/status.ps1{{else}}bash ./scripts/status.sh{{end}}'
 
   compile:
     desc: Ricompila i moduli e fa ripartire i servizi gia' avviati (hot reload)
@@ -61,8 +42,101 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& .\mvnw.cmd -q install -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw -q install -Dmaven.test.skip=true{{end}}'
 
+  # --- Stack in container -----------------------------------------------------
+
   docker-up:
-    desc: Build and start the full exam stack
+    desc: Compila le immagini e avvia lo stack completo in Docker
+    cmds:
+      # Lo stack locale userebbe le stesse porte: se e' rimasto acceso, i
+      # container non riuscirebbero a pubblicarle.
+      - task: dev-down
+      - task: compose-up
+
+  docker-down:
+    desc: Ferma i container (i dati del database restano)
+    dir: demo
+    cmds:
+      - docker compose down --remove-orphans
+
+  docker-reset:
+    desc: Ferma i container ED elimina i volumi (database ricreato da zero)
+    dir: demo
+    cmds:
+      - docker compose down -v --remove-orphans
+
+  docker-logs:
+    desc: Segue i log dei container
+    dir: demo
+    cmds:
+      - docker compose logs -f
+
+  run-db:
+    desc: Avvia il solo PostgreSQL in Docker
+    dir: demo
+    cmds:
+      - docker compose up -d postgres
+
+  # --- Build ------------------------------------------------------------------
+
+  build:
+    desc: Compila e impacchetta tutti i moduli Maven
+    dir: demo
+    cmds:
+      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& .\mvnw.cmd clean package -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw clean package -Dmaven.test.skip=true{{end}}'
+
+  # --- Pulizia ----------------------------------------------------------------
+
+  clean-ports:
+    desc: Libera le porte dello stack (come dev-down)
+    cmds:
+      - task: dev-down
+
+  kill-java:
+    desc: "ULTIMA SPIAGGIA: termina TUTTI i processi java della macchina, anche estranei al progetto"
+    cmds:
+      - '{{if eq OS "windows"}}cmd /c "taskkill /F /IM java.exe /T 2>nul || ver >nul"{{else}}pkill -f java || true{{end}}'
+
+  # --- Avvio di un singolo servizio in primo piano ----------------------------
+
+  run-eureka:
+    desc: Avvia il solo Eureka server, in primo piano
+    cmds:
+      - task: run-module
+        vars:
+          MODULE: "naming-server"
+
+  run-tourist:
+    desc: Avvia il solo tourist-service, in primo piano
+    cmds:
+      - task: run-module
+        vars:
+          MODULE: "tourist-service"
+
+  run-random:
+    desc: Avvia il solo random-service, in primo piano
+    cmds:
+      - task: run-module
+        vars:
+          MODULE: "random-service"
+
+  run-store:
+    desc: Avvia il solo store-service, in primo piano
+    cmds:
+      - task: run-module
+        vars:
+          MODULE: "store-service"
+
+  run-ui:
+    desc: Avvia la sola event-ui, in primo piano
+    cmds:
+      - task: run-module
+        vars:
+          MODULE: "event-ui"
+
+  # --- Interni ----------------------------------------------------------------
+
+  compose-up:
+    internal: true
     dir: demo
     cmds:
       - docker compose build eureka-server
@@ -71,29 +145,6 @@ tasks:
       - docker compose build store-service
       - docker compose build ui-service
       - docker compose up -d
-
-  docker-down:
-    desc: Stop the full exam stack
-    dir: demo
-    cmds:
-      - docker compose down -v --remove-orphans
-
-  docker-logs:
-    desc: Tail compose logs
-    dir: demo
-    cmds:
-      - docker compose logs -f
-
-  build:
-    desc: Package all Maven modules
-    dir: demo
-    cmds:
-      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& .\mvnw.cmd clean package -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw clean package -Dmaven.test.skip=true{{end}}'
-
-  clean-ports:
-    desc: Kill Java processes
-    cmds:
-      - '{{if eq OS "windows"}}cmd /c "taskkill /F /IM java.exe /T 2>nul || ver >nul"{{else}}pkill -f java || true{{end}}'
 
   run-module:
     internal: true

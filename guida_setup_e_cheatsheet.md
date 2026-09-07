@@ -41,20 +41,35 @@ Per monitorare i log in tempo reale:
 task docker-logs
 ```
 
-Per arrestare lo stack e pulire le risorse:
+Per arrestare i container conservando i dati del database:
 ```bash
 task docker-down
 ```
+
+Per ripartire da un database vuoto (rimuove anche i volumi):
+```bash
+task docker-reset
+```
+
+> ℹ️ Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale prima di partire, e `task dev` si rifiuta di partire se i container sono accesi, dicendoti quale dei due spegnere.
 
 ---
 
 ### B. Sviluppo Locale con Hot Reload (CONSIGLIATO MENTRE SVILUPPI)
 
-Un solo comando avvia PostgreSQL, compila tutto e lancia Eureka e i quattro servizi, ognuno nella propria finestra:
+Un solo comando libera le porte da eventuali avanzi, avvia PostgreSQL, compila tutto e lancia Eureka e i quattro servizi:
 
 ```bash
 task dev
 ```
+
+I servizi girano in background: niente finestre sparse, un terminale solo. Per vedere l'output di tutti insieme, ogni riga prefissata dal nome del servizio:
+
+```bash
+task logs
+```
+
+`Ctrl+C` chiude solo la vista, i servizi restano su. Per uno solo: `task logs -- store`. I log restano comunque su file in `.dev-logs/`.
 
 Dopo una modifica al codice, ricompila e i servizi interessati si riavviano da soli grazie a `spring-boot-devtools`:
 
@@ -62,13 +77,19 @@ Dopo una modifica al codice, ricompila e i servizi interessati si riavviano da s
 task compile
 ```
 
-Per fermare lo stack locale (PostgreSQL resta attivo):
+Per fermare lo stack locale e liberare le porte (ferma anche il PostgreSQL avviato da `task dev`, conservando i dati):
 
 ```bash
 task dev-down
 ```
 
-I log dei servizi restano consultabili in `.dev-logs/`.
+Quando qualcosa non risponde, il primo comando da lanciare è:
+
+```bash
+task status
+```
+
+Dice chi occupa ogni porta (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
 
 **Perché non usare `task docker-up` mentre sviluppi**: `docker compose build` ricostruisce tutte e cinque le immagini, e poiché il `Dockerfile` copia i sorgenti prima di compilare, ogni singola modifica invalida la cache e fa ricompilare tutto in ogni immagine. Un ciclo costa minuti contro i ~20 secondi del build locale.
 
@@ -131,7 +152,12 @@ curl "http://localhost:8083/api/suggestions?limit=10"
 ## 5. Cheat Sheet Risoluzione Emergenze Esame
 
 ### 🚨 Emergenza 1: "Porta 8080 / 8761 / 5432 già in uso"
-Se sono rimasti appesi i servizi dello stack locale:
+Prima di tutto, guarda chi la occupa:
+```bash
+task status
+```
+
+`task dev` fa già pulizia da solo all'avvio, quindi gli avanzi dei suoi processi non sono un problema. Se restano appesi comunque:
 ```bash
 task dev-down
 ```
@@ -139,12 +165,12 @@ Se hai lo stack Docker attivo:
 ```bash
 task docker-down
 ```
-Come ultima risorsa, termina tutti i processi Java della macchina:
+Come ultima risorsa, termina tutti i processi Java della macchina — **anche quelli estranei al progetto**:
 ```bash
-task clean-ports
+task kill-java
 ```
 
-Se invece la porta è tenuta da un'applicazione **estranea** al progetto, `task dev` si ferma e ti dice quale processo la occupa. Tomcat non riesce a fare il bind nemmeno quando l'altro processo ascolta solo su `127.0.0.1`: il servizio muore con `Web server failed to start. Port N was already in use`. Chiudi quel processo, oppure sposta la UI:
+Se invece la porta è tenuta da un'applicazione **estranea** al progetto, `task dev` si ferma e ti dice quale processo la occupa. Tomcat non riesce a fare il bind nemmeno quando l'altro processo ascolta solo su `127.0.0.1`: il servizio muore con `Web server failed to start. Port N was already in use`. E se lo stack è nei container, la porta è pubblicata ma `http://localhost:8080` continua a rispondere dall'altra applicazione, perché su Windows il bind più specifico vince. Chiudi quel processo, oppure sposta la UI:
 ```bash
 task dev -- -UiPort 9080
 ```
@@ -166,14 +192,13 @@ docker compose up -d
 ### 🚨 Emergenza 3: "PostgreSQL non si connette o DDL-Auto fallisce"
 Reset completo del volume del database:
 ```bash
-task docker-down
-```
-```bash
-docker volume rm demo_postgres-data
+task docker-reset
 ```
 ```bash
 task docker-up
 ```
+
+> ⚠️ `task docker-reset` **cancella i dati**. Per il semplice arresto usa `task docker-down`, che conserva il volume.
 
 > ℹ️ Il volume è montato su `/var/lib/postgresql`, non sul percorso legacy `/var/lib/postgresql/data`: dalla versione 18 l'immagine tiene i dati in `/var/lib/postgresql/<versione>/docker`, e col mount vecchio il volume restava vuoto e il container non partiva.
 

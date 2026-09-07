@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# Funzioni condivise dagli script di sviluppo (dev, dev-down, logs, status).
+# Equivalente POSIX di scripts/dev-lib.ps1: la gestione delle porte e l'arresto
+# dei servizi stanno qui, cosi' l'avvio e l'arresto non possono divergere.
+
+# Porte dello stack, anche quando .dev-logs/dev.ports non esiste piu'.
+DEV_DEFAULT_PORTS="8761 8081 8082 8083 8080"
+
+dev_repo_root() {
+  cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd
+}
+
+dev_log_dir() {
+  echo "$(dev_repo_root)/.dev-logs"
+}
+
+# Tutte le porte da controllare: le fisse piu' quelle dell'ultimo avvio
+# (che possono differire se e' stato passato --ui-port).
+dev_ports() {
+  local log_dir="$1"
+  local ports="$DEV_DEFAULT_PORTS"
+  if [ -f "$log_dir/dev.ports" ]; then
+    ports="$ports $(tr '\n' ' ' <"$log_dir/dev.ports")"
+  fi
+  echo "$ports" | tr ' ' '\n' | grep -E '^[0-9]+$' | sort -u
+}
+
+port_pids() {
+  local port="$1"
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null
+  fi
+}
+
+port_in_use() {
+  local port="$1"
+  if command -v nc >/dev/null 2>&1; then
+    nc -z 127.0.0.1 "$port" >/dev/null 2>&1
+  else
+    (exec 3<>"/dev/tcp/127.0.0.1/$port") >/dev/null 2>&1
+  fi
+}
+
+process_name() {
+  ps -p "$1" -o comm= 2>/dev/null | tr -d ' '
+}
+
+# Chiude l'intero albero: mvnw ha maven come figlio e la JVM
+# dell'applicazione come nipote, altrimenti resterebbe orfana in ascolto.
+kill_tree() {
+  local pid="$1" child
+  for child in $(pgrep -P "$pid" 2>/dev/null); do
+    kill_tree "$child"
+  done
+  kill -TERM "$pid" >/dev/null 2>&1 || true
+}
+
+wait_for_port() {
+  local port="$1" timeout="${2:-120}" elapsed=0
+  while [ "$elapsed" -lt "$timeout" ]; do
+    if port_in_use "$port"; then return 0; fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  return 1
+}
+
+# Ferma i servizi locali e libera le porte. Non tocca i processi che non
+# abbiamo avviato noi: sulle porte dello stack termina solo processi java.
+# Stampa il numero di processi fermati sullo stdout.
+stop_dev_stack() {
+  local log_dir="$1" quiet="${2:-}"
+  local stopped=0 pid name port
+
+  if [ -f "$log_dir/dev.pids" ]; then
+    while read -r pid name; do
+      [ -z "${pid:-}" ] && continue
+      if kill -0 "$pid" >/dev/null 2>&1; then
+        [ -z "$quiet" ] && echo "  fermo $name (PID $pid)" >&2
+        kill_tree "$pid"
+        stopped=$((stopped + 1))
+      fi
+    done <"$log_dir/dev.pids"
+    rm -f "$log_dir/dev.pids"
+  fi
+
+  # Rete di sicurezza: qualunque java rimasto in ascolto sulle porte dello stack.
+  for port in $(dev_ports "$log_dir"); do
+    for pid in $(port_pids "$port"); do
+      case "$(process_name "$pid")" in
+        java*)
+          [ -z "$quiet" ] && echo "  fermo java (PID $pid) sulla porta $port" >&2
+          kill -TERM "$pid" >/dev/null 2>&1 || true
+          stopped=$((stopped + 1))
+          ;;
+        *)
+          [ -z "$quiet" ] && echo "  porta $port occupata da $(process_name "$pid") (PID $pid), estraneo allo stack: lasciato in esecuzione." >&2
+          ;;
+      esac
+    done
+  done
+
+  # Le porte in chiusura restano qualche istante in TIME_WAIT.
+  [ "$stopped" -gt 0 ] && sleep 2
+  echo "$stopped"
+}
