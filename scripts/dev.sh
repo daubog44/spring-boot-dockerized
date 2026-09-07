@@ -12,10 +12,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # passa gli stessi argomenti a entrambi gli script).
 UI_PORT=8080
 NO_BUILD=""
+KEEP_FOREIGN=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -UiPort|--ui-port) UI_PORT="$2"; shift 2 ;;
     -NoBuild|--no-build) NO_BUILD=1; shift ;;
+    -KeepForeign|--keep-foreign) KEEP_FOREIGN=1; shift ;;
     *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
   esac
 done
@@ -45,9 +47,9 @@ mkdir -p "$LOG_DIR"
 # Un `task dev` lanciato due volte, o dopo un crash, troverebbe le porte
 # occupate dai propri stessi processi: li fermiamo prima di ricominciare.
 echo ""
-echo "==> Pulizia degli avanzi dell'avvio precedente..."
-cleaned="$(stop_dev_stack "$LOG_DIR")"
-[ "$cleaned" -eq 0 ] && echo "  niente da fermare."
+echo "==> Libero le porte dello stack..."
+cleaned="$(stop_dev_stack "$LOG_DIR" "" "$REPO_ROOT" "$KEEP_FOREIGN")"
+[ "$cleaned" -eq 0 ] && echo "  erano gia libere."
 
 # Log degli avvii precedenti: `task logs` segue tutto quello che trova qui,
 # quindi un log rimasto da un'altra traccia comparirebbe insieme a quelli veri.
@@ -108,7 +110,8 @@ cleanup_on_failure() {
   if [ "$started_ok" -eq 0 ]; then
     echo ""
     echo "==> Avvio non riuscito: fermo i servizi gia' partiti..." >&2
-    stop_dev_stack "$LOG_DIR" >/dev/null
+    # Qui vogliamo solo ritirare quello che abbiamo avviato noi.
+    stop_dev_stack "$LOG_DIR" "" "" 1 >/dev/null
   fi
 }
 # Vale anche per Ctrl+C: non lasciamo mezzo stack acceso a occupare le porte.

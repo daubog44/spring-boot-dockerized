@@ -10,7 +10,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dev_repo_root)"
 LOG_DIR="$(dev_log_dir)"
 
-stopped="$(stop_dev_stack "$LOG_DIR")"
+# --keep-foreign: segnala le applicazioni estranee sulle porte, senza chiuderle.
+KEEP_FOREIGN=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -KeepForeign|--keep-foreign) KEEP_FOREIGN=1; shift ;;
+    *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
+  esac
+done
+
+stopped="$(stop_dev_stack "$LOG_DIR" "" "$REPO_ROOT" "${KEEP_FOREIGN:-}")"
 
 # PostgreSQL: solo se e' stato `task dev` ad accenderlo. `stop` e non `down`,
 # cosi' il volume con i dati resta al suo posto.
