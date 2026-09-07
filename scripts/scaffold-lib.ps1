@@ -46,7 +46,7 @@ function Split-TextLines {
 
 function Find-LineIndex {
     param(
-        [Parameter(Mandatory = $true)][string[]]$Lines,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][AllowEmptyString()][string[]]$Lines,
         [Parameter(Mandatory = $true)][string]$Pattern,
         [int]$From = 0
     )
@@ -60,7 +60,7 @@ function Add-LinesAt {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][int]$Index,
-        [Parameter(Mandatory = $true)][string[]]$NewLines
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][AllowEmptyString()][string[]]$NewLines
     )
     $text = Read-TextFile $Path
     $eol = Get-TextEol $text
@@ -79,7 +79,7 @@ function Add-LinesBefore {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$Anchor,
-        [Parameter(Mandatory = $true)][string[]]$NewLines,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][AllowEmptyString()][string[]]$NewLines,
         [string]$Start
     )
     $lines = @(Split-TextLines (Read-TextFile $Path))
@@ -97,7 +97,7 @@ function Add-LinesAfterLast {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$Anchor,
-        [Parameter(Mandatory = $true)][string[]]$NewLines
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][AllowEmptyString()][string[]]$NewLines
     )
     $lines = @(Split-TextLines (Read-TextFile $Path))
     $idx = -1

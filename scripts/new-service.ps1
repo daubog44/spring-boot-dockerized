@@ -306,12 +306,13 @@ if ($withDb) {
     properties:
       hibernate:
         format_sql: true
+
 "@
 }
 
 $yml = @"
 # La porta si legge da SERVER_PORT (in Docker la passa docker-compose.yml) e
-# ricade su $Port in locale. Per cambiarla:
+# ricade sul valore qui sotto quando lo avvii in locale. Per cambiarla:
 #   task set-port -- -Module $module -Port <porta>
 server:
   port: `${SERVER_PORT:$Port}
@@ -377,7 +378,8 @@ Write-Step "demo/docker-compose.yml  servizio $module"
 
 # --- 5. Lista dei servizi di task dev (Windows e POSIX) -----------------------
 
-$devLine = "    [pscustomobject]@{{ Name = '{0}'; Module = '{1}'; Port = {2} }}" -f $short, $module, $Port
+# Le colonne sono allineate come le altre righe: la lista si legge a colpo d'occhio.
+$devLine = "    [pscustomobject]@{{ Name = {0,-14} Module = {1,-18} Port = {2} }}" -f "'$short';", "'$module';", $Port
 Add-LinesBefore -Path $devPs1 -Start '^\$services = @\(' -Anchor '^\)' -NewLines @($devLine)
 Write-Step ("scripts/dev.ps1          {0} -> {1}:{2}" -f $short, $module, $Port)
 

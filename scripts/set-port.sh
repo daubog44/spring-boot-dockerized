@@ -156,6 +156,7 @@ LEFT="$(grep -rnE "\b$OLD_PORT\b" "$REPO_ROOT" \
   --include='*.ps1' --include='*.sh' --include='*.md' --include='*.yml' --include='*.yaml' \
   --exclude-dir=.git --exclude-dir=.dev-logs --exclude-dir=target --exclude-dir=node_modules --exclude-dir=.task \
   --exclude=docker-compose.yml --exclude=dev.ps1 --exclude=dev.sh --exclude=status.ps1 --exclude=status.sh --exclude=dev-lib.ps1 --exclude=dev-lib.sh \
+  --exclude=scaffold-lib.ps1 --exclude='new-service.*' --exclude='add-dep.*' --exclude='set-port.*' \
   2>/dev/null | cut -d: -f1,2 | sed "s|^$REPO_ROOT/||" || true)"
 if [ -n "$LEFT" ]; then
   echo ""

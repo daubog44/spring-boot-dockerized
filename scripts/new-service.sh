@@ -283,7 +283,7 @@ fi
 {
   cat <<EOF
 # La porta si legge da SERVER_PORT (in Docker la passa docker-compose.yml) e
-# ricade su $PORT in locale. Per cambiarla:
+# ricade sul valore qui sotto quando lo avvii in locale. Per cambiarla:
 #   task set-port -- --module $MODULE --port <porta>
 server:
   port: \${SERVER_PORT:$PORT}
@@ -368,7 +368,9 @@ echo "  demo/docker-compose.yml  servizio $MODULE"
 PS_START="$(line_of_first "$DEV_PS1" '^\$services = @\(')"
 PS_END="$(awk -v s="$PS_START" 'NR > s && /^\)/ { print NR; exit }' "$DEV_PS1")"
 [ -n "$PS_END" ] || { echo "Non trovo la fine della lista \$services in $DEV_PS1: aggiungi la riga a mano." >&2; exit 1; }
-insert_at_line "$DEV_PS1" "$((PS_END - 1))" "    [pscustomobject]@{ Name = '$SHORT'; Module = '$MODULE'; Port = $PORT }"
+# Le colonne sono allineate come le altre righe: la lista si legge a colpo d'occhio.
+PS_LINE="$(printf '    [pscustomobject]@{ Name = %-14s Module = %-18s Port = %s }' "'$SHORT';" "'$MODULE';" "$PORT")"
+insert_at_line "$DEV_PS1" "$((PS_END - 1))" "$PS_LINE"
 echo "  scripts/dev.ps1          $SHORT -> $MODULE:$PORT"
 
 SH_START="$(line_of_first "$DEV_SH" '^SERVICES=\(')"
