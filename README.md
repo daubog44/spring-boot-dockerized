@@ -1,6 +1,8 @@
-# Spring Boot Dockerized - Template d'Esame ITS
+# Spring Boot Dockerized - Esempio Eventi/Turismo
 
-Questo repository è un **Template Multi-Modulo Maven d'Esame** pronto all'uso. È progettato per consentirti di sviluppare rapidamente qualsiasi traccia d'esame (WMS, Catasto, Prenotazione Ospedaliera, Eventi/Turismo, ecc.) basata su **Spring Boot**, **Spring Cloud Eureka**, **OpenFeign**, **OpenAPI/Swagger UI**, **PostgreSQL** e **Docker Compose**.
+Questo branch contiene un **esempio d'esame svolto** sulla traccia **Eventi/Turismo (OpenDataHub)**, costruito sul template multi-modulo Maven del branch [`main`](https://github.com/daubog44/spring-boot-dockerized/tree/main) con **Spring Boot**, **Spring Cloud Eureka**, **OpenFeign**, **OpenAPI/Swagger UI**, **PostgreSQL** e **Docker Compose**.
+
+Flusso applicativo: la UI riceve coordinate, raggio e numero di alternative, interroga `TOURIST-SERVICE` (wrapper Feign di OpenDataHub), estrae un indice tramite `RANDOM-SERVICE` e salva il suggerimento scelto su `STORE-SERVICE`, che lo persiste su PostgreSQL.
 
 ---
 
@@ -13,19 +15,32 @@ Questo repository è un **Template Multi-Modulo Maven d'Esame** pronto all'uso. 
 
 ---
 
-## 🏗️ Architettura del Template Multi-Modulo
+## 🌿 Branch del Repository
 
-Il progetto è organizzato come un aggregatore Multi-Module Maven dentro la cartella `demo`:
+- **[`main`](https://github.com/daubog44/spring-boot-dockerized/tree/main)**: Template d'Esame pulito e neutro, adattabile a qualsiasi traccia.
+- **[`solution/wms`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: Soluzione completa della traccia WMS Magazzino "Spostati S.r.l." con script di collaudo automatizzato.
+- **`example/tourist-events`** (questo branch): Esempio svolto della traccia Eventi/Turismo.
 
-1. **`naming-server`**: Server Eureka Naming Server (Porta `8761`).
-2. **`common-dto`**: Modulo libreria con le classi DTO condivise tra i microservizi.
-3. **Microservizi Modello / Scheletro**:
-   - `tourist-service` (Porta `8081`) - Esempio di wrapper / servizio REST esterno.
-   - `random-service` (Porta `8082`) - Esempio di microservizio ausiliario / generatore.
-   - `store-service` (Porta `8083`) - Esempio di microservizio REST con persistenza DB PostgreSQL/H2.
-4. **`event-ui`**: Applicazione Web UI Thymeleaf / Frontend (Porta `8080`).
+---
 
-> 💡 **Nota per il Giorno dell'Esame**: Puoi rinominare, adattare o aggiungere nuovi moduli all'interno di `demo` in base al contesto della traccia assegnata (es. trasformare `store-service` nel servizio anagrafica WMS o Catasto).
+## 🏗️ Architettura dei Servizi
+
+Il progetto è un aggregatore Multi-Module Maven dentro la cartella `demo`:
+
+1. **`naming-server`**: Eureka Naming Server (Porta `8761`).
+2. **`common-dto`**: Modulo libreria con i DTO condivisi tra i microservizi.
+3. **`tourist-service`** (Porta `8081`): Wrapper REST dell'endpoint OpenDataHub `/v1/Event` (`TouristController`, `OpenDataHubEventClient` via OpenFeign). Base URL configurabile con `TOURIST_API_BASE_URL`.
+4. **`random-service`** (Porta `8082`): Generatore di indici casuali (`RandomController`).
+5. **`store-service`** (Porta `8083`): Storico dei suggerimenti (`SuggestionController`), persistenza JPA/Hibernate su PostgreSQL.
+6. **`event-ui`** (Porta `8080`): Web UI Thymeleaf (`UiController`), consuma gli altri tre servizi via OpenFeign (`TouristServiceClient`, `RandomServiceClient`, `StoreServiceClient`) risolti tramite Eureka.
+
+> ⚠️ Il container Docker della UI si chiama `ui-service` nel `docker-compose.yml`, mentre il modulo Maven è `event-ui`.
+
+Nomi con cui i servizi si registrano su Eureka: `TOURIST-SERVICE`, `RANDOM-SERVICE`, `STORE-SERVICE`, `EVENT-UI`.
+
+### 🗄️ Database
+
+`store-service` è collegato a PostgreSQL tramite le variabili d'ambiente già impostate nel `docker-compose.yml` (`STORE_DB_URL`, `STORE_DB_USERNAME`, `STORE_DB_PASSWORD`). Gli altri servizi non hanno persistenza.
 
 ---
 
@@ -37,13 +52,56 @@ Il progetto è organizzato come un aggregatore Multi-Module Maven dentro la cart
 - `task docker-logs`: Monitora i log di tutti i microservizi.
 - `task clean-ports`: Termina eventuali processi Java rimasti pendenti.
 
+Avvio locale dei singoli moduli (senza Docker): `task run-eureka`, `task run-tourist`, `task run-random`, `task run-store`, `task run-ui`, `task run-db`.
+
 ---
 
 ## 🌐 Mappa delle Porte ed Interfacce OpenAPI / Swagger UI
 
 - **UI Applicativa**: `http://localhost:8080`
 - **Dashboard Eureka**: `http://localhost:8761`
+- **PostgreSQL**: `localhost:5432` (db `event_suggestions`, utente `exam`, password `exam`)
 - **Swagger UI Tourist Service**: `http://localhost:8081/swagger-ui.html`
 - **Swagger UI Random Service**: `http://localhost:8082/swagger-ui.html`
 - **Swagger UI Store Service**: `http://localhost:8083/swagger-ui.html`
 - **Swagger UI Event UI**: `http://localhost:8080/swagger-ui.html`
+
+---
+
+## 🩺 Troubleshooting
+
+### `dependency failed to start: container exam-eureka is unhealthy`
+
+Sintomo: `task docker-up` fallisce, `exam-eureka` risulta `unhealthy` e nessun microservizio parte, anche se nei log Eureka scrive regolarmente `Started Eureka Server`.
+
+Causa: l'healthcheck di `eureka-server` invoca `curl` su `/actuator/health`, ma l'immagine runtime `eclipse-temurin:25-jre` **non include `curl`**. Ogni probe fallisce con `curl: not found`, il container resta `unhealthy` e tutti i servizi con `depends_on: condition: service_healthy` non vengono mai avviati.
+
+> ⚠️ **Su questo branch il fix non è ancora applicato.** I branch `main` e `solution/wms` lo hanno già. Per applicarlo qui, aggiungi in `demo/Dockerfile` questa riga subito dopo `FROM eclipse-temurin:25-jre`:
+>
+> ```dockerfile
+> RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+> ```
+>
+> Utile anche aggiungere `start_period: 30s` all'healthcheck di `eureka-server` in `demo/docker-compose.yml`, così l'avvio della JVM non consuma i retry.
+
+Per capire *perché* un healthcheck non passa, leggi l'output delle probe:
+
+```bash
+docker inspect exam-eureka --format "{{json .State.Health}}"
+```
+
+### Altri controlli utili
+
+```bash
+docker compose ps
+```
+
+```bash
+docker logs exam-store-service --tail 50
+```
+
+Per verificare quali servizi si sono effettivamente registrati su Eureka, apri `http://localhost:8761` nel browser oppure, dall'host:
+
+```bash
+curl -s -H "Accept: application/json" http://localhost:8761/eureka/apps
+```
