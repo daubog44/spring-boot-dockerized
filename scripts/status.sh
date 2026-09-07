@@ -9,8 +9,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 LOG_DIR="$(dev_log_dir)"
 
-# Nome atteso per ogni porta (cambia da traccia a traccia).
+# Nome dei servizi: prima l'ultimo `task dev` (dev.ports e dev.services sono
+# scritti nello stesso ordine, quindi la coppia riga-per-riga dice chi sta su
+# ogni porta), poi un ripiego per quando .dev-logs non c'e' ancora.
 port_name() {
+  local i=1 p
+  if [ -f "$LOG_DIR/dev.ports" ] && [ -f "$LOG_DIR/dev.services" ]; then
+    while read -r p; do
+      if [ "$p" = "$1" ]; then sed -n "${i}p" "$LOG_DIR/dev.services"; return; fi
+      i=$((i + 1))
+    done <"$LOG_DIR/dev.ports"
+  fi
   case "$1" in
     8761) echo "eureka" ;;
     8081) echo "tourist" ;;
