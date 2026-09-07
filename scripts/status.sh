@@ -25,8 +25,8 @@ port_name() {
 echo ""
 echo "PORTE"
 printf '  %-6s %-18s %-12s %s\n' "PORTA" "SERVIZIO" "STATO" "PROCESSO"
-# 5432 non e' nell'elenco dello stack (il database vive in un container e
-# non va mai terminato), ma qui interessa sapere se risponde.
+# 5432 non e' fra le porte dello stack (il database vive in un container e non
+# va mai terminato), ma qui interessa sapere se risponde.
 for port in $(printf '%s\n' $DEV_DEFAULT_PORTS 5432 $(dev_ports "$LOG_DIR") | sort -un); do
   pid="$(port_pids "$port" | head -n 1)"
   if [ -z "$pid" ]; then

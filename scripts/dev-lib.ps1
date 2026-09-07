@@ -134,16 +134,43 @@ function Wait-ForPort {
     return $false
 }
 
+function Test-ProtectedProcess {
+    <#
+        Processi che non vanno terminati per liberare una porta: chiuderli fa
+        cadere Windows o Docker Desktop, non il nostro stack. Su una di queste
+        porte ci finiscono, per esempio, il portproxy di WinNAT o IIS Express,
+        che girano dentro svchost.
+    #>
+    param([pscustomobject]$Listener)
+
+    if ($Listener.IsDocker) { return $true }
+    if ($Listener.Id -le 4) { return $true }
+    $protected = @(
+        'system', 'idle', 'registry', 'memory compression', 'ntoskrnl',
+        'svchost', 'services', 'wininit', 'winlogon', 'csrss', 'smss', 'lsass', 'dwm',
+        'explorer', 'dockerd', 'containerd'
+    )
+    return ($protected -contains $Listener.Name.ToLower())
+}
+
 function Stop-DevStack {
     <#
     .SYNOPSIS
         Ferma i servizi locali e libera le porte dello stack.
     .DESCRIPTION
-        Non tocca i processi che non abbiamo avviato noi: sulle porte dello
-        stack termina solo i processi java, e per Docker o altre applicazioni
-        si limita a segnalare chi occupa la porta.
+        Libera davvero le porte: termina i nostri processi java, spegne i
+        container dell'esame se sono loro a tenerle, e chiude le applicazioni
+        estranee rimaste in ascolto. Restano intoccati i processi di sistema e
+        l'infrastruttura di Docker (vedi Test-ProtectedProcess).
+    .PARAMETER KeepForeign
+        Non chiudere le applicazioni estranee: le segnala soltanto.
     #>
-    param([string]$LogDir, [switch]$Quiet)
+    param(
+        [string]$LogDir,
+        [string]$RepoRoot,
+        [switch]$Quiet,
+        [switch]$KeepForeign
+    )
 
     $stopped = 0
     $pidFile = Join-Path $LogDir 'dev.pids'
@@ -164,28 +191,64 @@ function Stop-DevStack {
         Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
     }
 
-    # 2. Rete di sicurezza: qualunque java rimasto in ascolto sulle porte dello
-    #    stack, anche di un avvio precedente di cui non abbiamo piu' i PID.
+    # 2. Tutto quello che e' rimasto in ascolto sulle porte dello stack: i nostri
+    #    java di un avvio precedente di cui non abbiamo piu' i PID, i container
+    #    dell'esame, e le applicazioni estranee. L'obiettivo e' che dopo questa
+    #    funzione le porte siano libere, senza doverci pensare.
+    $dockerHoldsPorts = $false
     foreach ($port in (Get-DevPorts -LogDir $LogDir)) {
-        $listeners = @(Get-PortListeners -Port $port)
+        foreach ($listener in (Get-PortListeners -Port $port)) {
 
-        foreach ($listener in ($listeners | Where-Object { $_.IsOurs })) {
-            if (-not $Quiet) { Write-Host "  fermo java (PID $($listener.Id)) sulla porta $port" }
+            if ($listener.IsOurs) {
+                if (-not $Quiet) { Write-Host "  fermo java (PID $($listener.Id)) sulla porta $port" }
+                Stop-Process -Id $listener.Id -Force -ErrorAction SilentlyContinue
+                $stopped++
+                continue
+            }
+
+            # I container li fermiamo una volta sola, con docker compose: sono
+            # nostri quanto i processi java, ma vanno spenti dal loro gestore.
+            if ($listener.IsDocker) { $dockerHoldsPorts = $true; continue }
+
+            if (Test-ProtectedProcess -Listener $listener) {
+                if (-not $Quiet) {
+                    Write-Host "  porta $port occupata da $($listener.Name) (PID $($listener.Id)): processo di sistema, non lo tocco." -ForegroundColor Yellow
+                }
+                continue
+            }
+
+            if ($KeepForeign) {
+                if (-not $Quiet) {
+                    Write-Host "  porta $port occupata da $($listener.Name) (PID $($listener.Id)), estraneo allo stack: lasciato in esecuzione." -ForegroundColor Yellow
+                }
+                continue
+            }
+
+            Write-Host "  chiudo $($listener.Name) (PID $($listener.Id)), estraneo allo stack, che teneva la porta $port" -ForegroundColor Yellow
             Stop-Process -Id $listener.Id -Force -ErrorAction SilentlyContinue
-            $stopped++
+            if ($?) { $stopped++ }
         }
+    }
 
-        if ($Quiet) { continue }
-
-        # Sugli altri non interveniamo: una riga sola per porta, non una per
-        # processo, altrimenti Docker (che ne usa piu' d'uno) riempie lo schermo.
-        $foreign = @($listeners | Where-Object { -not $_.IsOurs })
-        if ($foreign.Count -eq 0) { continue }
-        if ($foreign | Where-Object { $_.IsDocker }) {
-            Write-Host "  porta $port pubblicata dai container: la libera 'task docker-down'." -ForegroundColor Yellow
-        } else {
-            $other = $foreign[0]
-            Write-Host "  porta $port occupata da $($other.Name) (PID $($other.Id)), estraneo allo stack: lasciato in esecuzione." -ForegroundColor Yellow
+    # 3. I container dell'esame. `down` e non `down -v`: i dati del database restano.
+    if ($dockerHoldsPorts -and $RepoRoot) {
+        if (-not $Quiet) { Write-Host '  fermo i container dell''esame, che tenevano le porte' -ForegroundColor Yellow }
+        Push-Location (Join-Path $RepoRoot 'demo')
+        # docker compose scrive l'avanzamento su stderr: con ErrorActionPreference
+        # a Stop ogni riga diventerebbe un errore terminante, e il conteggio dei
+        # processi fermati salterebbe.
+        $previousPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            docker compose down --remove-orphans 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $stopped++
+            } else {
+                Write-Host '  (docker compose non raggiungibile: container ancora accesi)' -ForegroundColor Yellow
+            }
+        } finally {
+            $ErrorActionPreference = $previousPreference
+            Pop-Location
         }
     }
 

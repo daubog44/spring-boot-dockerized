@@ -8,6 +8,7 @@ Flusso applicativo: la UI riceve coordinate, raggio e numero di alternative, int
 
 ## 📚 Documentazione & Guide per l'Esame
 
+- **[🚨 Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. Parti da qui.
 - [📖 Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
 - [📘 Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md)
 - [🛠️ Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
@@ -52,7 +53,7 @@ Nomi con cui i servizi si registrano su Eureka: `TOURIST-SERVICE`, `RANDOM-SERVI
 task dev
 ```
 
-Prima ferma quello che fosse rimasto acceso da un avvio precedente e libera le porte, poi avvia PostgreSQL su Docker, compila tutti i moduli una volta sola, lancia Eureka, ne attende la porta e infine avvia gli altri quattro servizi.
+Prima **libera le porte**: ferma i servizi di un avvio precedente, spegne i container dell'esame se sono loro a tenerle e chiude le applicazioni estranee rimaste in ascolto (non tocca i processi di sistema né l'infrastruttura di Docker). Poi avvia PostgreSQL su Docker, compila tutti i moduli una volta sola, lancia Eureka, ne attende la porta e infine avvia gli altri quattro servizi.
 
 **Un terminale solo, nessuna finestra sparsa**: i servizi girano in background e scrivono in `.dev-logs/`. Per vedere cosa fanno:
 
@@ -64,11 +65,11 @@ Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (`stor
 
 **Hot reload**: ogni servizio gira con `spring-boot-devtools`. Dopo aver modificato del codice, `task compile` ricompila e il servizio interessato si riavvia da solo.
 
-**Per fermare tutto**: `task dev-down`, che ferma anche il container PostgreSQL avviato da `task dev` (il volume resta, i dati non si perdono).
+**Per fermare tutto**: `task dev-down`. Libera le porte esattamente come fa `task dev` all'avvio (stessa funzione, quindi non possono divergere) e ferma il container PostgreSQL avviato da `task dev`, conservando il volume.
 
 **Quando qualcosa non risponde**: `task status` dice chi occupa ognuna delle porte (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
 
-> 💡 Se una porta è occupata da un'applicazione estranea, `task dev` si ferma e ti dice quale processo la tiene. Per spostare la sola UI: `task dev -- -UiPort 9080`.
+> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: `task dev -- -KeepForeign -UiPort 9080`. Senza `-KeepForeign` viene chiusa.
 
 **Per la demo**, usa lo stack containerizzato:
 
@@ -76,7 +77,7 @@ Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (`stor
 task docker-up
 ```
 
-Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale prima di partire, e `task dev` si rifiuta di partire se i container sono accesi.
+Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale prima di partire, e `task dev` spegne da solo i container (con `docker compose down`, i dati del database restano).
 
 ### Elenco completo dei task
 
@@ -145,7 +146,7 @@ Causa: un'altra applicazione della macchina è in ascolto su `127.0.0.1:8080`. S
 task status
 ```
 
-Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. Chiudi il processo indicato, oppure sposta la UI: `task dev -- -UiPort 9080`.
+Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. `task dev` chiude da solo quel processo al prossimo avvio; se invece ti serve tenerlo vivo, sposta la UI con `task dev -- -KeepForeign -UiPort 9080`.
 
 ### Altri controlli utili
 
