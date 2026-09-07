@@ -256,7 +256,7 @@ public class WmsService implements CommandLineRunner {
         String customerName = null;
         if (entity.getCustomerId() != null) {
             CustomerDTO c = fetchCustomer(entity.getCustomerId());
-            customerName = (c != null) ? c.getCompany() + " (" + c.getName() + ")" : "Cliente #" + entity.getCustomerId();
+            customerName = (c != null) ? formatCustomer(c) : "Cliente #" + entity.getCustomerId();
         }
 
         return LocationDTO.builder()
@@ -272,6 +272,17 @@ public class WmsService implements CommandLineRunner {
             .customerName(customerName)
             .quantity(entity.getQuantity())
             .build();
+    }
+
+    /**
+     * Il fallback usato quando il CRM non risponde valorizza solo la ragione sociale:
+     * senza questo controllo la dashboard mostrerebbe "Cliente #201 (null)".
+     */
+    private String formatCustomer(CustomerDTO customer) {
+        if (customer.getName() == null || customer.getName().isBlank()) {
+            return customer.getCompany();
+        }
+        return customer.getCompany() + " (" + customer.getName() + ")";
     }
 
     private ProductDTO fetchProduct(Long id) {

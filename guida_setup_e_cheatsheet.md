@@ -111,6 +111,12 @@ task test-e2e
 
 Esegue [`test_e2e_wms.ps1`](./test_e2e_wms.ps1), che percorre l'intero flusso sui servizi avviati.
 
+Se hai spostato la UI su un'altra porta, passala anche al collaudo, altrimenti il controllo sulla dashboard interroga qualunque applicazione occupi la 8080:
+
+```bash
+task test-e2e -- -UiPort 9080
+```
+
 ### Test manuale via `curl` (API Direct Check)
 
 ```bash

@@ -94,7 +94,7 @@ tasks:
   test-e2e:
     desc: Run automated E2E test script
     cmds:
-      - powershell -ExecutionPolicy Bypass -File ./test_e2e_wms.ps1
+      - powershell -ExecutionPolicy Bypass -File ./test_e2e_wms.ps1 {{.CLI_ARGS}}
 
   run-module:
     internal: true

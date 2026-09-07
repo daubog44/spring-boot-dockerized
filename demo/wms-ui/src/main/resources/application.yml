@@ -1,5 +1,11 @@
 server:
   port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      # Solo cookie: senza questo, al primo invio di un form (quando il client non ha
+      # ancora un JSESSIONID) Tomcat riscrive il redirect in "/;jsessionid=..." e la
+      # richiesta successiva risponde 404, perche' i path parameter sono rifiutati.
+      tracking-modes: cookie
 
 spring:
   application:

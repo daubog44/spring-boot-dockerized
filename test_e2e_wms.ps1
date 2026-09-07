@@ -2,6 +2,13 @@
 # SCRIPT DI TEST E2E AUTOMATIZZATO - TRACCIA WMS "SPOSTATI S.R.L."
 # ===================================================================
 
+param(
+    # Porta su cui risponde la UI. Va allineata a quella usata all'avvio: con
+    # `task dev -- -UiPort 9080` passa 9080, altrimenti il controllo interrogherebbe
+    # qualunque altra applicazione occupi la 8080, dando un falso positivo.
+    [int]$UiPort = 8080
+)
+
 $ErrorActionPreference = "Continue"
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host " 🚀 AVVIO TEST E2E COMPLETO - TRACCIA D'ESAME WMS MAGAZZINO" -ForegroundColor Cyan
@@ -18,7 +25,7 @@ $demoDir = Join-Path $baseDir "demo"
 Push-Location $demoDir
 
 try {
-    $mvnResult = cmd /c "mvnw.cmd clean package -Dmaven.test.skip=true"
+    $mvnResult = cmd /c ".\mvnw.cmd clean package -Dmaven.test.skip=true"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Fallimento nella compilazione Maven!" -ForegroundColor Red
         Pop-Location
@@ -67,7 +74,7 @@ $tests = @(
     @{ Name = "CRM Swagger UI"; Url = "http://localhost:8082/swagger-ui.html" },
     @{ Name = "WMS Service Locations"; Url = "http://localhost:8083/api/wms/locations" },
     @{ Name = "WMS Swagger UI"; Url = "http://localhost:8083/swagger-ui.html" },
-    @{ Name = "WMS Web UI Dashboard"; Url = "http://localhost:8080" }
+    @{ Name = "WMS Web UI Dashboard"; Url = "http://localhost:$UiPort" }
 )
 
 foreach ($t in $tests) {

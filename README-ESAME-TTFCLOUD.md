@@ -327,7 +327,7 @@ task docker-down
 task test-e2e
 ```
 
-Esegue [`test_e2e_wms.ps1`](./test_e2e_wms.ps1), che percorre il flusso completo sui servizi avviati.
+Esegue [`test_e2e_wms.ps1`](./test_e2e_wms.ps1), che percorre il flusso completo sui servizi avviati. Se hai spostato la UI su un'altra porta, passala anche qui: `task test-e2e -- -UiPort 9080`.
 
 ## Task disponibili
 
