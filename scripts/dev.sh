@@ -48,7 +48,12 @@ mkdir -p "$LOG_DIR"
 # occupate dai propri stessi processi: li fermiamo prima di ricominciare.
 echo ""
 echo "==> Libero le porte dello stack..."
-cleaned="$(stop_dev_stack "$LOG_DIR" "" "$REPO_ROOT" "$KEEP_FOREIGN")"
+CONFIGURED_PORTS=""
+for svc in "${SERVICES[@]}"; do
+  IFS=':' read -r _name _module port <<<"$svc"
+  CONFIGURED_PORTS="$CONFIGURED_PORTS $port"
+done
+cleaned="$(stop_dev_stack "$LOG_DIR" "" "$REPO_ROOT" "$KEEP_FOREIGN" "$CONFIGURED_PORTS")"
 [ "$cleaned" -eq 0 ] && echo "  erano gia libere."
 
 # Log degli avvii precedenti: `task logs` segue tutto quello che trova qui,
@@ -167,15 +172,21 @@ fi
 
 started_ok=1
 
+echo ""
+echo "Stack locale avviato."
+echo ""
+# Gli indirizzi vengono dalla configurazione in cima: cambiando una porta li',
+# questo elenco resta giusto senza altri interventi.
+for svc in "${SERVICES[@]}"; do
+  IFS=':' read -r name _module port <<<"$svc"
+  case "$name" in
+    eureka) printf '  %-18s%s\n' "Dashboard Eureka" "http://localhost:$port" ;;
+    ui|*-ui) printf '  %-18s%s\n' "UI $name" "http://localhost:$port" ;;
+    *)      printf '  %-18s%s\n' "Swagger $name" "http://localhost:$port/swagger-ui.html" ;;
+  esac
+done
+
 cat <<EOF
-
-Stack locale avviato.
-
-  UI applicativa    http://localhost:$UI_PORT
-  Dashboard Eureka  http://localhost:8761
-  Swagger tourist   http://localhost:8081/swagger-ui.html
-  Swagger random    http://localhost:8082/swagger-ui.html
-  Swagger store     http://localhost:8083/swagger-ui.html
 
   task logs         segue i log di tutti i servizi (Ctrl+C per uscire)
   task logs -- store   solo quel servizio

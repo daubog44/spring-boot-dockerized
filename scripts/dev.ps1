@@ -76,7 +76,7 @@ New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 # di sistema e l'infrastruttura Docker.
 Write-Host ''
 Write-Host '==> Libero le porte dello stack...' -ForegroundColor Cyan
-$cleaned = Stop-DevStack -LogDir $logDir -RepoRoot $repoRoot -KeepForeign:$KeepForeign
+$cleaned = Stop-DevStack -LogDir $logDir -RepoRoot $repoRoot -Ports ($services | ForEach-Object { $_.Port }) -KeepForeign:$KeepForeign
 if ($cleaned -eq 0) { Write-Host '  erano gia libere.' }
 
 # Log e wrapper degli avvii precedenti: `task logs` segue tutto quello che
@@ -266,11 +266,16 @@ try {
 Write-Host ''
 Write-Host 'Stack locale avviato.' -ForegroundColor Green
 Write-Host ''
-Write-Host "  UI applicativa    http://localhost:$UiPort"
-Write-Host '  Dashboard Eureka  http://localhost:8761'
-Write-Host '  Swagger tourist   http://localhost:8081/swagger-ui.html'
-Write-Host '  Swagger random    http://localhost:8082/swagger-ui.html'
-Write-Host '  Swagger store     http://localhost:8083/swagger-ui.html'
+# Gli indirizzi vengono dalla configurazione in cima: cambiando una porta li',
+# questo elenco resta giusto senza altri interventi.
+foreach ($svc in $services) {
+    $label, $url = switch -Regex ($svc.Name) {
+        '^eureka$' { 'Dashboard Eureka', "http://localhost:$($svc.Port)"; break }
+        '(^|-)ui$' { "UI $($svc.Name)", "http://localhost:$($svc.Port)"; break }
+        default    { "Swagger $($svc.Name)", "http://localhost:$($svc.Port)/swagger-ui.html" }
+    }
+    Write-Host ("  {0,-18}{1}" -f $label, $url)
+}
 Write-Host ''
 Write-Host '  task logs         segue i log di tutti i servizi (Ctrl+C per uscire)'
 Write-Host '  task logs -- store   solo quel servizio'

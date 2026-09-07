@@ -29,6 +29,30 @@ function Get-DevPorts {
     $ports | Sort-Object -Unique
 }
 
+function Get-DevServiceMap {
+    <#
+    .SYNOPSIS
+        Mappa porta -> nome del servizio, com'erano all'ultimo `task dev`.
+    .DESCRIPTION
+        dev.ps1 scrive dev.ports e dev.services nello stesso ordine: leggendoli
+        in coppia, `task status` sa come si chiama chi sta su ogni porta senza
+        che i nomi vadano ripetuti anche qui.
+    #>
+    param([string]$LogDir)
+
+    $map = [ordered]@{}
+    $portFile = Join-Path $LogDir 'dev.ports'
+    $nameFile = Join-Path $LogDir 'dev.services'
+    if (-not (Test-Path $portFile) -or -not (Test-Path $nameFile)) { return $map }
+
+    $ports = @(Get-Content $portFile | Where-Object { $_ -match '^\d+$' })
+    $names = @(Get-Content $nameFile | Where-Object { $_ -match '\S' })
+    for ($i = 0; $i -lt [Math]::Min($ports.Count, $names.Count); $i++) {
+        $map[[string]$ports[$i]] = $names[$i].Trim()
+    }
+    return $map
+}
+
 function Get-PortListenerIds {
     param([int]$Port)
     try {
@@ -162,12 +186,17 @@ function Stop-DevStack {
         container dell'esame se sono loro a tenerle, e chiude le applicazioni
         estranee rimaste in ascolto. Restano intoccati i processi di sistema e
         l'infrastruttura di Docker (vedi Test-ProtectedProcess).
+    .PARAMETER Ports
+        Porte da liberare. Se omesso usa quelle dell'ultimo avvio piu' i default:
+        dev.ps1 passa qui le porte della sua configurazione, cosi' cambiarle in
+        un posto solo basta anche per la pulizia.
     .PARAMETER KeepForeign
         Non chiudere le applicazioni estranee: le segnala soltanto.
     #>
     param(
         [string]$LogDir,
         [string]$RepoRoot,
+        [int[]]$Ports,
         [switch]$Quiet,
         [switch]$KeepForeign
     )
@@ -196,7 +225,8 @@ function Stop-DevStack {
     #    dell'esame, e le applicazioni estranee. L'obiettivo e' che dopo questa
     #    funzione le porte siano libere, senza doverci pensare.
     $dockerHoldsPorts = $false
-    foreach ($port in (Get-DevPorts -LogDir $LogDir)) {
+    $portsToFree = if ($Ports) { @($Ports + (Get-DevPorts -LogDir $LogDir)) | Sort-Object -Unique } else { Get-DevPorts -LogDir $LogDir }
+    foreach ($port in $portsToFree) {
         foreach ($listener in (Get-PortListeners -Port $port)) {
 
             if ($listener.IsOurs) {
