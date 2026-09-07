@@ -1,21 +1,53 @@
 {
+    "version": "0.2.0",
     "configurations": [
         {
             "type": "java",
-            "name": "Main",
+            "name": "1. eureka-server (:8761)",
             "request": "launch",
-            "mainClass": "com.example.bootlezione1.Main",
-            "projectName": "demo"
+            "mainClass": "com.example.ttfcloud_esame.namingserver.Main",
+            "projectName": "naming-server"
         },
         {
             "type": "java",
-            "name": "Spring Boot-DemoApplication<demo>",
+            "name": "2. product-service (:8081)",
             "request": "launch",
-            "cwd": "${workspaceFolder}",
-            "mainClass": "com.example.demo.DemoApplication",
-            "projectName": "demo",
-            "args": "",
-            "envFile": "${workspaceFolder}/.env"
+            "mainClass": "com.example.ttfcloud_esame.productservice.Main",
+            "projectName": "product-service"
+        },
+        {
+            "type": "java",
+            "name": "3. crm-service (:8082)",
+            "request": "launch",
+            "mainClass": "com.example.ttfcloud_esame.crmservice.Main",
+            "projectName": "crm-service"
+        },
+        {
+            "type": "java",
+            "name": "4. wms-service (:8083)",
+            "request": "launch",
+            "mainClass": "com.example.ttfcloud_esame.wmsservice.Main",
+            "projectName": "wms-service"
+        },
+        {
+            "type": "java",
+            "name": "5. wms-ui (:8080)",
+            "request": "launch",
+            "mainClass": "com.example.ttfcloud_esame.wmsui.Main",
+            "projectName": "wms-ui"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Stack WMS completo",
+            "configurations": [
+                "1. eureka-server (:8761)",
+                "2. product-service (:8081)",
+                "3. crm-service (:8082)",
+                "4. wms-service (:8083)",
+                "5. wms-ui (:8080)"
+            ],
+            "stopAll": true
         }
     ]
 }
