@@ -67,8 +67,10 @@ task compile
 ```
 
 **Non rilanciare `task dev` a ogni modifica.** Ti serve solo quando cambi
-qualcosa che un riavvio a caldo non copre: un `application.yml`, una porta, un
-modulo nuovo nel `pom.xml`. Puoi lanciarlo quando vuoi, fa pulizia da solo.
+qualcosa che un riavvio a caldo non copre: un `application.yml`, una porta, una
+dipendenza, un modulo nuovo. Per quei casi c'è un comando apposta: vedi
+[Modifiche strutturali](#modifiche-strutturali-dipendenze-porte-moduli-nuovi).
+Puoi lanciarlo quando vuoi, fa pulizia da solo.
 
 Quando qualcosa non risponde, **prima di formulare ipotesi**:
 
@@ -78,6 +80,79 @@ task status
 
 Ti dice, porta per porta, chi è in ascolto: un tuo servizio, i container, o
 un'applicazione estranea. E cosa si è registrato su Eureka.
+
+---
+
+## Modifiche strutturali: dipendenze, porte, moduli nuovi
+
+Tre cose non le copre il ciclo `task compile`, perché toccano più file che
+devono restare d'accordo fra loro. Per ognuna c'è un comando.
+
+### Aggiungere una dipendenza a un microservizio
+
+```bash
+task add-dep -- -Module wms-service -Deps security,mail
+```
+
+Le versioni **non si scrivono**: le decide il `pom.xml` padre, che eredita da
+Spring Boot e importa il BOM di Spring Cloud. Per questo una dipendenza si
+aggiunge con il solo nome.
+
+I nomi brevi riconosciuti (`web`, `data-jpa`, `security`, `feign`, `kafka`,
+`postgresql`, ...) li stampa:
+
+```bash
+task add-dep -- -List
+```
+
+Se ti serve qualcosa che non è in elenco, passa le coordinate per esteso:
+`task add-dep -- -Module wms-service -Deps 'org.apache.commons:commons-lang3:3.17.0'`.
+
+> **Poi serve `task dev`, non `task compile`.** Il classpath di un servizio è
+> fissato quando parte: un jar nuovo lo vede solo un riavvio vero. Vale per
+> ogni dipendenza aggiunta e per ogni modulo nuovo.
+
+`devtools` non serve aggiungerlo: è già nel pom padre, quindi ce l'hanno tutti
+i moduli — è lui a dare l'hot reload dopo `task compile`.
+
+### Cambiare una porta
+
+```bash
+task set-port -- -Module wms-ui -Port 9080
+```
+
+Una porta è scritta in quattro punti: l'`application.yml` del modulo,
+`docker-compose.yml` (variabile d'ambiente **e** pubblicazione) e la lista dei
+servizi in `dev.ps1` e `dev.sh`. Cambiarne tre su quattro dà il caso peggiore:
+in locale funziona e in Docker no, o viceversa. Il comando li cambia tutti, e
+ti elenca i punti che restano (collaudo e documentazione) perché li guardi tu.
+
+Il **codice Java non contiene porte**: i servizi si chiamano per nome via
+Eureka e Feign, quindi spostare una porta non rompe nessuna chiamata. Anche
+spostare Eureka funziona: il comando aggiorna il `defaultZone` di tutti.
+
+Per una prova al volo, senza toccare i file, resta `task dev -- -UiPort 9080`.
+
+### Aggiungere un microservizio
+
+```bash
+task new-service -- -Name ordini-service
+```
+
+Crea il modulo (pom, `Main`, `application.yml`, un endpoint `/api/ping`) e lo
+collega dove serve: `<modules>` del pom aggregatore, `COPY` nel `Dockerfile`,
+blocco in `docker-compose.yml`, lista dei servizi di `task dev`. La porta è la
+prima libera, se non la passi tu con `-Port`.
+
+Varianti: `-Ui` per un modulo Thymeleaf invece di un servizio REST, `-NoDb`
+per un servizio senza JPA.
+
+Poi `task dev`, e il servizio nuovo si registra su Eureka con gli altri.
+
+### Cambiare configurazione (`application.yml`)
+
+Nessun comando: modifichi il file e rilanci `task dev`. Un `application.yml`
+non è codice ricompilato, quindi l'hot reload non lo rilegge.
 
 ---
 
@@ -131,6 +206,7 @@ task docker-down
 | "Port N was already in use" | `task dev`: chiude lui chi tiene la porta |
 | Su `localhost:8080` risponde un'altra app | `task dev` la chiude; se ti serve viva, `task dev -- -KeepForeign -UiPort 9080` |
 | Hai modificato il codice e non cambia niente | `task compile` (e controlla che non ci siano errori di compilazione) |
+| Hai aggiunto una dipendenza e non la vede | `task dev`: il classpath si fissa all'avvio, `task compile` non basta |
 | Il servizio è morto dopo una modifica | `task logs -- <servizio>`, poi `task dev` per ripartire pulito |
 | I container non partono | `task docker-down`, poi `task docker-up` |
 | Il database ha dati sporchi | `task docker-reset`, poi `task docker-up` — **cancella i dati** |
@@ -152,6 +228,9 @@ task docker-down
 | `task compile` | Ricompila: i servizi toccati si riavviano da soli |
 | `task status` | Chi occupa le porte, container attivi, registro Eureka |
 | `task dev-down` | Ferma i servizi locali e libera le porte |
+| `task add-dep` | Aggiunge dipendenze al pom di un modulo (`-List` per l'elenco) |
+| `task set-port` | Sposta un modulo su un'altra porta, ovunque sia scritta |
+| `task new-service` | Crea un microservizio nuovo e lo collega a tutto |
 | `task test-e2e` | Collaudo end-to-end sui servizi accesi |
 | `task docker-up` | Costruisce le immagini e avvia lo stack in container |
 | `task docker-down` | Ferma i container, **conservando** i dati del database |
