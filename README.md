@@ -44,15 +44,42 @@ Nomi con cui i servizi si registrano su Eureka: `TOURIST-SERVICE`, `RANDOM-SERVI
 
 ---
 
-## ⚡ Task Principali (`go-task`)
+## ⚡ Come lavorare
 
+**Per sviluppare, un comando solo:**
+
+```bash
+task dev
+```
+
+Avvia PostgreSQL su Docker, compila tutti i moduli una volta sola, lancia Eureka, ne attende la porta e poi avvia i quattro servizi, ognuno nella propria finestra. I log finiscono anche in `.dev-logs/`.
+
+**Hot reload**: ogni servizio gira con `spring-boot-devtools`. Dopo aver modificato del codice, `task compile` ricompila e il servizio interessato si riavvia da solo.
+
+**Per fermare tutto**: `task dev-down` (PostgreSQL resta attivo, fermalo con `task docker-down`).
+
+> 💡 Se una porta è occupata da un'applicazione estranea, `task dev` si ferma e ti dice quale processo la tiene. Per spostare la sola UI: `task dev -- -UiPort 9080`.
+
+**Per la demo**, usa lo stack containerizzato:
+
+```bash
+task docker-up
+```
+
+> ⚠️ Non tenere attivi contemporaneamente `task dev` e `task docker-up`: usano le stesse porte.
+
+### Elenco completo dei task
+
+- `task dev`: Compila e avvia l'intero stack in locale con hot reload.
+- `task dev-down`: Ferma lo stack locale.
+- `task compile`: Ricompila e fa ripartire i servizi già avviati.
 - `task build`: Compila tutti i moduli Maven tramite wrapper (`mvnw`).
 - `task docker-up`: Avvia l'intero cluster di microservizi su Docker Compose con healthcheck.
 - `task docker-down`: Arresta tutti i container e pulisce le risorse.
 - `task docker-logs`: Monitora i log di tutti i microservizi.
-- `task clean-ports`: Termina eventuali processi Java rimasti pendenti.
+- `task clean-ports`: Termina **tutti** i processi Java della macchina (più drastico di `dev-down`).
 
-Avvio locale dei singoli moduli (senza Docker): `task run-eureka`, `task run-tourist`, `task run-random`, `task run-store`, `task run-ui`, `task run-db`.
+Avvio manuale dei singoli moduli: `task run-eureka`, `task run-tourist`, `task run-random`, `task run-store`, `task run-ui`, `task run-db`.
 
 ---
 
@@ -76,13 +103,7 @@ Sintomo: `task docker-up` fallisce, `exam-eureka` risulta `unhealthy` e nessun m
 
 Causa: l'healthcheck di `eureka-server` invoca `curl` su `/actuator/health`, ma l'immagine runtime `eclipse-temurin:25-jre` **non include `curl`**. Ogni probe fallisce con `curl: not found`, il container resta `unhealthy` e tutti i servizi con `depends_on: condition: service_healthy` non vengono mai avviati.
 
-> ⚠️ **Su questo branch il fix non è ancora applicato.** I branch `main` e `solution/wms` lo hanno già. Per applicarlo qui, aggiungi in `demo/Dockerfile` questa riga subito dopo `FROM eclipse-temurin:25-jre`:
->
-> ```dockerfile
-> RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
-> ```
->
-> Utile anche aggiungere `start_period: 30s` all'healthcheck di `eureka-server` in `demo/docker-compose.yml`, così l'avvio della JVM non consuma i retry.
+Il `demo/Dockerfile` di questo repo installa già `curl` nello stage runtime, quindi il problema non si presenta. Se aggiungi un healthcheck HTTP a un altro servizio, ricordati che vale la stessa regola.
 
 Per capire *perché* un healthcheck non passa, leggi l'output delle probe:
 
