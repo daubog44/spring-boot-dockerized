@@ -271,7 +271,7 @@ Write-Host ''
 foreach ($svc in $services) {
     $label, $url = switch -Regex ($svc.Name) {
         '^eureka$' { 'Dashboard Eureka', "http://localhost:$($svc.Port)"; break }
-        '-ui$'     { "UI $($svc.Name)", "http://localhost:$($svc.Port)"; break }
+        '(^|-)ui$' { "UI $($svc.Name)", "http://localhost:$($svc.Port)"; break }
         default    { "Swagger $($svc.Name)", "http://localhost:$($svc.Port)/swagger-ui.html" }
     }
     Write-Host ("  {0,-18}{1}" -f $label, $url)

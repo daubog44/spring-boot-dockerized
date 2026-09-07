@@ -181,7 +181,7 @@ for svc in "${SERVICES[@]}"; do
   IFS=':' read -r name _module port <<<"$svc"
   case "$name" in
     eureka) printf '  %-18s%s\n' "Dashboard Eureka" "http://localhost:$port" ;;
-    *-ui)   printf '  %-18s%s\n' "UI $name" "http://localhost:$port" ;;
+    ui|*-ui) printf '  %-18s%s\n' "UI $name" "http://localhost:$port" ;;
     *)      printf '  %-18s%s\n' "Swagger $name" "http://localhost:$port/swagger-ui.html" ;;
   esac
 done
