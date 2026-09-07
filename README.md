@@ -1,6 +1,6 @@
-# Spring Boot Dockerized - Template d'Esame ITS
+# Spring Boot Dockerized - Soluzione d'Esame WMS
 
-Questo repository è un **Template Multi-Modulo Maven d'Esame** pronto all'uso. È progettato per consentirti di sviluppare rapidamente qualsiasi traccia d'esame (WMS, Catasto, Prenotazione Ospedaliera, Eventi/Turismo, ecc.) basata su **Spring Boot**, **Spring Cloud Eureka**, **OpenFeign**, **OpenAPI/Swagger UI**, **PostgreSQL** e **Docker Compose**.
+Questo branch contiene la **soluzione d'esame completa e collaudata** per la traccia **WMS Magazzino "Spostati S.r.l."**, costruita sul template multi-modulo Maven del branch [`main`](https://github.com/daubog44/spring-boot-dockerized/tree/main) con **Spring Boot**, **Spring Cloud Eureka**, **OpenFeign**, **OpenAPI/Swagger UI**, **PostgreSQL** e **Docker Compose**.
 
 ---
 
@@ -13,37 +13,93 @@ Questo repository è un **Template Multi-Modulo Maven d'Esame** pronto all'uso. 
 
 ---
 
-## 🏗️ Architettura del Template Multi-Modulo
+## 🌿 Branch del Repository
 
-Il progetto è organizzato come un aggregatore Multi-Module Maven dentro la cartella `demo`:
+- **[`main`](https://github.com/daubog44/spring-boot-dockerized/tree/main)**: Template d'Esame pulito e neutro, adattabile a qualsiasi traccia.
+- **`solution/wms`** (questo branch): Soluzione completa della traccia **WMS Magazzino "Spostati S.r.l."** con algoritmo di calcolo distanza Manhattan, DTO condivisi e script di collaudo automatizzato PowerShell.
+- **[`example/tourist-events`](https://github.com/daubog44/spring-boot-dockerized/tree/example/tourist-events)**: Esempio svolto della traccia Eventi/Turismo (OpenDataHub).
 
-1. **`naming-server`**: Server Eureka Naming Server (Porta `8761`).
-2. **`common-dto`**: Modulo libreria con le classi DTO condivise tra i microservizi.
-3. **Microservizi Modello / Scheletro**:
-   - `tourist-service` (Porta `8081`) - Esempio di wrapper / servizio REST esterno.
-   - `random-service` (Porta `8082`) - Esempio di microservizio ausiliario / generatore.
-   - `store-service` (Porta `8083`) - Esempio di microservizio REST con persistenza DB PostgreSQL/H2.
-4. **`event-ui`**: Applicazione Web UI Thymeleaf / Frontend (Porta `8080`).
+---
 
-> 💡 **Nota per il Giorno dell'Esame**: Puoi rinominare, adattare o aggiungere nuovi moduli all'interno di `demo` in base al contesto della traccia assegnata (es. trasformare `store-service` nel servizio anagrafica WMS o Catasto).
+## 🏗️ Architettura dei Servizi WMS
+
+Il progetto è un aggregatore Multi-Module Maven dentro la cartella `demo`. I moduli **attivi in questa soluzione** sono:
+
+1. **`naming-server`**: Eureka Naming Server (Porta `8761`).
+2. **`common-dto`**: Modulo libreria con i DTO condivisi tra i microservizi.
+3. **`product-service`** (Porta `8081`): Anagrafica prodotti (`ProductController`), persistenza JPA/Hibernate.
+4. **`crm-service`** (Porta `8082`): Anagrafica clienti (`CustomerController`). Servizio mock: **nessuna persistenza**, dati in memoria.
+5. **`wms-service`** (Porta `8083`): Backend di magazzino (`WmsController`) con persistenza JPA/Hibernate. Consuma `PRODUCT-SERVICE` e `CRM-SERVICE` via OpenFeign (`ProductClient`, `CrmClient`) risolti tramite Eureka.
+6. **`wms-ui`** (Porta `8080`): Web UI Thymeleaf (`WmsUiController`), consuma `WMS-SERVICE` via OpenFeign (`WmsClient`).
+
+> 💡 Il branch conserva anche i moduli scheletro del template (`tourist-service`, `random-service`, `store-service`, `event-ui`): sono dichiarati nel `pom.xml` aggregatore ma **non fanno parte dello stack Docker WMS**.
+
+Nomi con cui i servizi si registrano su Eureka: `PRODUCT-SERVICE`, `CRM-SERVICE`, `WMS-SERVICE`, `WMS-UI`.
+
+### 🗄️ Database
+
+`product-service` e `wms-service` girano di default su **H2 in-memory**: i dati vengono ricreati a ogni riavvio del container. Entrambi hanno comunque il driver PostgreSQL a classpath e l'URL è parametrico, quindi si passa a Postgres senza toccare il codice, valorizzando le variabili d'ambiente nel `docker-compose.yml`:
+
+- `product-service`: `PRODUCT_DB_URL`, `PRODUCT_DB_DRIVER`
+- `wms-service`: `WMS_DB_URL`, `WMS_DB_DRIVER`
+
+> ⚠️ Il `docker-compose.yml` **avvia il container `postgres` ma non lo collega ad alcun servizio**: finché quelle variabili non sono impostate, PostgreSQL resta inutilizzato. Tienilo presente se la traccia richiede persistenza reale.
 
 ---
 
 ## ⚡ Task Principali (`go-task`)
 
 - `task build`: Compila tutti i moduli Maven tramite wrapper (`mvnw`).
-- `task docker-up`: Avvia l'intero cluster di microservizi su Docker Compose con healthcheck.
+- `task docker-up`: Avvia l'intero stack WMS su Docker Compose con healthcheck.
 - `task docker-down`: Arresta tutti i container e pulisce le risorse.
 - `task docker-logs`: Monitora i log di tutti i microservizi.
+- `task test-e2e`: Esegue lo script di collaudo automatizzato [`test_e2e_wms.ps1`](./test_e2e_wms.ps1).
 - `task clean-ports`: Termina eventuali processi Java rimasti pendenti.
+
+Avvio locale dei singoli moduli (senza Docker): `task run-eureka`, `task run-product`, `task run-crm`, `task run-wms`, `task run-wms-ui`, `task run-db`.
 
 ---
 
 ## 🌐 Mappa delle Porte ed Interfacce OpenAPI / Swagger UI
 
-- **UI Applicativa**: `http://localhost:8080`
+- **UI Applicativa WMS**: `http://localhost:8080`
 - **Dashboard Eureka**: `http://localhost:8761`
-- **Swagger UI Tourist Service**: `http://localhost:8081/swagger-ui.html`
-- **Swagger UI Random Service**: `http://localhost:8082/swagger-ui.html`
-- **Swagger UI Store Service**: `http://localhost:8083/swagger-ui.html`
-- **Swagger UI Event UI**: `http://localhost:8080/swagger-ui.html`
+- **PostgreSQL**: `localhost:5432` (db `event_suggestions`, utente `exam`, password `exam`) — avviato ma non collegato ai servizi, vedi sezione Database
+- **Swagger UI Product Service**: `http://localhost:8081/swagger-ui.html`
+- **Swagger UI CRM Service**: `http://localhost:8082/swagger-ui.html`
+- **Swagger UI WMS Service**: `http://localhost:8083/swagger-ui.html`
+- **Swagger UI WMS UI**: `http://localhost:8080/swagger-ui.html`
+
+---
+
+## 🩺 Troubleshooting
+
+### `dependency failed to start: container exam-eureka is unhealthy`
+
+Sintomo: `task docker-up` fallisce, `exam-eureka` risulta `unhealthy` e nessun microservizio parte, anche se nei log Eureka scrive regolarmente `Started Eureka Server`.
+
+Causa: l'healthcheck di `eureka-server` invoca `curl` su `/actuator/health`, ma l'immagine runtime `eclipse-temurin:25-jre` **non include `curl`**. Ogni probe fallisce con `curl: not found`, il container resta `unhealthy` e tutti i servizi con `depends_on: condition: service_healthy` non vengono mai avviati.
+
+Il `demo/Dockerfile` di questo repo installa già `curl` nello stage runtime, quindi il problema non si presenta. Se aggiungi un healthcheck HTTP a un altro servizio, ricordati che vale la stessa regola.
+
+Per capire *perché* un healthcheck non passa, leggi l'output delle probe:
+
+```bash
+docker inspect exam-eureka --format "{{json .State.Health}}"
+```
+
+### Altri controlli utili
+
+```bash
+docker compose ps
+```
+
+```bash
+docker logs exam-wms-service --tail 50
+```
+
+Per verificare quali servizi si sono effettivamente registrati su Eureka:
+
+```bash
+docker exec exam-eureka curl -s -H "Accept: application/json" http://localhost:8761/eureka/apps
+```
