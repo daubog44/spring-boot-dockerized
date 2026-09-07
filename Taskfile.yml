@@ -45,6 +45,22 @@ tasks:
     cmds:
       - docker compose up -d postgres
 
+  dev:
+    desc: "AVVIO SVILUPPO: compila e avvia l'intero stack in locale con hot reload"
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/dev.sh {{.CLI_ARGS}}{{end}}'
+
+  dev-down:
+    desc: Ferma lo stack locale avviato con `task dev`
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-down.ps1{{else}}bash ./scripts/dev-down.sh{{end}}'
+
+  compile:
+    desc: Ricompila i moduli e fa ripartire i servizi gia' avviati (hot reload)
+    dir: demo
+    cmds:
+      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& .\mvnw.cmd -q install -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw -q install -Dmaven.test.skip=true{{end}}'
+
   docker-up:
     desc: Build and start the full WMS exam stack
     dir: demo
@@ -68,7 +84,7 @@ tasks:
     desc: Package all Maven modules
     dir: demo
     cmds:
-      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& mvnw.cmd clean package -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw clean package -Dmaven.test.skip=true{{end}}'
+      - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& .\mvnw.cmd clean package -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw clean package -Dmaven.test.skip=true{{end}}'
 
   clean-ports:
     desc: Kill Java processes

@@ -47,16 +47,55 @@ Nomi con cui i servizi si registrano su Eureka: `PRODUCT-SERVICE`, `CRM-SERVICE`
 
 ---
 
-## ⚡ Task Principali (`go-task`)
+## ⚡ Come lavorare durante l'esame
 
+**Per sviluppare, un comando solo:**
+
+```bash
+task dev
+```
+
+Compila tutti i moduli una volta sola, avvia Eureka, ne attende la porta e poi lancia i quattro servizi, ognuno nella propria finestra. Al termine stampa la mappa degli URL. I log finiscono anche in `.dev-logs/`.
+
+**Hot reload**: ogni servizio gira con `spring-boot-devtools`. Dopo aver modificato del codice:
+
+```bash
+task compile
+```
+
+Il servizio interessato si riavvia da solo in pochi secondi, senza rilanciare nulla. In VS Code, con la build automatica attiva, il riavvio parte già al salvataggio.
+
+**Per fermare tutto:**
+
+```bash
+task dev-down
+```
+
+Termina solo i processi Java dello stack: le altre applicazioni in ascolto sulle stesse porte non vengono toccate.
+
+> 💡 Se una porta è occupata da un'applicazione estranea, `task dev` si ferma prima di partire e ti dice quale processo la tiene. Per spostare la sola UI su un'altra porta: `task dev -- -UiPort 9080`.
+
+**Per la demo finale**, usa lo stack containerizzato, che è quello che presenterai:
+
+```bash
+task docker-up
+```
+
+> ⚠️ Non tenere attivi contemporaneamente `task dev` e `task docker-up`: usano le stesse porte. Fai `task dev-down` prima di `task docker-up`, e viceversa.
+
+### Elenco completo dei task
+
+- `task dev`: Compila e avvia l'intero stack in locale con hot reload.
+- `task dev-down`: Ferma lo stack locale.
+- `task compile`: Ricompila e fa ripartire i servizi già avviati.
 - `task build`: Compila tutti i moduli Maven tramite wrapper (`mvnw`).
 - `task docker-up`: Avvia l'intero stack WMS su Docker Compose con healthcheck.
 - `task docker-down`: Arresta tutti i container e pulisce le risorse.
 - `task docker-logs`: Monitora i log di tutti i microservizi.
 - `task test-e2e`: Esegue lo script di collaudo automatizzato [`test_e2e_wms.ps1`](./test_e2e_wms.ps1).
-- `task clean-ports`: Termina eventuali processi Java rimasti pendenti.
+- `task clean-ports`: Termina **tutti** i processi Java della macchina (più drastico di `dev-down`).
 
-Avvio locale dei singoli moduli (senza Docker): `task run-eureka`, `task run-product`, `task run-crm`, `task run-wms`, `task run-wms-ui`, `task run-db`.
+Avvio manuale dei singoli moduli, se ti serve isolarne uno: `task run-eureka`, `task run-product`, `task run-crm`, `task run-wms`, `task run-wms-ui`, `task run-db`.
 
 ---
 
