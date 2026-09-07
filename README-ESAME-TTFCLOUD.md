@@ -209,21 +209,26 @@ Servizi registrati:
 
 Sviluppo con hot reload:
 
-- `task dev` — avvia PostgreSQL, compila una volta e lancia Eureka e i quattro servizi, ognuno nella propria finestra
+- `task dev` — libera le porte, avvia PostgreSQL, compila una volta e lancia Eureka e i quattro servizi, in background
+- `task logs` — segue i log di tutti i servizi in un terminale solo (`task logs -- store` per uno)
+- `task status` — chi occupa le porte, quali container girano, cosa è registrato su Eureka
 - `task compile` — ricompila: i servizi toccati si riavviano da soli grazie a `spring-boot-devtools`
-- `task dev-down` — ferma lo stack locale (PostgreSQL resta attivo)
+- `task dev-down` — ferma lo stack locale e il PostgreSQL avviato da `task dev`, liberando le porte
 
 Stack containerizzato:
 
-- `task docker-up`
-- `task docker-down`
+- `task docker-up` (ferma da solo lo stack locale, prima di partire)
+- `task docker-down` (i dati del database restano)
+- `task docker-reset` (elimina anche i volumi: database da zero)
 - `task docker-logs`
 
 Utilità:
 
+- `task` — elenca tutti i task
 - `task build`
 - `task run-db`
-- `task clean-ports` (termina **tutti** i processi Java della macchina, più drastico di `dev-down`)
+- `task clean-ports` (come `dev-down`, libera le porte dello stack)
+- `task kill-java` (ultima spiaggia: termina **tutti** i processi Java della macchina)
 
 Task per singolo servizio:
 
@@ -234,7 +239,7 @@ Task per singolo servizio:
 - `task run-ui`
 
 Nota:
-I task `run-*` avviano processi foreground con `spring-boot:run` sul singolo modulo, quindi vanno lanciati in terminali separati.
+I task `run-*` avviano processi foreground con `spring-boot:run` sul singolo modulo, quindi vanno lanciati in terminali separati. `task dev` fa già questo lavoro per tutti e cinque in un colpo solo, in background e senza aprire finestre.
 
 ## Avvio rapido
 
@@ -310,7 +315,13 @@ task docker-up
 
 ### Avvio locale senza stack completo Docker
 
-Prima il DB:
+Un comando solo, che avvia anche PostgreSQL:
+
+```bash
+task dev
+```
+
+Se preferisci controllare i servizi uno per uno, prima il DB:
 
 ```bash
 task run-db
@@ -325,6 +336,8 @@ task run-random
 task run-store
 task run-ui
 ```
+
+In alternativa, da VS Code la configurazione di avvio **Stack completo** in [.vscode/launch.json](./.vscode/launch.json) lancia i cinque servizi in ordine con il debugger collegato.
 
 ## Verifiche eseguite
 
