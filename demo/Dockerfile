@@ -1,6 +1,11 @@
+# Immagine di un modulo qualsiasi: quale, lo dice l'argomento MODULE, che
+# docker-compose.yml passa per ogni servizio.
 FROM eclipse-temurin:25-jdk AS builder
 WORKDIR /workspace
 
+# Prima i soli pom: cosi' il livello con le dipendenze scaricate resta in cache
+# finche' non cambia un pom. Ogni modulo nuovo aggiunge qui la sua riga (lo fa
+# da solo `task new-service`).
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
@@ -16,13 +21,7 @@ ARG MODULE="event-ui"
 RUN chmod +x mvnw
 RUN ./mvnw -B -pl ${MODULE} -am dependency:go-offline
 
-COPY common-dto common-dto
-COPY naming-server naming-server
-COPY tourist-service tourist-service
-COPY random-service random-service
-COPY store-service store-service
-COPY event-ui event-ui
-COPY tailwind.config.js tailwind.config.js
+COPY . .
 
 RUN ./mvnw -B -pl ${MODULE} -am clean package -Dmaven.test.skip=true
 

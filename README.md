@@ -61,7 +61,7 @@ Prima **libera le porte**: ferma i servizi di un avvio precedente, spegne i cont
 task logs
 ```
 
-Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (`store | ...`) e di un colore diverso. `Ctrl+C` chiude solo la vista, i servizi restano su. Per seguirne uno solo: `task logs -- store`.
+Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (`store | ...`) e di un colore diverso. `Ctrl+C` chiude solo la vista, i servizi restano su. Per seguirne uno solo: `task logs SERVICE=store`.
 
 **Hot reload**: ogni servizio gira con `spring-boot-devtools`. Dopo aver modificato del codice, `task compile` ricompila e il servizio interessato si riavvia da solo.
 
@@ -69,7 +69,7 @@ Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (`stor
 
 **Quando qualcosa non risponde**: `task status` dice chi occupa ognuna delle porte (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
 
-> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: `task dev -- -KeepForeign -UiPort 9080`. Senza `-KeepForeign` viene chiusa.
+> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: `task dev KEEPFOREIGN=1 UI_PORT=9080`. Senza `KEEPFOREIGN=1` viene chiusa.
 
 **Per la demo**, usa lo stack containerizzato:
 
@@ -79,15 +79,45 @@ task docker-up
 
 Locale e Docker usano le stesse porte, ma non devi ricordartene: `task docker-up` ferma da solo lo stack locale prima di partire, e `task dev` spegne da solo i container (con `docker compose down`, i dati del database restano).
 
+### Quando cambia la struttura
+
+Aggiungere un modulo o una dipendenza, o spostare una porta, tocca piu' file
+che devono restare d'accordo. Un comando per ognuna di queste cose — tutti con
+variabili `NOME=valore`, mai con trattini:
+
+```bash
+task new-service NAME=ordini-service
+```
+
+```bash
+task add-dep SERVICE=store-service DEPS=security,mail
+```
+
+```bash
+task set-port SERVICE=event-ui PORT=9080
+```
+
+```bash
+task remove-service SERVICE=ordini-service
+```
+
+Dopo una dipendenza o un modulo nuovo ci vuole `task dev`: `task compile` non
+basta, perche' il classpath di un servizio e' fissato quando parte.
+
+E due controlli: `task check` verifica che moduli, porte, Dockerfile, compose e
+liste di avvio dicano la stessa cosa; `task test` collauda gli strumenti su una
+copia usa-e-getta del progetto.
+
 ### Elenco completo dei task
 
-Il comando `task` da solo stampa questo elenco.
+`task help` (o `task` da solo) stampa la guida; `task --summary <comando>` il
+dettaglio di uno.
 
 Sviluppo:
 
 - `task dev`: Pulisce, compila e avvia l'intero stack in locale con hot reload.
 - `task dev-down`: Ferma i servizi locali e libera le porte.
-- `task logs`: Segue i log di tutti i servizi in un terminale solo (`task logs -- store` per uno).
+- `task logs`: Segue i log di tutti i servizi in un terminale solo (`task logs SERVICE=store` per uno).
 - `task status`: Chi occupa le porte, quali container girano, cosa è registrato su Eureka.
 - `task compile`: Ricompila e fa ripartire i servizi già avviati.
 - `task build`: Compila e impacchetta tutti i moduli Maven tramite wrapper (`mvnw`).
@@ -104,7 +134,7 @@ Pulizia:
 - `task clean-ports`: Come `dev-down`, libera le porte dello stack.
 - `task kill-java`: Ultima spiaggia, termina **tutti** i processi Java della macchina, anche quelli estranei al progetto.
 
-Avvio manuale dei singoli moduli: `task run-eureka`, `task run-tourist`, `task run-random`, `task run-store`, `task run-ui`, `task run-db`.
+Avvio manuale di un modulo solo, in primo piano: `task run SERVICE=<modulo>` (o `task run-eureka`, `task run-db`).
 
 ---
 
@@ -146,7 +176,7 @@ Causa: un'altra applicazione della macchina è in ascolto su `127.0.0.1:8080`. S
 task status
 ```
 
-Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. `task dev` chiude da solo quel processo al prossimo avvio; se invece ti serve tenerlo vivo, sposta la UI con `task dev -- -KeepForeign -UiPort 9080`.
+Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. `task dev` chiude da solo quel processo al prossimo avvio; se invece ti serve tenerlo vivo, sposta la UI con `task dev KEEPFOREIGN=1 UI_PORT=9080`.
 
 ### Altri controlli utili
 

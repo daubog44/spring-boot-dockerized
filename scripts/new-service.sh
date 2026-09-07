@@ -2,9 +2,9 @@
 # Crea un nuovo microservizio e lo collega a tutto il resto, in un comando.
 # Equivalente POSIX di scripts/new-service.ps1: stessi file toccati, stesso
 # risultato. Uso:
-#   task new-service -- --name ordini-service
-#   task new-service -- --name report-ui --ui
-#   task new-service -- --name calcolo-service --no-db --port 8090
+#   task new-service NAME=ordini-service
+#   task new-service NAME=report-ui UI=1
+#   task new-service NAME=calcolo-service NODB=1 PORT=8090
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,7 +27,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ -n "$NAME" ] || { echo "Uso: task new-service -- --name <nome-modulo> [--port N] [--ui] [--no-db]" >&2; exit 1; }
+[ -n "$NAME" ] || { echo "Uso: task new-service NAME=<nome-modulo> [PORT=<porta>] [UI=1] [NODB=1]" >&2; exit 1; }
 if ! printf '%s' "$NAME" | grep -qE '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'; then
   echo "Nome non valido: '$NAME'. Usa minuscole e trattini, es. ordini-service." >&2
   exit 1
@@ -61,7 +61,7 @@ if [ "$PORT" -eq 0 ]; then
   PORT=8081
   while printf '%s\n' "$USED" | grep -qx "$PORT"; do PORT=$((PORT + 1)); done
 elif printf '%s\n' "$USED" | grep -qx "$PORT"; then
-  echo "La porta $PORT e' gia' assegnata a un altro modulo. Scegline un'altra, oppure sposta l'altro con: task set-port -- --module <modulo> --port <porta>" >&2
+  echo "La porta $PORT e' gia' assegnata a un altro modulo. Scegline un'altra, oppure sposta l'altro con: task set-port SERVICE=<modulo> PORT=<porta>" >&2
   exit 1
 fi
 
@@ -284,7 +284,7 @@ fi
   cat <<EOF
 # La porta si legge da SERVER_PORT (in Docker la passa docker-compose.yml) e
 # ricade sul valore qui sotto quando lo avvii in locale. Per cambiarla:
-#   task set-port -- --module $MODULE --port <porta>
+#   task set-port SERVICE=$MODULE PORT=<porta>
 server:
   port: \${SERVER_PORT:$PORT}
 

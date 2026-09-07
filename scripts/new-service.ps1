@@ -26,12 +26,12 @@
     Servizio senza database: niente JPA, H2 e PostgreSQL nel pom.
 
 .EXAMPLE
-    task new-service -- -Name ordini-service
-    task new-service -- -Name report-ui -Ui
-    task new-service -- -Name calcolo-service -NoDb -Port 8090
+    task new-service NAME=ordini-service
+    task new-service NAME=report-ui UI=1
+    task new-service NAME=calcolo-service NODB=1 PORT=8090
 #>
 param(
-    [Parameter(Mandatory = $true)][string]$Name,
+    [string]$Name = '',
     [int]$Port = 0,
     [switch]$Ui,
     [switch]$NoDb
@@ -45,6 +45,9 @@ $demoDir = Join-Path $repoRoot 'demo'
 
 # --- Nomi derivati ------------------------------------------------------------
 
+if (-not $Name) {
+    throw "Uso: task new-service NAME=<nome-modulo> [PORT=<porta>] [UI=1] [NODB=1]"
+}
 if ($Name -cnotmatch '^[a-z][a-z0-9]*(-[a-z0-9]+)*$') {
     throw "Nome non valido: '$Name'. Usa minuscole e trattini, es. ordini-service."
 }
@@ -86,7 +89,7 @@ if ($Port -eq 0) {
     $Port = 8081
     while ($used -contains $Port) { $Port++ }
 } elseif ($used -contains $Port) {
-    throw "La porta $Port e' gia' assegnata a un altro modulo. Scegline un'altra, oppure sposta l'altro con: task set-port -- -Module <modulo> -Port <porta>"
+    throw "La porta $Port e' gia' assegnata a un altro modulo. Scegline un'altra, oppure sposta l'altro con: task set-port SERVICE=<modulo> PORT=<porta>"
 }
 
 Write-Host ''
@@ -313,7 +316,7 @@ if ($withDb) {
 $yml = @"
 # La porta si legge da SERVER_PORT (in Docker la passa docker-compose.yml) e
 # ricade sul valore qui sotto quando lo avvii in locale. Per cambiarla:
-#   task set-port -- -Module $module -Port <porta>
+#   task set-port SERVICE=$module PORT=<porta>
 server:
   port: `${SERVER_PORT:$Port}
 

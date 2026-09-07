@@ -16,16 +16,16 @@
     Cartella del modulo sotto demo/, es. wms-service.
 
 .PARAMETER Deps
-    Elenco separato da virgole: nomi brevi (task add-dep -- -List per vederli)
+    Elenco separato da virgole: nomi brevi (task add-dep LIST=1 per vederli)
     oppure coordinate groupId:artifactId[:versione].
 
 .PARAMETER List
     Stampa l'elenco dei nomi brevi conosciuti ed esce.
 
 .EXAMPLE
-    task add-dep -- -Module wms-service -Deps security,mail
-    task add-dep -- -Module product-service -Deps 'org.apache.commons:commons-lang3:3.17.0'
-    task add-dep -- -List
+    task add-dep SERVICE=wms-service DEPS=security,mail
+    task add-dep SERVICE=product-service DEPS=org.apache.commons:commons-lang3:3.17.0
+    task add-dep LIST=1
 #>
 param(
     [string]$Module,
@@ -112,7 +112,7 @@ if ($List) {
         Write-Host ("  {0,-16}{1}:{2}{3}" -f $key, $dep.Group, $dep.Artifact, $suffix)
     }
     Write-Host ''
-    Write-Host 'Non in elenco? Passa le coordinate: -Deps ''gruppo:artefatto:versione'''
+    Write-Host 'Non in elenco? Passa le coordinate: DEPS=gruppo:artefatto:versione'
     Write-Host ''
     Write-Host 'devtools non serve aggiungerlo: e'' nel pom padre, quindi ce l''hanno gia'' tutti i moduli.'
     Write-Host ''
@@ -120,7 +120,7 @@ if ($List) {
 }
 
 if (-not $Module -or -not $Deps) {
-    throw "Uso: task add-dep -- -Module <modulo> -Deps <dip1,dip2>   (elenco: task add-dep -- -List)"
+    throw "Uso: task add-dep SERVICE=<modulo> DEPS=<dip1,dip2>   (elenco: task add-dep LIST=1)"
 }
 
 # --- Modulo -------------------------------------------------------------------
@@ -149,7 +149,7 @@ foreach ($raw in ($Deps -split ',')) {
         $wanted += (New-Dep $Matches[1] $Matches[2] $null $Matches[3])
         continue
     }
-    throw "Dipendenza sconosciuta: '$id'. Vedi l'elenco con: task add-dep -- -List (oppure passa gruppo:artefatto:versione)"
+    throw "Dipendenza sconosciuta: '$id'. Vedi l'elenco con: task add-dep LIST=1 (oppure passa gruppo:artefatto:versione)"
 }
 
 if ($wanted.Count -eq 0) {

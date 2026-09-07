@@ -210,7 +210,7 @@ Servizi registrati:
 Sviluppo con hot reload:
 
 - `task dev` — libera le porte (chiudendo chi le tiene occupate), avvia PostgreSQL, compila una volta e lancia Eureka e i quattro servizi, in background
-- `task logs` — segue i log di tutti i servizi in un terminale solo (`task logs -- store` per uno)
+- `task logs` — segue i log di tutti i servizi in un terminale solo (`task logs SERVICE=store` per uno)
 - `task status` — chi occupa le porte, quali container girano, cosa è registrato su Eureka
 - `task compile` — ricompila: i servizi toccati si riavviano da soli grazie a `spring-boot-devtools`
 - `task dev-down` — ferma lo stack locale e il PostgreSQL avviato da `task dev`, liberando le porte
