@@ -54,3 +54,37 @@ Il progetto è organizzato come un aggregatore Multi-Module Maven dentro la cart
 - **Swagger UI Random Service**: `http://localhost:8082/swagger-ui.html`
 - **Swagger UI Store Service**: `http://localhost:8083/swagger-ui.html`
 - **Swagger UI Event UI**: `http://localhost:8080/swagger-ui.html`
+
+---
+
+## 🩺 Troubleshooting
+
+### `dependency failed to start: container exam-eureka is unhealthy`
+
+Sintomo: `task docker-up` fallisce, `exam-eureka` risulta `unhealthy` e nessun microservizio parte, anche se nei log Eureka scrive regolarmente `Started Eureka Server`.
+
+Causa: l'healthcheck di `eureka-server` invoca `curl` su `/actuator/health`, ma l'immagine runtime `eclipse-temurin:25-jre` **non include `curl`**. Ogni probe fallisce con `curl: not found`, il container resta `unhealthy` e tutti i servizi con `depends_on: condition: service_healthy` non vengono mai avviati.
+
+Il `demo/Dockerfile` di questo repo installa già `curl` nello stage runtime, quindi il problema non si presenta. Se aggiungi un healthcheck HTTP a un altro servizio, ricordati che vale la stessa regola.
+
+Per capire *perché* un healthcheck non passa, leggi l'output delle probe:
+
+```bash
+docker inspect exam-eureka --format "{{json .State.Health}}"
+```
+
+### Altri controlli utili
+
+```bash
+docker compose ps
+```
+
+```bash
+docker logs exam-eureka --tail 50
+```
+
+Per verificare quali servizi si sono effettivamente registrati su Eureka:
+
+```bash
+docker exec exam-eureka curl -s -H "Accept: application/json" http://localhost:8761/eureka/apps
+```
