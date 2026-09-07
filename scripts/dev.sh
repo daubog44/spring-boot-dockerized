@@ -3,6 +3,17 @@
 # Equivalente POSIX di scripts/dev.ps1.
 set -euo pipefail
 
+# Porta della UI: -UiPort/--ui-port N, per allinearsi a dev.ps1 (il Taskfile passa
+# gli stessi argomenti a entrambi gli script).
+UI_PORT=8080
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -UiPort|--ui-port) UI_PORT="$2"; shift 2 ;;
+    -NoBuild|--no-build) NO_BUILD=1; shift ;;
+    *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
+  esac
+done
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEMO_DIR="$REPO_ROOT/demo"
 LOG_DIR="$REPO_ROOT/.dev-logs"
@@ -14,7 +25,7 @@ SERVICES=(
   "tourist:tourist-service:8081"
   "random:random-service:8082"
   "store:store-service:8083"
-  "ui:event-ui:8080"
+  "ui:event-ui:$UI_PORT"
 )
 
 port_in_use() {
@@ -62,19 +73,27 @@ if ! wait_for_port 5432 60; then
 fi
 echo "==> PostgreSQL pronto."
 
-echo "==> Compilazione di tutti i moduli (una sola volta)..."
-(cd "$DEMO_DIR" && ./mvnw -q install -Dmaven.test.skip=true)
-echo "==> Compilazione completata."
+if [ -z "${NO_BUILD:-}" ]; then
+  echo "==> Compilazione di tutti i moduli (una sola volta)..."
+  (cd "$DEMO_DIR" && ./mvnw -q install -Dmaven.test.skip=true)
+  echo "==> Compilazione completata."
+fi
 
 # --- Avvio ordinato -----------------------------------------------------------
 
 mkdir -p "$LOG_DIR"
 : >"$PID_FILE"
+# Registra le porte realmente usate, cosi' dev-down sa quali processi fermare.
+: >"$LOG_DIR/dev.ports"
+for svc in "${SERVICES[@]}"; do
+  IFS=':' read -r _n _m p <<<"$svc"
+  echo "$p" >>"$LOG_DIR/dev.ports"
+done
 
 for svc in "${SERVICES[@]}"; do
   IFS=':' read -r name module port <<<"$svc"
   echo "==> Avvio $name sulla porta $port..."
-  (cd "$DEMO_DIR/$module" && ../mvnw spring-boot:run) >"$LOG_DIR/$name.log" 2>&1 &
+  (cd "$DEMO_DIR/$module" && ../mvnw spring-boot:run "-Dspring-boot.run.arguments=--server.port=$port") >"$LOG_DIR/$name.log" 2>&1 &
   echo "$! $name" >>"$PID_FILE"
 
   # Eureka deve essere in ascolto prima che gli altri tentino di registrarsi,
@@ -113,7 +132,7 @@ fi
 cat <<EOF
 Stack locale avviato.
 
-  UI applicativa    http://localhost:8080
+  UI applicativa    http://localhost:$UI_PORT
   Dashboard Eureka  http://localhost:8761
   Swagger tourist   http://localhost:8081/swagger-ui.html
   Swagger random    http://localhost:8082/swagger-ui.html

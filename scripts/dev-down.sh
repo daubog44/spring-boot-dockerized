@@ -24,7 +24,12 @@ fi
 
 # Rete di sicurezza: chiude quel che resta in ascolto sulle porte dello stack.
 if command -v lsof >/dev/null 2>&1; then
-  for port in 8761 8081 8082 8083 8080; do
+  ports="8761 8081 8082 8083 8080"
+  if [ -f "$LOG_DIR/dev.ports" ]; then
+    ports="$ports $(tr '
+' ' ' <"$LOG_DIR/dev.ports")"
+  fi
+  for port in $ports; do
     for pid in $(lsof -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null); do
       echo "Termino il processo sulla porta $port (PID $pid)"
       kill -TERM "$pid" >/dev/null 2>&1
