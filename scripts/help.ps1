@@ -28,6 +28,7 @@ Write-Cmd 'task logs' 'segue i log (Ctrl+C esce, i servizi restano)'
 Write-Cmd 'task compile' 'dopo una modifica al codice: si riavvia da solo'
 Write-Cmd 'task status' 'chi occupa le porte, chi e'' su Eureka'
 Write-Cmd 'task dev-down' 'ferma tutto e libera le porte'
+Write-Cmd 'task run SERVICE=<modulo>' 'un modulo solo, in primo piano'
 
 Write-Section 'Modifiche strutturali (dopo queste ci vuole task dev)'
 Write-Cmd 'task add-dep SERVICE=<modulo> DEPS=<a,b>' 'aggiunge dipendenze al pom'

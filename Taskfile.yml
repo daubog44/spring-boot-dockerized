@@ -268,6 +268,23 @@ tasks:
 
   # --- Avvio di un singolo servizio in primo piano ----------------------------
 
+  run:
+    desc: "Avvia un solo modulo in primo piano, per vederne l'output (task run SERVICE=<modulo>)"
+    summary: |
+      Avvia un modulo solo, in primo piano: l'output resta nel terminale e
+      Ctrl+C lo ferma. Comodo quando ne stai debuggando uno.
+      Per lo stack intero, in background, resta `task dev`.
+
+      Variabili:
+        SERVICE=<modulo>   OBBLIGATORIA, la cartella sotto demo/
+
+      Esempio:
+        task run SERVICE=wms-service
+    cmds:
+      - task: run-module
+        vars:
+          MODULE: '{{.SERVICE}}'
+
   run-eureka:
     desc: Avvia il solo Eureka server, in primo piano
     cmds:

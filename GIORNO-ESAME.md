@@ -282,7 +282,8 @@ task docker-down
 | `task docker-reset` | Ferma i container **ed elimina** i volumi |
 | `task docker-logs` | Segue i log dei container |
 | `task build` | Compila e impacchetta tutti i moduli Maven |
-| `task run-eureka` · `run-product` · `run-crm` · `run-wms` · `run-wms-ui` | Avvia un solo modulo, in primo piano |
+| `task run SERVICE=<modulo>` | Avvia un solo modulo, in primo piano |
+| `task run-eureka` · `run-product` · `run-crm` · `run-wms` · `run-wms-ui` | Le scorciatoie per i moduli di questa traccia |
 | `task kill-java` | Ultima spiaggia: termina **tutti** i java della macchina |
 
 ### Opzioni utili

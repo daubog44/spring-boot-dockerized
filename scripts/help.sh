@@ -19,6 +19,7 @@ cmd "task logs" "segue i log (Ctrl+C esce, i servizi restano)"
 cmd "task compile" "dopo una modifica al codice: si riavvia da solo"
 cmd "task status" "chi occupa le porte, chi e' su Eureka"
 cmd "task dev-down" "ferma tutto e libera le porte"
+cmd "task run SERVICE=<modulo>" "un modulo solo, in primo piano"
 
 echo ""
 echo "Modifiche strutturali (dopo queste ci vuole task dev)"

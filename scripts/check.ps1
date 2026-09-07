@@ -96,9 +96,15 @@ $problems += $errors
 
 $dockerfile = Read-TextFile (Join-Path $demoDir 'Dockerfile')
 $errors = @()
+# Il sorgente puo' entrare tutto insieme (COPY . .) oppure modulo per modulo:
+# nel secondo caso ogni modulo deve avere la sua riga, o in Docker mancherebbe.
+$copiesEverything = $dockerfile -match '(?m)^COPY \. \.\s*$'
 foreach ($m in $declared) {
     if ($dockerfile -notmatch [regex]::Escape("COPY $m/pom.xml")) {
         $errors += "demo/Dockerfile non copia $m/pom.xml: la build in Docker fallira'"
+    }
+    if (-not $copiesEverything -and $dockerfile -notmatch [regex]::Escape("COPY $m $m")) {
+        $errors += "demo/Dockerfile non copia i sorgenti di $m (manca 'COPY $m $m')"
     }
 }
 Write-Check -Label 'Dockerfile' -Errors $errors

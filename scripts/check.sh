@@ -72,8 +72,15 @@ port_of() { printf '%s' "$PORT_LINES" | awk -v m="$1" '$1 == m {print $2}'; }
 
 # --- Dockerfile ---------------------------------------------------------------
 
+# Il sorgente puo' entrare tutto insieme (COPY . .) oppure modulo per modulo:
+# nel secondo caso ogni modulo deve avere la sua riga.
+COPIES_ALL=0
+grep -qE '^COPY \. \.[[:space:]]*$' "$DEMO_DIR/Dockerfile" && COPIES_ALL=1
 for m in $DECLARED; do
   grep -q "COPY $m/pom.xml" "$DEMO_DIR/Dockerfile" || add_error "demo/Dockerfile non copia $m/pom.xml: la build in Docker fallira'"
+  if [ "$COPIES_ALL" -eq 0 ]; then
+    grep -q "COPY $m $m" "$DEMO_DIR/Dockerfile" || add_error "demo/Dockerfile non copia i sorgenti di $m (manca 'COPY $m $m')"
+  fi
 done
 report "Dockerfile"
 
