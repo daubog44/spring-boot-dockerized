@@ -13,6 +13,13 @@ Questo repository è un **Template Multi-Modulo Maven d'Esame** pronto all'uso. 
 
 ---
 
+## 🌿 Branch e Soluzioni d'Esame Svolte
+
+- **`main`** (questo branch): **Template d'Esame Pulito & Neutro** pronto all'uso con Eureka Discovery, OpenFeign, PostgreSQL/H2, Swagger UI e scheletro multi-modulo.
+- **[`solution/wms`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: **Soluzione d'Esame Completa & Collaudata al 100%** per la traccia **WMS Magazzino "Spostati S.r.l."** (6 microservizi, algoritmo di calcolo distanza Manhattan, DTO condivisi e script di collaudo automatizzato PowerShell `test_e2e_wms.ps1`).
+
+---
+
 ## 🏗️ Architettura del Template Multi-Modulo
 
 Il progetto è organizzato come un aggregatore Multi-Module Maven dentro la cartella `demo`:
