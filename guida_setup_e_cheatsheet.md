@@ -48,15 +48,38 @@ task docker-down
 
 ---
 
-### B. Esecuzione Locale (Senza Container Docker per i Servizi)
+### B. Sviluppo Locale con Hot Reload (CONSIGLIATO MENTRE SVILUPPI)
 
-Se vuoi eseguire i microservizi localmente tramite Maven (`mvnw`) e avviare solo PostgreSQL su Docker:
+Un solo comando avvia PostgreSQL, compila tutto e lancia Eureka e i quattro servizi, ognuno nella propria finestra:
 
 ```bash
-# 1. Avvia solo il database PostgreSQL
-task run-db
+task dev
+```
 
-# 2. In terminali distinti, avvia i singoli moduli nell'ordine:
+Dopo una modifica al codice, ricompila e i servizi interessati si riavviano da soli grazie a `spring-boot-devtools`:
+
+```bash
+task compile
+```
+
+Per fermare lo stack locale (PostgreSQL resta attivo):
+
+```bash
+task dev-down
+```
+
+I log dei servizi restano consultabili in `.dev-logs/`.
+
+**Perché non usare `task docker-up` mentre sviluppi**: `docker compose build` ricostruisce tutte e cinque le immagini, e poiché il `Dockerfile` copia i sorgenti prima di compilare, ogni singola modifica invalida la cache e fa ricompilare tutto in ogni immagine. Un ciclo costa minuti contro i ~20 secondi del build locale.
+
+---
+
+### C. Avvio Manuale dei Singoli Moduli
+
+Se ti serve isolare un servizio, in terminali distinti:
+
+```bash
+task run-db
 task run-eureka
 task run-tourist
 task run-random
@@ -108,13 +131,28 @@ curl "http://localhost:8083/api/suggestions?limit=10"
 ## 5. Cheat Sheet Risoluzione Emergenze Esame
 
 ### 🚨 Emergenza 1: "Porta 8080 / 8761 / 5432 già in uso"
-Se un processo Java precedente è rimasto appeso in background:
+Se sono rimasti appesi i servizi dello stack locale:
+```bash
+task dev-down
+```
+Se hai lo stack Docker attivo:
+```bash
+task docker-down
+```
+Come ultima risorsa, termina tutti i processi Java della macchina:
 ```bash
 task clean-ports
 ```
-Oppure su Windows PowerShell:
-```powershell
-Get-Process -Name java -ErrorAction SilentlyContinue | Stop-Process -Force
+
+Se invece la porta è tenuta da un'applicazione **estranea** al progetto, `task dev` si ferma e ti dice quale processo la occupa. Tomcat non riesce a fare il bind nemmeno quando l'altro processo ascolta solo su `127.0.0.1`: il servizio muore con `Web server failed to start. Port N was already in use`. Chiudi quel processo, oppure sposta la UI:
+```bash
+task dev -- -UiPort 9080
+```
+
+### 🚨 Emergenza 1-bis: "container exam-eureka is unhealthy"
+`task docker-up` si interrompe con `dependency failed to start: container exam-eureka is unhealthy`, ma nei log Eureka scrive `Started Eureka Server`. L'healthcheck usa `curl`, che l'immagine `eclipse-temurin:25-jre` non contiene. Il `demo/Dockerfile` di questo repo lo installa già; se aggiungi un healthcheck HTTP a un altro servizio vale la stessa regola. Per leggere l'esito delle probe:
+```bash
+docker inspect exam-eureka --format "{{json .State.Health}}"
 ```
 
 ### 🚨 Emergenza 2: "Docker Compose non aggiorna il codice modificato"
@@ -129,9 +167,15 @@ docker compose up -d
 Reset completo del volume del database:
 ```bash
 task docker-down
-docker volume rm demo_postgres-data 2>nul
+```
+```bash
+docker volume rm demo_postgres-data
+```
+```bash
 task docker-up
 ```
+
+> ℹ️ Il volume è montato su `/var/lib/postgresql`, non sul percorso legacy `/var/lib/postgresql/data`: dalla versione 18 l'immagine tiene i dati in `/var/lib/postgresql/<versione>/docker`, e col mount vecchio il volume restava vuoto e il container non partiva.
 
 ### 🚨 Emergenza 4: "Eureka registra i servizi ma i Feign Client danno 500"
 I client Eureka richiedono qualche secondo per aggiornare il registro locale delle istanze (cache heartbeat). Attendi 10-15 secondi dall'avvio completo del cluster prima di effettuare la prima richiesta HTTP.

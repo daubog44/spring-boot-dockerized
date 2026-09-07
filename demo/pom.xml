@@ -34,6 +34,18 @@
         <springdoc.version>2.8.5</springdoc.version>
     </properties>
 
+    <!-- Ereditata da tutti i moduli: abilita l'hot reload durante lo sviluppo locale.
+         Non finisce nel jar prodotto da spring-boot-maven-plugin, quindi le immagini
+         Docker non ne sono influenzate. -->
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+
     <dependencyManagement>
         <dependencies>
             <dependency>
