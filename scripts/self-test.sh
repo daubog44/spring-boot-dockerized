@@ -73,7 +73,7 @@ end_case() {
 # --- Le prove -----------------------------------------------------------------
 
 start_case "il progetto di partenza e' coerente (task check)"
-run_tool check.sh && assert_ok "task check"
+run_tool check.sh --project-only && assert_ok "task check"
 end_case
 
 start_case "new-service crea il modulo e lo collega ovunque"
@@ -91,7 +91,7 @@ assert_ok "new-service" &&
 end_case
 
 start_case "il modulo nuovo e' coerente (task check)"
-run_tool check.sh && assert_ok "task check dopo new-service"
+run_tool check.sh --project-only && assert_ok "task check dopo new-service"
 end_case
 
 start_case "new-service UI=1 genera Thymeleaf e la pagina, senza JPA"
@@ -184,7 +184,7 @@ if assert_ok "set-port" &&
   assert_contains demo/docker-compose.yml '"8199:8199"' &&
   assert_contains scripts/dev.ps1 "Port = 8199" &&
   assert_contains scripts/dev.sh ":alfa-service:8199"; then
-  run_tool check.sh && assert_ok "task check dopo set-port"
+  run_tool check.sh --project-only && assert_ok "task check dopo set-port"
 fi
 end_case
 
@@ -199,7 +199,7 @@ if assert_ok "set-port su naming-server" &&
   assert_contains demo/alfa-service/src/main/resources/application.yml "localhost:8762" &&
   assert_contains demo/docker-compose.yml "eureka-server:8762" &&
   assert_not_contains demo/docker-compose.yml "localhost:8761/actuator"; then
-  run_tool check.sh && assert_ok "task check dopo aver spostato Eureka"
+  run_tool check.sh --project-only && assert_ok "task check dopo aver spostato Eureka"
 fi
 end_case
 
@@ -212,7 +212,7 @@ if assert_ok "remove-service" &&
   assert_not_contains demo/docker-compose.yml "MODULE: gamma-service" &&
   assert_not_contains scripts/dev.ps1 "Module = 'gamma-service'" &&
   assert_not_contains scripts/dev.sh ":gamma-service:"; then
-  run_tool check.sh && assert_ok "task check dopo remove-service"
+  run_tool check.sh --project-only && assert_ok "task check dopo remove-service"
 fi
 end_case
 

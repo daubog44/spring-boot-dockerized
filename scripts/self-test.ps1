@@ -122,7 +122,7 @@ function Test-Case {
 # --- Le prove -----------------------------------------------------------------
 
 Test-Case 'il progetto di partenza e'' coerente (task check)' {
-    Assert-Ok (Invoke-Tool 'check.ps1') 'task check non passa sul progetto cosi'' com''e'''
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'task check non passa sul progetto cosi'' com''e'''
 }
 
 Test-Case 'new-service crea il modulo e lo collega ovunque' {
@@ -143,7 +143,7 @@ Test-Case 'new-service crea il modulo e lo collega ovunque' {
 }
 
 Test-Case 'il modulo nuovo e'' coerente (task check)' {
-    Assert-Ok (Invoke-Tool 'check.ps1') 'dopo new-service il progetto non e'' piu'' coerente'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo new-service il progetto non e'' piu'' coerente'
 }
 
 Test-Case 'new-service UI=1 genera Thymeleaf e la pagina, senza JPA' {
@@ -234,7 +234,7 @@ Test-Case 'set-port sposta la porta in tutti i file' {
     Assert-Contains (Get-Text 'demo/docker-compose.yml') '"8199:8199"' 'compose: porta pubblicata non aggiornata'
     Assert-Contains (Get-Text 'scripts/dev.ps1') 'Port = 8199' 'dev.ps1 non aggiornato'
     Assert-Contains (Get-Text 'scripts/dev.sh') ':alfa-service:8199' 'dev.sh non aggiornato'
-    Assert-Ok (Invoke-Tool 'check.ps1') 'dopo set-port il progetto non e'' piu'' coerente'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo set-port il progetto non e'' piu'' coerente'
 }
 
 Test-Case 'set-port rifiuta una porta gia'' occupata' {
@@ -246,7 +246,7 @@ Test-Case 'set-port su Eureka aggiorna chi lo cerca' {
     Assert-Contains (Get-Text 'demo/alfa-service/src/main/resources/application.yml') 'localhost:8762' 'il defaultZone di un client non e'' stato aggiornato'
     Assert-Contains (Get-Text 'demo/docker-compose.yml') 'eureka-server:8762' 'EUREKA_SERVER_URL dei container non aggiornato'
     Assert-NotContains (Get-Text 'demo/docker-compose.yml') 'localhost:8761/actuator' 'healthcheck di Eureka rimasto sulla porta vecchia'
-    Assert-Ok (Invoke-Tool 'check.ps1') 'dopo aver spostato Eureka il progetto non e'' piu'' coerente'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo aver spostato Eureka il progetto non e'' piu'' coerente'
 }
 
 Test-Case 'remove-service toglie il modulo da tutti i file' {
@@ -257,7 +257,7 @@ Test-Case 'remove-service toglie il modulo da tutti i file' {
     Assert-NotContains (Get-Text 'demo/docker-compose.yml') 'MODULE: gamma-service' 'ancora nel compose'
     Assert-NotContains (Get-Text 'scripts/dev.ps1') "Module = 'gamma-service'" 'ancora nella lista di dev.ps1'
     Assert-NotContains (Get-Text 'scripts/dev.sh') ':gamma-service:' 'ancora nella lista di dev.sh'
-    Assert-Ok (Invoke-Tool 'check.ps1') 'dopo remove-service il progetto non e'' piu'' coerente'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo remove-service il progetto non e'' piu'' coerente'
 }
 
 Test-Case 'remove-service rifiuta un modulo che non esiste' {
