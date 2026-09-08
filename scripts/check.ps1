@@ -13,12 +13,20 @@
 
     Da lanciare dopo una modifica fatta a mano, e prima della demo.
 
+.PARAMETER ProjectOnly
+    Salta i controlli che riguardano la macchina e non il progetto (le porte
+    che Windows si e' riservato): serve alle prove automatiche, che verificano
+    la coerenza dei file su una copia.
+
 .EXAMPLE
     task check
 #>
+param([switch]$ProjectOnly)
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'scaffold-lib.ps1')
+# Serve Test-PortReserved: le porte le sa leggere dev-lib.
+. (Join-Path $PSScriptRoot 'dev-lib.ps1')
 
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
@@ -204,6 +212,31 @@ foreach ($svc in $devServices) {
 }
 Write-Check -Label 'docker-compose' -Errors $errors
 $problems += $errors
+
+# --- Porte riservate da Windows ----------------------------------------------
+
+# Windows si riserva interi intervalli di porte (Hyper-V, WSL, l'avvio di
+# Docker Desktop): dentro non fa il bind nessuno, ne' un servizio locale ne' un
+# container. Nessun processo risulta in ascolto, quindi sembra tutto libero.
+$errors = @()
+$reserved = @()
+if (-not $ProjectOnly) {
+    $reserved = @($devServices | Where-Object { Test-PortReserved -Port $_.Port })
+}
+foreach ($svc in $reserved) {
+    $errors += "$($svc.Module): la porta $($svc.Port) e' in un intervallo riservato da Windows, non la puo' usare nessuno"
+}
+if ($errors.Count -gt 0) {
+    $errors += "vedile con: netsh interface ipv4 show excludedportrange protocol=tcp"
+    $errors += "spostati con task set-port SERVICE=<modulo> PORT=<porta libera>, oppure libera le riserve da"
+    $errors += "terminale amministratore con 'net stop winnat' e 'net start winnat' (chiude Docker)"
+}
+if ($ProjectOnly) {
+    Write-Host ('  {0,-26}{1}' -f 'porte riservate', 'saltato (-ProjectOnly)') -ForegroundColor DarkGray
+} else {
+    Write-Check -Label 'porte riservate' -Errors $errors -OkNote 'OK (nessuna)'
+    $problems += $errors
+}
 
 # --- Il compose e' anche YAML valido? ----------------------------------------
 

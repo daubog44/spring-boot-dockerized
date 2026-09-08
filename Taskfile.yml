@@ -202,6 +202,11 @@ tasks:
   docker-up:
     desc: Compila le immagini e avvia lo stack completo in Docker
     cmds:
+      # Meglio fermarsi subito che a build finita: `task check` vede anche le
+      # porte che Windows si e' riservato, e su quelle Docker non riesce a
+      # pubblicare ("bind: An attempt was made to access a socket in a way
+      # forbidden by its access permissions").
+      - task: check
       # Lo stack locale userebbe le stesse porte: se e' rimasto acceso, i
       # container non riuscirebbero a pubblicarle.
       - task: dev-down
