@@ -38,6 +38,12 @@ Write-Cmd 'task new-service NAME=<nome>' 'crea un microservizio e lo collega'
 Write-Cmd 'task remove-service SERVICE=<modulo>' 'lo toglie da tutto (l''inverso)'
 Write-Note 'new-service: UI=1 per un modulo Thymeleaf, NODB=1 senza database,'
 Write-Note 'PORT=<n> per sceglierla (di default la prima libera).'
+Write-Host ''
+Write-Host '  Le versioni delle dipendenze non si scrivono: le governa il pom.xml' -ForegroundColor DarkGray
+Write-Host '  padre (Spring Boot piu'' il BOM di Spring Cloud), quindi basta il nome.' -ForegroundColor DarkGray
+Write-Host '  LIST=1 stampa i 35 nomi brevi conosciuti (web, data-jpa, security,' -ForegroundColor DarkGray
+Write-Host '  feign, kafka, postgresql...); se manca quello che ti serve, passa le' -ForegroundColor DarkGray
+Write-Host '  coordinate: DEPS=org.apache.commons:commons-lang3:3.17.0' -ForegroundColor DarkGray
 
 Write-Section 'Controlli'
 Write-Cmd 'task check' 'moduli, porte, Docker e liste sono coerenti?'

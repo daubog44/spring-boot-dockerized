@@ -29,6 +29,10 @@ $demoDir = Join-Path $baseDir "demo"
 # automatico partirebbe con il classpath a meta' e il servizio morirebbe con
 # "APPLICATION FAILED TO START ... required a bean that could not be found".
 $logDir = Get-DevLogDir
+# Quello che va storto nei controlli dal vivo: decide l'esito finale, cosi'
+# `task test-e2e` fallisce davvero quando qualcosa non va, invece di stampare
+# un banner verde su un collaudo mezzo saltato.
+$liveProblems = @()
 $runningPorts = @()
 foreach ($port in (Get-DevPorts -LogDir $logDir)) {
     if (Get-PortListeners -Port $port | Where-Object { $_.IsOurs }) { $runningPorts += $port }
@@ -48,7 +52,8 @@ try {
         Pop-Location
         exit 1
     }
-    Write-Host "✅ Maven Package eseguito con successo per tutti i 10 moduli!" -ForegroundColor Green
+    $moduleCount = ([regex]'<module>').Matches((Get-Content (Join-Path $demoDir 'pom.xml') -Raw)).Count
+    Write-Host "✅ Maven Package eseguito con successo per tutti i $moduleCount moduli!" -ForegroundColor Green
 } finally {
     Pop-Location
 }
@@ -62,7 +67,8 @@ if ($runningPorts.Count -gt 0) {
         if (-not (Wait-ForPort -Port $port -TimeoutSeconds 120)) { $notBack += $port }
     }
     if ($notBack.Count -gt 0) {
-        Write-Host "  ⚠️ Non sono tornati su dopo il riavvio: $($notBack -join ', '). Controlla 'task logs'." -ForegroundColor Yellow
+        Write-Host "  ❌ Non sono tornati su dopo il riavvio: $($notBack -join ', '). Guarda 'task logs'." -ForegroundColor Red
+        $liveProblems += "servizi non ripartiti dopo la ricompilazione: $($notBack -join ', ')"
     } else {
         Write-Host "  ✅ Tutti i servizi sono tornati in ascolto." -ForegroundColor Green
     }
@@ -115,6 +121,10 @@ foreach ($t in $tests) {
     if ($ok) { $endpointsPassed++ }
 }
 
+if ($runningPorts.Count -gt 0 -and $endpointsPassed -lt $endpointsChecked) {
+    $liveProblems += "$($endpointsChecked - $endpointsPassed) endpoint su $endpointsChecked non hanno risposto"
+}
+
 Write-Host ""
 # -------------------------------------------------------------------
 # STAGE 3: TEST DELLA LOGICA APPLICATIVA E DEGLI ALGORITMI (OFFLINE/ONLINE)
@@ -137,9 +147,11 @@ if ($endpointsPassed -ge 3) {
             Write-Host "  ✅ Validazione quantità insufficiente: OK ('$($resp.message)')" -ForegroundColor Green
         } else {
             Write-Host "  ❌ Risultato inatteso su movimentazione non valida!" -ForegroundColor Red
+            $liveProblems += "la movimentazione con quantita' eccessiva non e' stata respinta"
         }
     } catch {
-        Write-Host "  ⚠️ Impossibile eseguire test chiamata POST: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "  ❌ Impossibile eseguire test chiamata POST: $($_.Exception.Message)" -ForegroundColor Red
+        $liveProblems += "chiamata POST /api/wms/movements fallita"
     }
 
     # Test Algoritmo Ubicazione Vicina
@@ -153,10 +165,12 @@ if ($endpointsPassed -ge 3) {
         if ($respAlg.nearestLocation -ne $null) {
             Write-Host "  ✅ Algoritmo Distanza Manhattan: OK (Trovata ubicazione #$($respAlg.nearestLocation.id) a distanza d=$($respAlg.distance))" -ForegroundColor Green
         } else {
-            Write-Host "  ⚠️ Algoritmo ha restituito 0 candidati: $($respAlg.message)" -ForegroundColor Yellow
+            Write-Host "  ❌ Algoritmo ha restituito 0 candidati: $($respAlg.message)" -ForegroundColor Red
+            $liveProblems += "l'algoritmo della ubicazione piu' vicina non ha trovato candidati"
         }
     } catch {
-        Write-Host "  ⚠️ Impossibile eseguire test algoritmo POST: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "  ❌ Impossibile eseguire test algoritmo POST: $($_.Exception.Message)" -ForegroundColor Red
+        $liveProblems += "chiamata POST /api/wms/nearest-location fallita"
     }
 } else {
     Write-Host "  ℹ️ Lo stack di container Docker o le app locali non sono attualmente accese." -ForegroundColor Yellow
@@ -195,9 +209,28 @@ foreach ($file in $requiredFiles) {
 
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
-if ($filesOk) {
-    Write-Host " 🎉 RISULTATO TEST E2E: TEMPLATE E SOLUZIONE E2E WMS PERFETTI! " -ForegroundColor Green
-} else {
-    Write-Host " ⚠️ RISULTATO TEST E2E: Alcuni file non sono stati trovati." -ForegroundColor Red
+if (-not $filesOk) { $liveProblems += "mancano dei file attesi nel repository" }
+
+if ($liveProblems.Count -gt 0) {
+    Write-Host " ❌ RISULTATO TEST E2E: ci sono problemi da guardare." -ForegroundColor Red
+    Write-Host "============================================================" -ForegroundColor Cyan
+    foreach ($problem in $liveProblems) { Write-Host "   - $problem" -ForegroundColor Red }
+    Write-Host ""
+    exit 1
 }
+
+if ($endpointsPassed -eq 0) {
+    # Struttura e compilazione sono a posto, ma niente e' stato provato davvero:
+    # dirlo, invece di far passare per collaudato quello che non lo e'.
+    Write-Host " ⚠️ RISULTATO: struttura e compilazione OK, ma i servizi erano spenti." -ForegroundColor Yellow
+    Write-Host "============================================================" -ForegroundColor Cyan
+    Write-Host "   Avvia lo stack con 'task dev' (o 'task docker-up') e rilancia" -ForegroundColor Yellow
+    Write-Host "   'task test-e2e' per il collaudo vero." -ForegroundColor Yellow
+    Write-Host ""
+    exit 0
+}
+
+Write-Host " 🎉 RISULTATO TEST E2E: TEMPLATE E SOLUZIONE E2E WMS PERFETTI! " -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host ""
+exit 0

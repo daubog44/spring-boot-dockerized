@@ -31,6 +31,15 @@ cmd "task remove-service SERVICE=<modulo>" "lo toglie da tutto (l'inverso)"
 note "new-service: UI=1 per un modulo Thymeleaf, NODB=1 senza database,"
 note "PORT=<n> per sceglierla (di default la prima libera)."
 
+cat <<'EOF'
+
+  Le versioni delle dipendenze non si scrivono: le governa il pom.xml padre
+  (Spring Boot piu' il BOM di Spring Cloud), quindi basta il nome. LIST=1
+  stampa i 35 nomi brevi conosciuti (web, data-jpa, security, feign, kafka,
+  postgresql...); se manca quello che ti serve, passa le coordinate:
+  DEPS=org.apache.commons:commons-lang3:3.17.0
+EOF
+
 echo ""
 echo "Controlli"
 cmd "task check" "moduli, porte, Docker e liste sono coerenti?"

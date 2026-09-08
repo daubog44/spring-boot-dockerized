@@ -90,7 +90,7 @@ task status
 
 Dice chi occupa ognuna delle porte (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
 
-> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: `task dev KEEPFOREIGN=1 UI_PORT=9080`. Senza `-KeepForeign` viene chiusa.
+> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: `task dev KEEPFOREIGN=1 UI_PORT=9080`. Senza `KEEPFOREIGN=1` viene chiusa.
 
 **Per la demo finale**, usa lo stack containerizzato, che è quello che presenterai:
 

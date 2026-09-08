@@ -205,6 +205,28 @@ foreach ($svc in $devServices) {
 Write-Check -Label 'docker-compose' -Errors $errors
 $problems += $errors
 
+# --- Il compose e' anche YAML valido? ----------------------------------------
+
+# `docker compose config` non ha bisogno del daemon acceso: legge e valida il
+# file. Se Docker non c'e', non e' un errore: qui non lo si sta usando.
+$errors = @()
+if (Get-Command docker -ErrorAction SilentlyContinue) {
+    Push-Location $demoDir
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = cmd /c "docker compose config --quiet 2>&1"
+        if ($LASTEXITCODE -ne 0) { $errors += "docker-compose.yml non e' valido: $output" }
+    } finally {
+        $ErrorActionPreference = $previous
+        Pop-Location
+    }
+    Write-Check -Label 'compose valido' -Errors $errors
+    $problems += $errors
+} else {
+    Write-Host ('  {0,-26}{1}' -f 'compose valido', 'saltato (docker non installato)') -ForegroundColor DarkGray
+}
+
 # --- Esito --------------------------------------------------------------------
 
 Write-Host ''

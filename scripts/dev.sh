@@ -189,7 +189,7 @@ done
 cat <<EOF
 
   task logs         segue i log di tutti i servizi (Ctrl+C per uscire)
-  task logs -- wms  solo quel servizio
+  task logs SERVICE=wms   solo quel servizio
   task status       chi occupa le porte
   task dev-down     ferma tutto
 

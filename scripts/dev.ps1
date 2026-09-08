@@ -278,7 +278,7 @@ foreach ($svc in $services) {
 }
 Write-Host ''
 Write-Host '  task logs         segue i log di tutti i servizi (Ctrl+C per uscire)'
-Write-Host '  task logs -- wms  solo quel servizio'
+Write-Host '  task logs SERVICE=wms   solo quel servizio'
 Write-Host '  task status       chi occupa le porte'
 Write-Host '  task dev-down     ferma tutto'
 Write-Host ''
