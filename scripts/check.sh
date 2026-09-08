@@ -154,6 +154,19 @@ while read -r _name module port; do
 done <<<"$DEV_PS"
 report "docker-compose"
 
+# --- Il compose e' anche YAML valido? ----------------------------------------
+
+# `docker compose config` non ha bisogno del daemon acceso: legge e valida il
+# file. Se Docker non c'e', non e' un errore: qui non lo si sta usando.
+if command -v docker >/dev/null 2>&1; then
+  out="$(cd "$DEMO_DIR" && docker compose config --quiet 2>&1)" ||
+    add_error "docker-compose.yml non e' valido: $out"
+  report "compose valido"
+else
+  printf '  %-26s%s
+' "compose valido" "saltato (docker non installato)"
+fi
+
 # --- Esito --------------------------------------------------------------------
 
 echo ""

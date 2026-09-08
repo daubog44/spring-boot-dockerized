@@ -119,7 +119,7 @@ tasks:
         SERVICE=<modulo>     OBBLIGATORIA, la cartella sotto demo/
         DEPS=<a,b,c>         OBBLIGATORIA, nomi brevi separati da virgole,
                              oppure coordinate gruppo:artefatto[:versione]
-        LIST=1               stampa i nomi brevi conosciuti ed esce
+        LIST=1               stampa i 35 nomi brevi conosciuti ed esce
 
       Esempi:
         task add-dep LIST=1
