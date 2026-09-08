@@ -62,10 +62,18 @@ rm -f "$LOG_DIR"/*.log
 
 # --- Controllo porte occupate -------------------------------------------------
 
+# Un processo appena terminato rilascia la porta con un attimo di ritardo: se
+# guardassimo una volta sola, un avvio subito dopo un `task dev-down`
+# fallirebbe per una porta che sta gia' tornando libera.
 busy=""
-for svc in "${SERVICES[@]}"; do
-  IFS=':' read -r name _module port <<<"$svc"
-  if port_in_use "$port"; then busy="$busy $name:$port"; fi
+for attempt in $(seq 1 10); do
+  busy=""
+  for svc in "${SERVICES[@]}"; do
+    IFS=':' read -r name _module port <<<"$svc"
+    if port_in_use "$port"; then busy="$busy $name:$port"; fi
+  done
+  [ -z "$busy" ] && break
+  [ "$attempt" -lt 10 ] && sleep 1
 done
 if [ -n "$busy" ]; then
   echo "Porte ancora occupate dopo la pulizia:$busy" >&2

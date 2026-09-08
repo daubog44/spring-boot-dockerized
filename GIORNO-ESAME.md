@@ -248,6 +248,7 @@ task docker-down
 | Su `localhost:8080` risponde un'altra app | `task dev` la chiude; se ti serve viva, `task dev KEEPFOREIGN=1 UI_PORT=9080` |
 | Hai modificato il codice e non cambia niente | `task compile` (e controlla che non ci siano errori di compilazione) |
 | Hai aggiunto una dipendenza e non la vede | `task dev`: il classpath si fissa all'avvio, `task compile` non basta |
+| "Porta occupata da processo sconosciuto" | Non è un processo: Windows si è riservato quell'intervallo (succede quando parte Docker Desktop). `task status` la segna **RISERVATA**. Sposta il servizio con `task set-port`, o libera le riserve da terminale amministratore: `net stop winnat` e `net start winnat` |
 | Il servizio è morto dopo una modifica | `task logs SERVICE=<servizio>`, poi `task dev` per ripartire pulito |
 | I container non partono | `task docker-down`, poi `task docker-up` |
 | Il database ha dati sporchi | `task docker-reset`, poi `task docker-up` — **cancella i dati** |

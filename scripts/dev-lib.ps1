@@ -111,6 +111,32 @@ function Test-CanBind {
     }
 }
 
+function Get-ReservedPortRanges {
+    <#
+        Gli intervalli di porte che Windows si e' riservato (Hyper-V, WSL,
+        Docker Desktop): nessuno puo' farci il bind e nessun processo risulta
+        in ascolto, quindi la porta sembra libera ma non lo e'.
+    #>
+    $ranges = @()
+    try {
+        $output = netsh interface ipv4 show excludedportrange protocol=tcp 2>$null
+        foreach ($line in $output) {
+            if ($line -match '^\s*(\d+)\s+(\d+)') {
+                $ranges += [pscustomobject]@{ Start = [int]$Matches[1]; End = [int]$Matches[2] }
+            }
+        }
+    } catch { }
+    return $ranges
+}
+
+function Test-PortReserved {
+    param([int]$Port)
+    foreach ($range in (Get-ReservedPortRanges)) {
+        if ($Port -ge $range.Start -and $Port -le $range.End) { return $true }
+    }
+    return $false
+}
+
 function Get-PortStatus {
     <#
         Esito possibile: free, docker, busy, blocked, loopback-taken.
