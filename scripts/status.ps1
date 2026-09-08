@@ -46,7 +46,13 @@ foreach ($entry in $portNames.GetEnumerator()) {
     $listeners = @(Get-PortListeners -Port $port)
 
     if ($listeners.Count -eq 0) {
-        Write-Host ($format -f $port, $entry.Value, 'libera', '-', '-') -ForegroundColor DarkGray
+        if (Test-PortReserved -Port $port) {
+            # Nessuno in ascolto, ma il bind fallirebbe: la porta e' dentro un
+            # intervallo riservato da Windows, e nessun servizio potra' usarla.
+            Write-Host ($format -f $port, $entry.Value, 'RISERVATA', 'Windows', 'nessun processo: intervallo riservato') -ForegroundColor Red
+        } else {
+            Write-Host ($format -f $port, $entry.Value, 'libera', '-', '-') -ForegroundColor DarkGray
+        }
         continue
     }
 

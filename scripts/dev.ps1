@@ -94,16 +94,27 @@ function Format-Owner {
     return 'processo sconosciuto'
 }
 
+# Un processo appena terminato rilascia la porta con un attimo di ritardo, e
+# nel frattempo il sistema non sa nemmeno piu' dire di chi era: se guardassimo
+# una volta sola, un avvio subito dopo un `task dev-down` fallirebbe con
+# "porta occupata da processo sconosciuto". Riproviamo per qualche secondo.
 $inDocker = @()
 $blocked = @()
 $hijacked = @()
-foreach ($svc in $services) {
-    switch (Get-PortStatus -Port $svc.Port) {
-        'docker'         { $inDocker += $svc }
-        'busy'           { $blocked += $svc }
-        'blocked'        { $blocked += $svc }
-        'loopback-taken' { $hijacked += $svc }
+foreach ($attempt in 1..10) {
+    $inDocker = @()
+    $blocked = @()
+    $hijacked = @()
+    foreach ($svc in $services) {
+        switch (Get-PortStatus -Port $svc.Port) {
+            'docker'         { $inDocker += $svc }
+            'busy'           { $blocked += $svc }
+            'blocked'        { $blocked += $svc }
+            'loopback-taken' { $hijacked += $svc }
+        }
     }
+    if (@($inDocker + $blocked + $hijacked).Count -eq 0) { break }
+    if ($attempt -lt 10) { Start-Sleep -Milliseconds 500 }
 }
 
 # Se qualcosa e' ancora in ascolto dopo la pulizia, e' un caso che non possiamo
@@ -117,14 +128,31 @@ if ($stillBusy.Count -gt 0) {
         Write-Host "  $($svc.Name):$($svc.Port) -> $(Format-Owner -Port $svc.Port)"
     }
     Write-Host ''
+    # Una porta senza nessuno in ascolto ma su cui non si riesce a fare il bind
+    # e' quasi sempre in un intervallo che Windows si e' riservato (Hyper-V, WSL,
+    # l'avvio di Docker Desktop): non c'e' nessun processo da chiudere.
+    $reserved = @($stillBusy | Where-Object { Test-PortReserved -Port $_.Port })
     if ($inDocker.Count -gt 0) {
         Write-Host 'Sono i container dell''esame e non sono riuscito a fermarli:' -ForegroundColor Yellow
         Write-Host '  task docker-down    # poi rilancia task dev'
+    } elseif ($reserved.Count -gt 0) {
+        Write-Host 'Non e'' un processo: Windows si e'' riservato queste porte' -ForegroundColor Yellow
+        Write-Host '(succede all''avvio di Docker Desktop o di WSL). Nessuno puo'' usarle' -ForegroundColor Yellow
+        Write-Host 'finche'' la riserva resta. Le vedi tutte con:' -ForegroundColor Yellow
+        Write-Host '  netsh interface ipv4 show excludedportrange protocol=tcp'
+        Write-Host ''
+        Write-Host 'Due strade: spostare il servizio su una porta fuori dagli intervalli,'
+        foreach ($svc in $reserved) {
+            Write-Host ("  task set-port SERVICE={0} PORT=<porta libera>" -f $svc.Module)
+        }
+        Write-Host 'oppure liberare le riserve (da terminale amministratore, chiude Docker):'
+        Write-Host '  net stop winnat'
+        Write-Host '  net start winnat'
     } else {
         Write-Host 'Tomcat non riesce a fare il bind in questa situazione e il servizio muore' -ForegroundColor Yellow
         Write-Host "con 'Web server failed to start. Port N was already in use'." -ForegroundColor Yellow
         Write-Host 'Chiudi tu quel processo, oppure sposta la UI su un''altra porta:' -ForegroundColor Yellow
-        Write-Host '  task dev -- -UiPort 9080'
+        Write-Host '  task dev UI_PORT=9080'
     }
     Write-Host '  task status         # per vedere chi occupa cosa'
     exit 1
@@ -278,7 +306,7 @@ foreach ($svc in $services) {
 }
 Write-Host ''
 Write-Host '  task logs         segue i log di tutti i servizi (Ctrl+C per uscire)'
-Write-Host '  task logs -- store   solo quel servizio'
+Write-Host '  task logs SERVICE=<nome>   solo quel servizio'
 Write-Host '  task status       chi occupa le porte'
 Write-Host '  task dev-down     ferma tutto'
 Write-Host ''
