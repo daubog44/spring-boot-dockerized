@@ -201,7 +201,17 @@ tasks:
 
   docker-up:
     desc: Compila le immagini e avvia lo stack completo dell'esame in Docker
+    summary: |
+      Costruisce le immagini e avvia lo stack in container: e' quello che
+      presenterai. Prima controlla che il progetto sia coerente e che le porte
+      siano usabili, perche' scoprirlo dopo dieci minuti di build non aiuta;
+      poi ferma lo stack locale, che userebbe le stesse porte.
     cmds:
+      # Meglio fermarsi subito che a build finita: `task check` vede anche le
+      # porte che Windows si e' riservato, e su quelle Docker non riesce a
+      # pubblicare ("bind: An attempt was made to access a socket in a way
+      # forbidden by its access permissions").
+      - task: check
       # Lo stack locale userebbe le stesse porte: se e' rimasto acceso, i
       # container non riuscirebbero a pubblicarle.
       - task: dev-down

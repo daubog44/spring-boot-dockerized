@@ -5,6 +5,14 @@
 #   task check
 set -uo pipefail
 
+PROJECT_ONLY=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -ProjectOnly|--project-only) PROJECT_ONLY=1; shift ;;
+    *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
+  esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEMO_DIR="$REPO_ROOT/demo"
@@ -153,6 +161,24 @@ while read -r _name module port; do
     add_error "$module: in docker-compose.yml la porta pubblicata non e' $port:$port"
 done <<<"$DEV_PS"
 report "docker-compose"
+
+# --- Porte riservate da Windows ----------------------------------------------
+
+# Riguarda solo Windows: qui non esiste il concetto, e non c'e' niente da dire.
+if [ "$PROJECT_ONLY" -eq 0 ] && command -v netsh >/dev/null 2>&1; then
+  RESERVED="$(netsh interface ipv4 show excludedportrange protocol=tcp 2>/dev/null | grep -E '^ *[0-9]+ +[0-9]+')"
+  while read -r _name module port; do
+    [ -z "$module" ] && continue
+    printf '%s
+' "$RESERVED" | while read -r start end; do
+      [ -z "$start" ] && continue
+      if [ "$port" -ge "$start" ] && [ "$port" -le "$end" ]; then
+        echo "$module: la porta $port e' in un intervallo riservato da Windows ($start-$end)"
+      fi
+    done
+  done <<<"$DEV_PS" | while read -r line; do add_error "$line"; done
+  report "porte riservate" "OK (nessuna)"
+fi
 
 # --- Il compose e' anche YAML valido? ----------------------------------------
 
