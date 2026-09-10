@@ -78,7 +78,7 @@ foreach ($entry in $portNames.GetEnumerator()) {
 foreach ($item in $hijacked) {
     Write-Host ''
     Write-Host ("  ATTENZIONE: http://localhost:{0} risponde da {1} (PID {2}), non dal tuo servizio." -f $item.Port, $item.Listener.Name, $item.Listener.Id) -ForegroundColor Red
-    Write-Host '  Chiudi quel processo, oppure usa un''altra porta: task dev -- -UiPort 9080' -ForegroundColor Yellow
+    Write-Host '  Chiudi quel processo, oppure usa un''altra porta: task dev UI_PORT=9080' -ForegroundColor Yellow
 }
 
 # --- Container ----------------------------------------------------------------
