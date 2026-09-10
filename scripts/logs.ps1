@@ -7,9 +7,9 @@
     i servizi, ogni riga prefissata dal nome del servizio e di un colore diverso.
 
     task logs              tutti i servizi
-    task logs -- wms       solo wms
-    task logs -- wms crm   solo quei due
-    task logs -- -Tail 200 parte da piu' indietro nello storico
+    task logs SERVICE=<nome>            solo quel servizio
+    task logs SERVICE=<nome> TAIL=200  parte da piu' indietro nello storico
+    task logs -- <a> <b>               piu' servizi insieme
 
     Ctrl+C per uscire: chiude solo questa vista, i servizi restano in esecuzione.
 #>
