@@ -387,6 +387,17 @@ assert_contains "demo/alfa-service/src/main/resources/application.yml" "defer-da
 assert_contains "demo/alfa-service/src/main/resources/application.yml" "mode: always" "application.yml"
 end_case
 
+start_case "seed-data non ripete i valori quando le righe superano la tabella"
+# Le tabelle di valori hanno otto voci: oltre l'ottava riga il valore deve
+# portarsi dietro il numero, o una colonna unique = true farebbe fallire l'avvio.
+run_tool seed-data.sh --module alfa-service --rows 12
+assert_ok "seed-data con 12 righe"
+tot="$(grep -c '^INSERT INTO articoli' "$SANDBOX/$SQL")"
+uniche="$(grep '^INSERT INTO articoli' "$SANDBOX/$SQL" | sort -u | wc -l)"
+[ "$tot" = "12" ] || fail "righe generate: $tot"
+[ "$uniche" = "12" ] || fail "righe uguali fra loro: $(( tot - uniche ))"
+end_case
+
 start_case "db-schema ricava tabelle e relazioni dalle @Entity"
 run_tool db-schema.sh
 assert_ok "db-schema"

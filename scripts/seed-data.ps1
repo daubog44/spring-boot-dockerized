@@ -49,18 +49,27 @@ $Persone = @('Mario Rossi', 'Anna Bianchi', 'Luca Verdi', 'Giulia Neri', 'Paolo 
 $Descrizioni = @('Prima consegna del mese', 'Ordine urgente', 'Riassortimento magazzino', 'Reso da cliente', 'Fornitura periodica', 'Campione gratuito', 'Ordine ricorrente', 'Spedizione parziale')
 $Prodotti = @('Vite M6', 'Dado esagonale', 'Cuscinetto 6203', 'Guarnizione 40mm', 'Molla a trazione', 'Rondella piana', 'Perno filettato', 'Boccola in ottone')
 
+# Un valore dalla tabella, con il numero di riga appeso quando la tabella
+# finisce: cosi' anche con ROWS=50 non nascono due righe uguali, che su una
+# colonna unique = true farebbero fallire l'avvio.
+function Get-FromTable {
+    param([string[]]$Table, [int]$Index)
+    $value = $Table[($Index - 1) % $Table.Count]
+    if ($Index -gt $Table.Count) { $value = "$value $Index" }
+    return $value
+}
+
 function Get-StringValue {
     param([string]$Column, [int]$Index)
-    $i = ($Index - 1)
     switch -Regex ($Column) {
         'email'                      { return ('utente' + $Index + '@esempio.it') }
-        '(citta|city|comune|luogo)'  { return $Citta[$i % $Citta.Count] }
+        '(citta|city|comune|luogo)'  { return (Get-FromTable -Table $Citta -Index $Index) }
         '(indirizzo|via|address)'    { return ('Via Roma ' + ($Index * 3)) }
         '(codice|sigla|targa|cod)'   { return ('COD-' + $Index.ToString('000')) }
-        '(descrizione|note|testo)'   { return $Descrizioni[$i % $Descrizioni.Count] }
-        '(prodotto|articolo|item)'   { return $Prodotti[$i % $Prodotti.Count] }
-        '(cliente|fornitore|ragione|azienda|societa)' { return $Nomi[$i % $Nomi.Count] }
-        '(nome|cognome|utente|referente|responsabile)' { return $Persone[$i % $Persone.Count] }
+        '(descrizione|note|testo)'   { return (Get-FromTable -Table $Descrizioni -Index $Index) }
+        '(prodotto|articolo|item)'   { return (Get-FromTable -Table $Prodotti -Index $Index) }
+        '(cliente|fornitore|ragione|azienda|societa)' { return (Get-FromTable -Table $Nomi -Index $Index) }
+        '(nome|cognome|utente|referente|responsabile)' { return (Get-FromTable -Table $Persone -Index $Index) }
         '(stato|status|tipo)'        { return ('VALORE_' + $Index) }
         default                      { return ($Column.Replace('_', ' ') + ' ' + $Index) }
     }

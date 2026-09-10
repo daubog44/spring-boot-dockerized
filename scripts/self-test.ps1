@@ -422,6 +422,17 @@ Test-Case 'seed-data ricava le INSERT dalle @Entity' {
     Assert-Contains $yml 'mode: always' 'manca spring.sql.init.mode'
 }
 
+Test-Case 'seed-data non ripete i valori quando le righe superano la tabella' {
+    # Le tabelle di valori hanno otto voci: oltre l'ottava riga il valore deve
+    # portarsi dietro il numero, o una colonna unique = true farebbe fallire
+    # l'avvio.
+    Assert-Ok (Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '12')) 'seed-data con 12 righe e'' fallito'
+    $righe = @((Get-Text 'demo/alfa-service/src/main/resources/data.sql') -split "`r?`n" | Where-Object { $_ -match '^INSERT INTO articoli' })
+    Assert-That ($righe.Count -eq 12) ("righe generate: " + $righe.Count)
+    $unici = @($righe | Select-Object -Unique)
+    Assert-That ($unici.Count -eq 12) ("righe uguali fra loro: " + (12 - $unici.Count))
+}
+
 Test-Case 'db-schema ricava tabelle e relazioni dalle @Entity' {
     $r = Invoke-Tool 'db-schema.ps1'
     Assert-Ok $r 'db-schema e'' fallito'
