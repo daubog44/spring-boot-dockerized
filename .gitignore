@@ -1,2 +1,5 @@
 # log dei servizi avviati con `task dev`
 .dev-logs/
+
+# cartella prodotta da `task consegna`
+consegna/

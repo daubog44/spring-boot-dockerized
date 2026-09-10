@@ -32,7 +32,7 @@ Write-Host "  copia di prova: $sandbox" -ForegroundColor DarkGray
 Write-Host ''
 
 # robocopy esce con codici 0-7 quando ha funzionato (1 = file copiati).
-$null = robocopy $repoRoot $sandbox /E /XD target .git .dev-logs node_modules .task /NFL /NDL /NJH /NJS /NP
+$null = robocopy $repoRoot $sandbox /E /XD target .git .dev-logs node_modules .task consegna /NFL /NDL /NJH /NJS /NP
 if ($LASTEXITCODE -ge 8) { throw "Copia del progetto fallita (robocopy $LASTEXITCODE)." }
 
 $sandboxScripts = Join-Path $sandbox 'scripts'
@@ -308,6 +308,139 @@ Test-Case 'remove-service toglie il modulo da tutti i file' {
 
 Test-Case 'remove-service rifiuta un modulo che non esiste' {
     Assert-Fails (Invoke-Tool 'remove-service.ps1' @('-Module', 'questo-non-esiste')) 'ha accettato un modulo inventato'
+}
+
+# --- Database: credenziali, dati di prova, schema ----------------------------
+
+Test-Case 'db-config stampa la configurazione del database' {
+    $r = Invoke-Tool 'db-config.ps1'
+    Assert-Ok $r 'db-config senza variabili e'' fallito'
+    # Il nome del database cambia da un branch all'altro: lo leggiamo dal compose.
+    $dbNow = [regex]::Match((Get-Text 'demo/docker-compose.yml'), '(?m)^\s+POSTGRES_DB:\s*(\S+)').Groups[1].Value
+    Assert-Contains $r.Output $dbNow 'non stampa il nome del database'
+    Assert-Contains $r.Output 'alfa-service' 'non elenca i moduli collegati'
+}
+
+Test-Case 'db-config cambia le credenziali dappertutto' {
+    Assert-Ok (Invoke-Tool 'db-config.ps1' @('-DbName', 'collaudo', '-User', 'tester', '-Password', 'segreta', '-Port', '5544')) 'db-config e'' fallito'
+    $compose = Get-Text 'demo/docker-compose.yml'
+    Assert-Contains $compose 'POSTGRES_DB: collaudo' 'il container non ha il database nuovo'
+    Assert-Contains $compose 'POSTGRES_USER: tester' 'il container non ha l''utente nuovo'
+    Assert-Contains $compose 'pg_isready -U tester -d collaudo' 'la healthcheck e'' rimasta indietro'
+    Assert-Contains $compose '"5544:5432"' 'la porta pubblicata non e'' cambiata'
+    Assert-Contains $compose 'jdbc:postgresql://postgres:5432/collaudo' 'il modulo nel compose punta ancora al vecchio database'
+    $yml = Get-Text 'demo/alfa-service/src/main/resources/application.yml'
+    Assert-Contains $yml 'jdbc:postgresql://localhost:5544/collaudo' 'application.yml non aggiornato'
+    Assert-Contains $yml '_DB_USERNAME:tester}' 'utente non aggiornato in application.yml'
+    Assert-Contains (Get-Text 'demo/postgres-init/create-betadb.sql') 'TO tester;' 'la GRANT del database dedicato e'' rimasta indietro'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo db-config il progetto non e'' piu'' coerente'
+}
+
+Test-Case 'db-config rifiuta un valore che PostgreSQL non accetterebbe' {
+    Assert-Fails (Invoke-Tool 'db-config.ps1' @('-DbName', 'non valido!')) 'ha accettato un nome impossibile'
+}
+
+# Da qui in poi serve un dominio con delle @Entity: lo scriviamo noi.
+$entityDir = Join-Path $demo 'alfa-service/src/main/java/com/example/ttfcloud_esame/alfaservice'
+Write-TextFile -Path (Join-Path $entityDir 'DepositoEntity.java') -Text @'
+package com.example.ttfcloud_esame.alfaservice;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
+@Entity
+public class DepositoEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String citta;
+}
+'@
+Write-TextFile -Path (Join-Path $entityDir 'StatoArticolo.java') -Text @'
+package com.example.ttfcloud_esame.alfaservice;
+
+public enum StatoArticolo { DISPONIBILE, ESAURITO }
+'@
+Write-TextFile -Path (Join-Path $entityDir 'ArticoloEntity.java') -Text @'
+package com.example.ttfcloud_esame.alfaservice;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "articoli")
+public class ArticoloEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 80)
+    private String nome;
+
+    private Integer quantita;
+
+    @Enumerated(EnumType.STRING)
+    private StatoArticolo stato;
+
+    @ManyToOne
+    @JoinColumn(name = "deposito_id")
+    private DepositoEntity deposito;
+}
+'@
+
+Test-Case 'seed-data ricava le INSERT dalle @Entity' {
+    Assert-Ok (Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '3')) 'seed-data e'' fallito'
+    $sql = Get-Text 'demo/alfa-service/src/main/resources/data.sql'
+
+    # Senza @Table il nome della tabella e' quello della classe, suffisso
+    # compreso: e' cosi' che la chiama Hibernate.
+    Assert-Contains $sql 'INSERT INTO deposito_entity' 'manca la tabella senza @Table'
+    Assert-Contains $sql 'INSERT INTO articoli (nome, quantita, stato, deposito_id)' 'colonne sbagliate (la PK generata non va scritta)'
+    Assert-Contains $sql 'DISPONIBILE' 'gli enum non arrivano dal file Java'
+
+    # La tabella padre va riempita prima, o la chiave esterna punterebbe a niente.
+    $primoDeposito = $sql.IndexOf('INSERT INTO deposito_entity')
+    $primoArticolo = $sql.IndexOf('INSERT INTO articoli')
+    Assert-That ($primoDeposito -lt $primoArticolo) 'le righe figlie vengono prima di quelle padre'
+
+    $righe = ([regex]'INSERT INTO articoli').Matches($sql).Count
+    Assert-That ($righe -eq 3) "ROWS=3 ha prodotto $righe righe"
+
+    # Senza queste due proprieta' il file non verrebbe eseguito.
+    $yml = Get-Text 'demo/alfa-service/src/main/resources/application.yml'
+    Assert-Contains $yml 'defer-datasource-initialization: true' 'manca la proprieta'' che rimanda data.sql dopo Hibernate'
+    Assert-Contains $yml 'mode: always' 'manca spring.sql.init.mode'
+}
+
+Test-Case 'db-schema ricava tabelle e relazioni dalle @Entity' {
+    $r = Invoke-Tool 'db-schema.ps1'
+    Assert-Ok $r 'db-schema e'' fallito'
+    Assert-Contains $r.Output 'Modello concettuale' 'manca il modello concettuale'
+    Assert-Contains $r.Output 'Modello logico' 'manca il modello logico'
+    Assert-Contains $r.Output 'Tabella `articoli`' 'manca la tabella con @Table'
+    Assert-Contains $r.Output 'Tabella `deposito_entity`' 'manca la tabella senza @Table'
+    Assert-Contains $r.Output 'erDiagram' 'manca il diagramma ER'
+    Assert-Contains $r.Output 'FK' 'la chiave esterna non e'' segnata'
+}
+
+# Questa cambia il nome della cartella dei moduli: va per ultima.
+Test-Case 'rename-project rinomina la cartella e i file che la nominano' {
+    Assert-Ok (Invoke-Tool 'rename-project.ps1' @('-Name', 'collaudo-modules')) 'rename-project e'' fallito'
+    Assert-That (Test-Path (Join-Path $sandbox 'collaudo-modules/pom.xml')) 'la cartella nuova non c''e'''
+    Assert-That (-not (Test-Path $demo)) 'la cartella vecchia e'' rimasta'
+    Assert-Contains (Get-Text 'Taskfile.yml') 'dir: collaudo-modules' 'il Taskfile punta ancora alla cartella vecchia'
+    Assert-Contains (Get-Text 'scripts/check.ps1') "'collaudo-modules'" 'gli script puntano ancora alla cartella vecchia'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo rename-project il progetto non e'' piu'' coerente'
 }
 
 Test-Case 'gli script PowerShell hanno sintassi valida' {

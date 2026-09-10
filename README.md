@@ -115,6 +115,13 @@ dettaglio di uno.
 
 Sviluppo:
 
+- `task wizard`: Fa le domande e monta il progetto (`SERVICE=<modulo>` per uno solo).
+- `task consegna NOME=COGNOME_NOME`: Prepara la cartella da consegnare.
+- `task seed-data`: Dati di prova ricavati dalle `@Entity`.
+- `task db-schema`: Schema concettuale e logico ricavato dalle `@Entity`.
+- `task db-config`: Stampa o cambia le credenziali del database.
+- `task rename-project NAME=<nome>`: Rinomina la cartella dei moduli Maven.
+- `task offline-prep` / `task offline`: Preparazione e verifica per un esame senza rete.
 - `task dev`: Pulisce, compila e avvia l'intero stack in locale con hot reload.
 - `task dev-down`: Ferma i servizi locali e libera le porte.
 - `task logs`: Segue i log di tutti i servizi in un terminale solo (`task logs SERVICE=store` per uno).
@@ -135,6 +142,63 @@ Pulizia:
 - `task kill-java`: Ultima spiaggia, termina **tutti** i processi Java della macchina, anche quelli estranei al progetto.
 
 Avvio manuale di un modulo solo, in primo piano: `task run SERVICE=<modulo>` (o `task run-eureka`, `task run-db`).
+
+---
+
+## Wizard, dati di prova e consegna
+
+Il giorno dell'esame, letta la traccia, il modo piu' rapido per montare il
+progetto e' il wizard: chiede come si chiama la cartella dei moduli, se serve
+PostgreSQL e con quali credenziali, e poi i microservizi uno per uno.
+
+```bash
+task wizard
+```
+
+Per un microservizio solo: `task wizard SERVICE=<nome>`. Non fa niente di
+magico: chiama `rename-project`, `db-config`, `new-service` e `use-postgres`
+nell'ordine giusto, e finisce con `task check`.
+
+Scritte le entity, due comandi le leggono e ne ricavano il resto:
+
+```bash
+task seed-data
+```
+
+Scrive un `data.sql` per modulo con dati di prova plausibili, che Spring Boot
+esegue all'avvio dopo che Hibernate ha creato le tabelle. Una demo su tabelle
+vuote non si vede.
+
+```bash
+task db-schema
+```
+
+Lo schema concettuale e logico della base dati - tabelle, colonne, tipi SQL,
+chiavi, relazioni e un diagramma ER - ricavato dalle `@Entity`. E' quello che
+chiede l'allegato tecnico.
+
+E a fine giornata:
+
+```bash
+task consegna NOME=COGNOME_NOME
+```
+
+Prepara `consegna/`: i moduli zippati senza `target/`, l'allegato tecnico gia'
+compilato, le istruzioni di esecuzione, il compose, e un archivio unico da
+consegnare.
+
+### Esame senza rete
+
+La sera prima, con la connessione:
+
+```bash
+task offline-prep
+```
+
+Scarica le dipendenze Maven in `~/.m2`, le immagini Docker di base e fa una
+prima build dei container. Poi `task offline` dice se il progetto partirebbe a
+rete staccata. Portati la cartella del progetto e la `~/.m2` su una chiavetta:
+il template *e'* la cartella, non serve altro.
 
 ---
 

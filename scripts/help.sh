@@ -12,8 +12,18 @@ COMANDI DEL PROGETTO
   Si usano con variabili NOME=valore, mai con trattini.
   Dettaglio di uno solo: task --summary <comando>
 
-La giornata, in ordine
+Dall'inizio alla consegna
 EOF
+cmd "task wizard" "fa le domande e monta il progetto"
+cmd "task wizard SERVICE=<modulo>" "le domande di un microservizio solo"
+cmd "task seed-data" "dati di prova dalle @Entity (data.sql)"
+cmd "task db-schema" "schema concettuale e logico, dalle @Entity"
+cmd "task consegna NOME=COGNOME_NOME" "la cartella da consegnare"
+note "Il wizard e' anche task init. seed-data: SERVICE=<modulo>, ROWS=<n>."
+note "db-schema: OUT=<file>. consegna genera l'allegato tecnico gia' compilato."
+
+echo ""
+echo "La giornata, in ordine"
 cmd "task dev" "compila e avvia tutto in background"
 cmd "task logs" "segue i log (Ctrl+C esce, i servizi restano)"
 cmd "task compile" "dopo una modifica al codice: si riavvia da solo"
@@ -30,6 +40,9 @@ cmd "task new-service NAME=<nome>" "crea un microservizio e lo collega"
 cmd "task remove-service SERVICE=<modulo>" "lo toglie da tutto (l'inverso)"
 cmd "task use-postgres SERVICE=<modulo>" "lo collega a PostgreSQL invece che a H2"
 cmd "task enable-swagger SERVICE=<modulo>" "accende Swagger dove manca"
+cmd "task db-config" "stampa credenziali e moduli collegati"
+cmd "task db-config DBNAME=<db> USER=<u>" "le cambia dappertutto in una volta"
+cmd "task rename-project NAME=<nome>" "rinomina la cartella dei moduli Maven"
 note "new-service: UI=1 per un modulo Thymeleaf, NODB=1 senza database,"
 note "PORT=<n> per sceglierla (di default la prima libera)."
 note "use-postgres: DBNAME=<db> per dare al modulo un database tutto suo."
@@ -48,6 +61,12 @@ echo ""
 echo "Controlli"
 cmd "task check" "moduli, porte, Docker e liste sono coerenti?"
 cmd "task test" "collauda gli strumenti in una copia usa-e-getta"
+
+echo ""
+echo "Esame senza rete"
+cmd "task offline-prep" "DA FARE CON LA RETE: scarica tutto"
+cmd "task offline" "dice se partirebbe a rete staccata"
+note "Senza rete presenta con task dev + task run-db: non ricompila dentro Docker."
 
 echo ""
 echo "Docker, per la demo"
