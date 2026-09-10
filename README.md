@@ -20,7 +20,7 @@ posti.
 
 - **[Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. **Parti da qui.**
 - [Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
-- [Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md)
+- [Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — c'è anche **come funziona il tutto insieme**: il giro di una richiesta da browser a database, chi accende cosa (Lombok, Swagger, Feign, JPA/Hibernate) e come si usa `common-dto`
 - [Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
 
 Dal terminale, la guida ai comandi è `task help` (o `task` da solo); il

@@ -26,7 +26,7 @@ java --version
 
 ### A. Avvio Stack Completo Containerizzato (CONSIGLIATO PER LA DEMO)
 
-Esegue tutti i 5 microservizi Spring Boot e il database PostgreSQL in container Docker isolati:
+Esegue in container Docker isolati tutti i moduli del progetto — Eureka, i tuoi servizi — e il database PostgreSQL:
 
 ```bash
 # Entra nella cartella di progetto
@@ -57,7 +57,7 @@ task docker-reset
 
 ### B. Sviluppo Locale con Hot Reload (CONSIGLIATO MENTRE SVILUPPI)
 
-Un solo comando libera le porte (chiudendo chi le tiene occupate), avvia PostgreSQL, compila tutto e lancia Eureka e i quattro servizi:
+Un solo comando libera le porte (chiudendo chi le tiene occupate), compila tutto e lancia Eureka e i tuoi servizi, nell'ordine giusto (Eureka per primo, e ne aspetta la porta prima degli altri). Se un tuo servizio usa PostgreSQL, avvia anche quello: basta mettere `$usesPostgres = $true` in `scripts/dev.ps1` (`USES_POSTGRES=1` in `dev.sh`).
 
 ```bash
 task dev
@@ -69,7 +69,7 @@ I servizi girano in background: niente finestre sparse, un terminale solo. Per v
 task logs
 ```
 
-`Ctrl+C` chiude solo la vista, i servizi restano su. Per uno solo: `task logs -- store`. I log restano comunque su file in `.dev-logs/`.
+`Ctrl+C` chiude solo la vista, i servizi restano su. Per uno solo: `task logs SERVICE=<nome>`, col nome breve che vedi in `task status`. I log restano comunque su file in `.dev-logs/`.
 
 Dopo una modifica al codice, ricompila e i servizi interessati si riavviano da soli grazie a `spring-boot-devtools`:
 
@@ -91,61 +91,97 @@ task status
 
 Dice chi occupa ogni porta (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
 
-**Perché non usare `task docker-up` mentre sviluppi**: `docker compose build` ricostruisce tutte e cinque le immagini, e poiché il `Dockerfile` copia i sorgenti prima di compilare, ogni singola modifica invalida la cache e fa ricompilare tutto in ogni immagine. Un ciclo costa minuti contro i ~20 secondi del build locale.
+**Perché non usare `task docker-up` mentre sviluppi**: `docker compose build` ricostruisce un'immagine per servizio, e poiché il `Dockerfile` copia i sorgenti prima di compilare, ogni singola modifica invalida la cache e fa ricompilare tutto in ogni immagine. Un ciclo costa minuti contro i ~20 secondi del build locale.
 
 ---
 
 ### C. Avvio Manuale dei Singoli Moduli
 
-Se ti serve isolare un servizio, in terminali distinti:
+Se ti serve isolare un servizio e vederne l'output nel terminale:
+
+```bash
+task run SERVICE=<modulo>
+```
+
+Due scorciatoie per quello che c'è sempre:
+
+```bash
+task run-eureka
+```
 
 ```bash
 task run-db
-task run-eureka
-task run-tourist
-task run-random
-task run-store
-task run-ui
 ```
+
+`Ctrl+C` ferma il modulo. Per lo stack intero, in background, resta `task dev`.
 
 ---
 
 ## 3. Mappa delle Porte ed Endpoint OpenAPI / Swagger UI
 
-| Servizio | Porta Host | Endpoint Principal / Dashboard | Swagger UI (Contratti OpenAPI) |
+Questo branch è il **template vuoto**: le uniche porte fisse sono quelle
+dell'infrastruttura. Le altre le assegna `task new-service` (la prima libera
+dopo l'ultima usata) e te le stampa `task dev` alla fine dell'avvio.
+
+| Servizio | Porta Host | Endpoint / Dashboard | Swagger UI |
 | :--- | :---: | :--- | :--- |
-| **Event UI** | `8080` | `http://localhost:8080` | `http://localhost:8080/swagger-ui.html` |
-| **Eureka Naming Server** | `8761` | `http://localhost:8761` | N/A (Dashboard Eureka) |
-| **Tourist Service** | `8081` | `http://localhost:8081/api/events/nearby` | `http://localhost:8081/swagger-ui.html` |
-| **Random Service** | `8082` | `http://localhost:8082/api/random` | `http://localhost:8082/swagger-ui.html` |
-| **Store Service** | `8083` | `http://localhost:8083/api/suggestions` | `http://localhost:8083/swagger-ui.html` |
-| **PostgreSQL DB** | `5432` | `jdbc:postgresql://localhost:5432/event_suggestions` | N/A (Postgres Native) |
+| **Eureka Naming Server** | `8761` | `http://localhost:8761` | N/A (dashboard Eureka) |
+| **PostgreSQL** | `5432` | `jdbc:postgresql://localhost:5432/esame` (utente e password `exam`) | N/A |
+| **I tuoi servizi REST** | `8081`, `8082`, ... | `http://localhost:<porta>/api/...` | `http://localhost:<porta>/swagger-ui.html` |
+| **La tua UI** | la prima libera | `http://localhost:<porta>` | idem |
+
+Per sapere in ogni momento chi sta su quale porta, e chi è registrato su Eureka:
+
+```bash
+task status
+```
+
+Per spostare una porta ovunque sia scritta (`application.yml`, compose, liste
+di avvio):
+
+```bash
+task set-port SERVICE=<modulo> PORT=<porta>
+```
 
 ---
 
-## 4. Collaudo Rapido & Coordinate Demo (Bolzano)
+## 4. Collaudo Rapido
 
-Per dimostrare il funzionamento durante la presentazione della prova finale, inserisci nella UI o nei test HTTP le seguenti coordinate testate:
-
-### Coordinate Bolzano Centro:
-- **Latitudine**: `46.4983`
-- **Longitudine**: `11.3548`
-- **Raggio**: `10000` (metri)
-- **Limit**: `5` (eventi)
-- **Lingua**: `it`
-
-### Test Rapido via `curl` (API Direct Check)
+### Prima: il progetto è coerente?
 
 ```bash
-# 1. Test Tourist Service via OpenDataHub Wrapper
-curl "http://localhost:8081/api/events/nearby?latitude=46.4983&longitude=11.3548&limit=5&radius=10000&language=it"
-
-# 2. Test Random Service
-curl "http://localhost:8082/api/random?upperBound=5"
-
-# 3. Test Store Service (Storico)
-curl "http://localhost:8083/api/suggestions?limit=10"
+task check
 ```
+
+Non avvia niente: verifica che moduli, porte, `Dockerfile`, `docker-compose.yml`
+e liste di avvio dicano la stessa cosa, e che le porte siano davvero usabili su
+questa macchina. Se qualcosa non torna te lo dice qui, non a demo iniziata.
+
+### Poi: i servizi si vedono fra loro?
+
+```bash
+task status
+```
+
+Nella sezione **REGISTRO EUREKA** devono comparire tutti i tuoi servizi. Se uno
+manca, o è partito da meno di 15 secondi, o non parte affatto: `task logs
+SERVICE=<nome>`.
+
+### Infine: gli endpoint rispondono?
+
+Ogni servizio creato con `task new-service` nasce con un endpoint di prova e
+con Swagger già collegato:
+
+```bash
+curl http://localhost:<porta>/api/ping
+```
+
+Swagger UI (`http://localhost:<porta>/swagger-ui.html`) è il modo più comodo
+per provare gli endpoint veri: mostra lo schema esatto delle richieste e le
+esegue dal browser, senza scrivere `curl` a mano.
+
+L'ultimo collaudo, quello che conta, è percorrere il flusso completo dalla UI
+come lo mostrerai alla commissione.
 
 ---
 
@@ -172,7 +208,33 @@ Perché conta: Tomcat non riesce a fare il bind nemmeno quando l'altro processo 
 
 Se su una di quelle porte gira qualcosa che ti serve viva, dillo e sposta la UI:
 ```bash
-task dev -- -KeepForeign -UiPort 9080
+task dev KEEPFOREIGN=1 UI_PORT=9080
+```
+
+### 🚨 Emergenza 1-ter: "porta occupata da processo sconosciuto"
+
+`task dev` dice che una porta è occupata, `task status` la segna **RISERVATA** e
+nessun processo risulta in ascolto. Non c'è niente da chiudere: Windows si
+riserva interi intervalli di porte (Hyper-V, WSL, **l'avvio di Docker
+Desktop**), e dentro quegli intervalli non fa il bind nessuno — né un servizio
+locale né un container, per cui anche `task docker-up` fallirebbe con
+`bind: An attempt was made to access a socket in a way forbidden by its access permissions`.
+
+Per vedere gli intervalli:
+```bash
+netsh interface ipv4 show excludedportrange protocol=tcp
+```
+
+Due strade: spostare il servizio fuori dagli intervalli,
+```bash
+task set-port SERVICE=<modulo> PORT=<porta libera>
+```
+oppure liberare le riserve, da terminale **amministratore** (chiude Docker):
+```bash
+net stop winnat
+```
+```bash
+net start winnat
 ```
 
 ### 🚨 Emergenza 1-bis: "container exam-eureka is unhealthy"
