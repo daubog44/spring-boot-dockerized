@@ -143,6 +143,19 @@ di avvio):
 task set-port SERVICE=<modulo> PORT=<porta>
 ```
 
+### Il database
+
+Il `docker-compose.yml` contiene **un** container PostgreSQL (database `esame`,
+utente e password `exam`), che di suo non è collegato a nessun servizio: i
+moduli creati da `task new-service` usano H2 in memoria. Per collegarne uno:
+
+```bash
+task use-postgres SERVICE=<modulo>
+```
+
+Con `DBNAME=<nome>` quel modulo ottiene un database tutto suo, sempre dentro
+lo stesso container. Vedi GIORNO-ESAME.md, "Collegare un servizio a PostgreSQL".
+
 ---
 
 ## 4. Collaudo Rapido

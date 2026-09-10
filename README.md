@@ -53,8 +53,8 @@ E, già pronto e configurato per i moduli che creerai:
 
 - **Spring Boot 4.0.5** e **Spring Cloud 2025.1.1** con le versioni gestite dal pom padre: nei moduli le dipendenze si scrivono senza versione.
 - **spring-boot-devtools** ereditato da tutti i moduli: hot reload dopo `task compile`.
-- **springdoc-openapi**: ogni servizio espone `/swagger-ui.html`.
-- **PostgreSQL** in `docker-compose.yml` (database `esame`, utente e password `exam`), pronto se un servizio ne ha bisogno; i moduli generati partono con H2 in memoria.
+- **springdoc-openapi**: ogni modulo creato da `task new-service` espone `/swagger-ui.html` dal primo avvio, senza configurazione (per gli altri c'è `task enable-swagger`).
+- **PostgreSQL** in `docker-compose.yml` (database `esame`, utente e password `exam`): c'è un container, **non collegato a niente** finché non lo chiedi. I moduli generati partono con H2 in memoria; `task use-postgres SERVICE=<modulo>` sposta un modulo sul database vero, e con `DBNAME=` gliene dà uno tutto suo dentro lo stesso container.
 - **Dockerfile unico** parametrico sul modulo: un'immagine per servizio, senza un Dockerfile per cartella.
 
 ---
@@ -108,6 +108,14 @@ task set-port SERVICE=ordini-service PORT=8090
 
 ```bash
 task remove-service SERVICE=ordini-service
+```
+
+```bash
+task use-postgres SERVICE=ordini-service
+```
+
+```bash
+task enable-swagger SERVICE=ordini-service
 ```
 
 Tutti si usano con variabili `NOME=valore`, mai con trattini. Dopo una
