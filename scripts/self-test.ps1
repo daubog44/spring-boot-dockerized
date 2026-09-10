@@ -249,6 +249,52 @@ Test-Case 'set-port su Eureka aggiorna chi lo cerca' {
     Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo aver spostato Eureka il progetto non e'' piu'' coerente'
 }
 
+Test-Case 'enable-swagger e'' idempotente su un modulo che ce l''ha gia''' {
+    $before = Get-Text 'demo/alfa-service/pom.xml'
+    $r = Invoke-Tool 'enable-swagger.ps1' @('-Module', 'alfa-service')
+    Assert-Ok $r 'enable-swagger e'' fallito'
+    Assert-That ((Get-Text 'demo/alfa-service/pom.xml') -eq $before) 'ha toccato un pom che era gia'' a posto'
+    Assert-Contains $r.Output 'gia'' presente' 'non dice che c''era gia'' tutto'
+}
+
+Test-Case 'enable-swagger rimette springdoc dove manca' {
+    # Simuliamo un modulo scritto a mano: niente dipendenza, niente blocco yml.
+    $pomPath = Join-Path $demo 'beta-ui/pom.xml'
+    $pattern = '\s*<dependency>\s*<groupId>org\.springdoc</groupId>.*?</dependency>'
+    Write-TextFile -Path $pomPath -Text ([regex]::Replace((Read-TextFile $pomPath), $pattern, '', 'Singleline'))
+    $ymlPath = Join-Path $demo 'beta-ui/src/main/resources/application.yml'
+    $yml = Read-TextFile $ymlPath
+    Write-TextFile -Path $ymlPath -Text ($yml.Substring(0, $yml.IndexOf('springdoc:')).TrimEnd() + "`n")
+
+    Assert-Ok (Invoke-Tool 'enable-swagger.ps1' @('-Module', 'beta-ui')) 'enable-swagger e'' fallito'
+    Assert-Contains (Get-Text 'demo/beta-ui/pom.xml') '<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>' 'dipendenza non rimessa'
+    Assert-Contains (Get-Text 'demo/beta-ui/src/main/resources/application.yml') 'swagger-ui:' 'blocco yml non rimesso'
+}
+
+Test-Case 'use-postgres collega il modulo al database condiviso' {
+    Assert-Ok (Invoke-Tool 'use-postgres.ps1' @('-Module', 'alfa-service')) 'use-postgres e'' fallito'
+    $yml = Get-Text 'demo/alfa-service/src/main/resources/application.yml'
+    Assert-Contains $yml 'jdbc:postgresql://localhost:5432/' 'application.yml non punta a postgres'
+    Assert-NotContains $yml 'jdbc:h2:mem' 'e'' rimasto l''H2'
+    Assert-Contains (Get-Text 'demo/docker-compose.yml') 'jdbc:postgresql://postgres:5432/' 'il compose non passa l''url del container'
+    Assert-Contains (Get-Text 'demo/alfa-service/pom.xml') '<artifactId>postgresql</artifactId>' 'manca il driver nel pom'
+    Assert-Contains (Get-Text 'scripts/dev.ps1') '$usesPostgres = $true' 'task dev non avviera'' il database'
+    Assert-Contains (Get-Text 'scripts/dev.sh') 'USES_POSTGRES=1' 'dev.sh non allineato'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo use-postgres il progetto non e'' piu'' coerente'
+}
+
+Test-Case 'use-postgres con DBNAME crea il database dedicato' {
+    Assert-Ok (Invoke-Tool 'use-postgres.ps1' @('-Module', 'beta-ui', '-DbName', 'betadb')) 'use-postgres con DBNAME e'' fallito'
+    Assert-That (Test-Path (Join-Path $demo 'postgres-init/create-betadb.sql')) 'manca lo script di init'
+    Assert-Contains (Get-Text 'demo/postgres-init/create-betadb.sql') 'CREATE DATABASE betadb' 'lo script non crea il database'
+    Assert-Contains (Get-Text 'demo/docker-compose.yml') 'postgres-init:/docker-entrypoint-initdb.d' 'il compose non monta gli script di init'
+    Assert-Contains (Get-Text 'demo/beta-ui/src/main/resources/application.yml') 'betadb' 'il modulo non punta al suo database'
+}
+
+Test-Case 'use-postgres rifiuta un modulo che non esiste' {
+    Assert-Fails (Invoke-Tool 'use-postgres.ps1' @('-Module', 'questo-non-esiste')) 'ha accettato un modulo inventato'
+}
+
 Test-Case 'remove-service toglie il modulo da tutti i file' {
     Assert-Ok (Invoke-Tool 'remove-service.ps1' @('-Module', 'gamma-service')) 'remove-service e'' fallito'
     Assert-That (-not (Test-Path (Join-Path $demo 'gamma-service'))) 'la cartella del modulo e'' rimasta'

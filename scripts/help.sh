@@ -28,8 +28,12 @@ cmd "task add-dep LIST=1" "i nomi brevi delle dipendenze"
 cmd "task set-port SERVICE=<modulo> PORT=<n>" "sposta una porta, ovunque sia scritta"
 cmd "task new-service NAME=<nome>" "crea un microservizio e lo collega"
 cmd "task remove-service SERVICE=<modulo>" "lo toglie da tutto (l'inverso)"
+cmd "task use-postgres SERVICE=<modulo>" "lo collega a PostgreSQL invece che a H2"
+cmd "task enable-swagger SERVICE=<modulo>" "accende Swagger dove manca"
 note "new-service: UI=1 per un modulo Thymeleaf, NODB=1 senza database,"
 note "PORT=<n> per sceglierla (di default la prima libera)."
+note "use-postgres: DBNAME=<db> per dare al modulo un database tutto suo."
+note "Swagger sui moduli nuovi c'e' gia': enable-swagger serve solo a rimetterlo."
 
 cat <<'EOF'
 

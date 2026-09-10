@@ -163,6 +163,55 @@ per un servizio senza JPA.
 
 Poi `task dev`, e il servizio nuovo si registra su Eureka con gli altri.
 
+### Collegare un servizio a PostgreSQL
+
+```bash
+task use-postgres SERVICE=ordini-service
+```
+
+I servizi creati da `task new-service` partono con **H2 in memoria**: comodo
+mentre sviluppi (nessun container da aspettare, database pulito a ogni
+riavvio), ma i dati non sopravvivono. Quando la traccia chiede persistenza
+vera, questo comando sposta il modulo sul PostgreSQL che è **già** nel
+`docker-compose.yml`, in tutti i punti che servono: driver e JPA nel pom,
+url/utente/password nell'`application.yml`, le stesse variabili nel compose
+(dove il database non è `localhost` ma `postgres`), `depends_on` sul database,
+e `task dev` che d'ora in poi lo avvia e ne aspetta la porta.
+
+**Un database per servizio**, se lo vuoi:
+
+```bash
+task use-postgres SERVICE=ordini-service DBNAME=ordini
+```
+
+Crea anche `demo/postgres-init/create-ordini.sql`. PostgreSQL esegue gli script
+di init **solo quando il volume è vuoto**: la prima volta serve un
+`task docker-reset` (che cancella i dati già presenti).
+
+> **Serve più di un database all'esame?** Quasi mai. Le tracce chiedono
+> persistenza su uno o due servizi, e un solo database condiviso è accettato
+> senza problemi — è quello che trovi già configurato (`esame`, utente e
+> password `exam`). Se vuoi essere ortodosso ("un servizio, un database"), o se
+> la traccia lo chiede esplicitamente, `DBNAME=` te lo dà: resta **un solo
+> container** PostgreSQL, con più database dentro. Non serve un secondo
+> container, e non conviene: sono altri 300 MB e un'altra porta da gestire.
+
+### Accendere Swagger dove manca
+
+I moduli creati da `task new-service` hanno **già** Swagger: dipendenza nel pom
+e blocco nell'`application.yml`, quindi `http://localhost:<porta>/swagger-ui.html`
+risponde dal primo avvio — sia per un servizio REST sia per una UI. Non devi
+fare niente.
+
+Serve solo se lavori su un modulo scritto a mano, o da cui la dipendenza è
+stata tolta:
+
+```bash
+task enable-swagger SERVICE=ordini-service
+```
+
+È idempotente: se c'è già tutto, te lo dice e non tocca niente.
+
 ### Togliere un microservizio
 
 ```bash
@@ -274,6 +323,8 @@ task docker-down
 | `task set-port` | Sposta un modulo su un'altra porta, ovunque sia scritta |
 | `task new-service` | Crea un microservizio nuovo e lo collega a tutto |
 | `task remove-service` | Toglie un modulo dal progetto e da tutti i file |
+| `task use-postgres` | Collega un modulo a PostgreSQL (`DBNAME=` per un database suo) |
+| `task enable-swagger` | Rimette Swagger su un modulo che non ce l'ha |
 | `task check` | Moduli, porte, Docker e liste sono coerenti? |
 | `task test` | Collauda gli strumenti su una copia usa-e-getta |
 | `task help` | Questa guida, dal terminale |
