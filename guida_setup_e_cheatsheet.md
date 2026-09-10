@@ -138,6 +138,28 @@ Con `DBNAME=<nome>` quel modulo ottiene un database tutto suo, sempre dentro
 lo stesso container. Vedi GIORNO-ESAME.md, "Collegare un servizio a PostgreSQL".
 
 
+
+Le credenziali non sono scolpite nella pietra:
+
+```bash
+task db-config
+```
+
+Senza variabili stampa nome, utente, password, porta e moduli collegati. Con
+`DBNAME=`, `USER=`, `PASSWORD=` o `PORT=` le cambia in tutti i punti in cui
+sono scritte (container, healthcheck, variabili dei moduli, `application.yml`,
+script di init). Dopo un cambio di nome, utente o password serve un
+`task docker-reset`: PostgreSQL crea utente e database solo al primo avvio.
+
+E per non presentare tabelle vuote:
+
+```bash
+task seed-data
+```
+
+Legge le `@Entity` e scrive un `data.sql` per modulo, che Spring Boot esegue
+all'avvio dopo che Hibernate ha creato le tabelle.
+
 ---
 
 ## 4. Collaudo Rapido
@@ -264,3 +286,33 @@ task docker-up
 
 ### 🚨 Emergenza 4: "Eureka registra i servizi ma i Feign Client danno 500"
 I client Eureka richiedono qualche secondo per aggiornare il registro locale delle istanze (cache heartbeat). Attendi 10-15 secondi dall'avvio completo del cluster prima di effettuare la prima richiesta HTTP.
+
+
+---
+
+## Prima e dopo: preparazione offline e consegna
+
+Se il giorno dell'esame non avrai rete, la sera prima:
+
+```bash
+task offline-prep
+```
+
+Scarica le dipendenze Maven in `~/.m2`, le immagini Docker di base e fa una
+prima build dei container. `task offline` verifica lo stato e prova davvero una
+compilazione offline (`mvnw -o`). Portati la cartella del progetto **e** la
+cartella `~/.m2` su una chiavetta: il template e' la cartella, non serve altro.
+
+Senza rete presenta con `task dev` piu' `task run-db` (il solo PostgreSQL in
+container): non ricompila niente dentro Docker, quindi e' il modo che regge
+meglio.
+
+A fine giornata:
+
+```bash
+task consegna NOME=COGNOME_NOME
+```
+
+Prepara `consegna/` con i moduli zippati senza `target/`, l'allegato tecnico
+gia' compilato (moduli, porte, endpoint, schema del database), le istruzioni di
+esecuzione, il compose, e un archivio unico da consegnare.

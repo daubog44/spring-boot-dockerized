@@ -14,11 +14,14 @@ COPY wms-ui/pom.xml wms-ui/pom.xml
 ARG MODULE="wms-ui"
 
 RUN chmod +x mvnw
-RUN ./mvnw -B -pl ${MODULE} -am dependency:go-offline
+# La cache di Maven vive fuori dall'immagine e sopravvive alle build: cosi'
+# una modifica ai pom non rimanda a scaricare tutto da capo, e il giorno
+# dell'esame senza rete le dipendenze sono gia' qui (task offline-prep).
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -pl ${MODULE} -am dependency:go-offline
 
 COPY . .
 
-RUN ./mvnw -B -pl ${MODULE} -am clean package -Dmaven.test.skip=true
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -pl ${MODULE} -am clean package -Dmaven.test.skip=true
 
 FROM eclipse-temurin:25-jre
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*

@@ -22,6 +22,64 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/help.ps1{{else}}bash ./scripts/help.sh{{end}}'
 
+  # --- Inizio e fine del progetto ---------------------------------------------
+  # Il wizard monta il progetto facendo domande; la consegna prepara la
+  # cartella da consegnare. In mezzo c'e' tutto il resto.
+
+  wizard:
+    desc: "WIZARD: fa le domande e monta il progetto (task wizard, oppure SERVICE=<modulo> per uno solo)"
+    aliases: [init]
+    interactive: true
+    summary: |
+      Chiede quello che serve e lancia i comandi giusti nell'ordine giusto:
+      come si chiama la cartella dei moduli, se il progetto usa PostgreSQL e
+      con quali credenziali, e poi i microservizi uno per uno (REST, REST
+      senza database, o interfaccia Thymeleaf; porta; H2 o PostgreSQL).
+      Alla fine lancia `task check`.
+
+      Eureka, OpenFeign, Swagger, Lombok, validation, actuator e common-dto
+      ci sono gia' nel modulo appena nasce: non te li chiede perche' non c'e'
+      niente da decidere.
+
+      Variabili (facoltative):
+        SERVICE=<modulo>   solo le domande di quel microservizio (lo crea se
+                           non esiste, lo rifinisce se c'e' gia')
+
+      Esempi:
+        task wizard
+        task wizard SERVICE=wms-service
+
+      Serve un terminale vero: fa domande.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/wizard.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/wizard.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{end}}'
+
+  consegna:
+    desc: "Prepara la cartella da consegnare: moduli zippati, allegato tecnico, istruzioni (task consegna NOME=ROSSI_MARIO)"
+    summary: |
+      Mette in consegna/ tutto quello che va consegnato e niente di quello che
+      non serve:
+
+        moduli/<modulo>.zip        i sorgenti di ogni microservizio, senza
+                                   target/ (megabyte di roba ricompilabile)
+        ALLEGATO-TECNICO.md        gia' compilato con moduli, porte, endpoint
+                                   e schema del database
+        SCHEMA-DATABASE.md         lo schema da solo, comodo da copiare
+        ISTRUZIONI-ESECUZIONE.md   come far girare il progetto
+        docker-compose.yml         + Dockerfile e script di init
+        <NOME>.zip                 tutto quanto sopra in un archivio solo
+
+      Variabili:
+        NOME=<COGNOME_NOME>   nome dell'archivio finale
+        OUT=<cartella>        dove prepararla (default: consegna/)
+
+      Esempio:
+        task consegna NOME=ROSSI_MARIO
+
+      Prima di consegnare passa da `task check`: se il progetto non e'
+      coerente, si ferma.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/consegna.ps1{{if .NOME}} -Nome {{.NOME}}{{end}}{{if .OUT}} -OutDir {{.OUT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/consegna.sh{{if .NOME}} --nome {{.NOME}}{{end}}{{if .OUT}} --out-dir {{.OUT}}{{end}} {{.CLI_ARGS}}{{end}}'
+
   # --- Sviluppo quotidiano ----------------------------------------------------
 
   dev:
@@ -206,6 +264,106 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/enable-swagger.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/enable-swagger.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{end}}'
 
+  rename-project:
+    desc: "Rinomina la cartella dei moduli Maven, ovunque sia nominata (task rename-project NAME=wms)"
+    summary: |
+      La cartella che contiene il pom aggregatore, il Dockerfile e il
+      docker-compose si chiama demo perche' cosi' nasce da Spring Initializr.
+      Questo comando le da' il nome del progetto, e aggiorna insieme a lei il
+      Taskfile, gli script e le guide che la nominano. Alla fine lancia
+      `task check`.
+
+      Variabili:
+        NAME=<nome>   OBBLIGATORIA, minuscole, numeri e trattini
+
+      Esempio:
+        task rename-project NAME=wms
+
+      La cartella che contiene tutto (quella del repository) rinominala pure a
+      mano: nessuno script dipende dal suo nome.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/rename-project.ps1{{if .NAME}} -Name {{.NAME}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/rename-project.sh{{if .NAME}} --name {{.NAME}}{{end}} {{.CLI_ARGS}}{{end}}'
+
+  db-config:
+    desc: "Cambia nome, utente, password o porta del database, e aggiorna i moduli collegati (task db-config)"
+    summary: |
+      Senza variabili stampa com'e' configurato adesso il database e quali
+      moduli ci sono collegati: e' il modo piu' veloce per ricordarsi la
+      password durante la demo.
+
+      Con le variabili cambia i valori dappertutto in una volta: nel container
+      postgres del compose (compresa la sua healthcheck e la porta
+      pubblicata), nelle variabili d'ambiente di ogni modulo collegato,
+      nell'application.yml di ognuno e negli script di init dei database
+      dedicati.
+
+      Variabili (tutte facoltative):
+        DBNAME=<nome>       nome del database condiviso
+        USER=<utente>       utente
+        PASSWORD=<password> password
+        PORT=<porta>        porta pubblicata sulla macchina (in Docker resta 5432)
+
+      Esempi:
+        task db-config
+        task db-config DBNAME=magazzino USER=wms PASSWORD=wms123
+        task db-config PORT=5433
+
+      PostgreSQL crea utente e database solo al primo avvio, su volume vuoto:
+      dopo aver cambiato nome, utente o password serve `task docker-reset`.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/db-config.ps1{{if .DBNAME}} -DbName {{.DBNAME}}{{end}}{{if .USER}} -User {{.USER}}{{end}}{{if .PASSWORD}} -Password {{.PASSWORD}}{{end}}{{if .PORT}} -Port {{.PORT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/db-config.sh{{if .DBNAME}} --db-name {{.DBNAME}}{{end}}{{if .USER}} --user {{.USER}}{{end}}{{if .PASSWORD}} --password {{.PASSWORD}}{{end}}{{if .PORT}} --port {{.PORT}}{{end}} {{.CLI_ARGS}}{{end}}'
+
+  db-schema:
+    desc: "Ricava lo schema concettuale e logico del database dalle @Entity (task db-schema)"
+    summary: |
+      Legge le classi annotate con @Entity e ne ricava le tabelle: colonne,
+      tipi SQL, chiavi primarie ed esterne, relazioni, piu' un diagramma ER in
+      mermaid che GitHub e VS Code disegnano da soli. E' lo "schema
+      concettuale e logico della base dati" che chiede l'allegato tecnico,
+      ricavato dal codice invece che ricordato a memoria.
+
+      Non si collega a nessun database: legge i sorgenti. Funziona anche a
+      stack spento, e dice la verita' su quello che Hibernate creera'.
+
+      Variabili (facoltative):
+        OUT=<file>   scrive su file invece che a schermo
+
+      Esempi:
+        task db-schema
+        task db-schema OUT=schema.md
+
+      Lo genera da solo anche `task consegna`.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/db-schema.ps1{{if .OUT}} -OutFile {{.OUT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/db-schema.sh{{if .OUT}} --out {{.OUT}}{{end}} {{.CLI_ARGS}}{{end}}'
+
+  seed-data:
+    desc: "Riempie il database di dati di prova ricavati dalle @Entity (task seed-data)"
+    summary: |
+      Legge le @Entity e scrive un src/main/resources/data.sql per modulo, con
+      le INSERT. Spring Boot lo esegue all'avvio, dopo che Hibernate ha creato
+      le tabelle.
+
+      I valori sono inventati ma plausibili: le stringhe seguono il nome della
+      colonna (un campo "citta" prende nomi di citta', un "email" indirizzi),
+      gli enum vengono presi davvero dai valori dichiarati nel file Java, e le
+      tabelle con chiave esterna vengono riempite dopo quelle a cui puntano.
+
+      Aggiunge da solo all'application.yml le due proprieta' senza cui il file
+      non verrebbe eseguito (defer-datasource-initialization e sql.init.mode).
+
+      Variabili (tutte facoltative):
+        SERVICE=<modulo>   un modulo solo (default: tutti quelli con @Entity)
+        ROWS=<numero>      quante righe per tabella (default 5)
+
+      Esempi:
+        task seed-data
+        task seed-data SERVICE=wms-service ROWS=10
+
+      Su PostgreSQL le INSERT vengono rieseguite a ogni avvio: se ti trovi
+      righe doppie, svuota con `task docker-reset`.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/seed-data.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .ROWS}} -Rows {{.ROWS}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/seed-data.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .ROWS}} --rows {{.ROWS}}{{end}} {{.CLI_ARGS}}{{end}}'
+
   check:
     desc: "Controlla che il progetto sia coerente: moduli, porte, Docker, lista dei servizi"
     summary: |
@@ -236,6 +394,33 @@ tasks:
         task test FULL=1
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/self-test.ps1{{if .FULL}} -Full{{end}}{{else}}bash ./scripts/self-test.sh{{if .FULL}} --full{{end}}{{end}}'
+
+  offline:
+    desc: "Dice se il progetto partirebbe senza rete (cache Maven, immagini Docker)"
+    summary: |
+      Il giorno dell'esame potresti non avere internet. Maven scarica le
+      dipendenze in ~/.m2, Docker le immagini di base: se non sono gia' sul
+      disco, a rete staccata non parte niente.
+
+      Questo comando controlla gli attrezzi (go-task, JDK), la cache di Maven,
+      prova davvero una build offline (mvnw -o) e verifica che le immagini
+      Docker siano gia' scaricate. Alla fine dice come presentare senza rete.
+
+      Per scaricare quello che manca, con la rete: `task offline-prep`.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/offline.ps1{{else}}bash ./scripts/offline.sh{{end}}'
+
+  offline-prep:
+    desc: "DA FARE CON LA RETE: scarica tutto quello che servira' il giorno dell'esame"
+    summary: |
+      Da lanciare la sera prima, con internet. Scarica le dipendenze Maven in
+      ~/.m2, compila una volta, scarica le immagini Docker di base e fa una
+      prima `docker compose build`, che riempie la cache dei livelli (compreso
+      quello con curl, che a rete staccata non si potrebbe piu' installare).
+
+      Poi verifica con `task offline`.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/offline.ps1 -Prep{{else}}bash ./scripts/offline.sh --prep{{end}}'
 
   # --- Stack in container -----------------------------------------------------
 
