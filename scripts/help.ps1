@@ -36,8 +36,12 @@ Write-Cmd 'task add-dep LIST=1' 'i nomi brevi delle dipendenze'
 Write-Cmd 'task set-port SERVICE=<modulo> PORT=<n>' 'sposta una porta, ovunque sia scritta'
 Write-Cmd 'task new-service NAME=<nome>' 'crea un microservizio e lo collega'
 Write-Cmd 'task remove-service SERVICE=<modulo>' 'lo toglie da tutto (l''inverso)'
+Write-Cmd 'task use-postgres SERVICE=<modulo>' 'lo collega a PostgreSQL invece che a H2'
+Write-Cmd 'task enable-swagger SERVICE=<modulo>' 'accende Swagger dove manca'
 Write-Note 'new-service: UI=1 per un modulo Thymeleaf, NODB=1 senza database,'
 Write-Note 'PORT=<n> per sceglierla (di default la prima libera).'
+Write-Note 'use-postgres: DBNAME=<db> per dare al modulo un database tutto suo.'
+Write-Note 'Swagger sui moduli nuovi c''e'' gia'': enable-swagger serve solo a rimetterlo.'
 Write-Host ''
 Write-Host '  Le versioni delle dipendenze non si scrivono: le governa il pom.xml' -ForegroundColor DarkGray
 Write-Host '  padre (Spring Boot piu'' il BOM di Spring Cloud), quindi basta il nome.' -ForegroundColor DarkGray

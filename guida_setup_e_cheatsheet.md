@@ -127,6 +127,20 @@ task run-ui
 | **Store Service** | `8083` | `http://localhost:8083/api/suggestions` | `http://localhost:8083/swagger-ui.html` |
 | **PostgreSQL DB** | `5432` | `jdbc:postgresql://localhost:5432/event_suggestions` | N/A (Postgres Native) |
 
+### Il database
+
+Il `docker-compose.yml` contiene **un** container PostgreSQL (database `esame`,
+utente e password `exam`), che di suo non è collegato a nessun servizio: i
+moduli creati da `task new-service` usano H2 in memoria. Per collegarne uno:
+
+```bash
+task use-postgres SERVICE=<modulo>
+```
+
+Con `DBNAME=<nome>` quel modulo ottiene un database tutto suo, sempre dentro
+lo stesso container. Vedi GIORNO-ESAME.md, "Collegare un servizio a PostgreSQL".
+
+
 ---
 
 ## 4. Collaudo Rapido & Coordinate Demo (Bolzano)

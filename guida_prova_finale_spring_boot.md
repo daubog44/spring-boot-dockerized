@@ -379,6 +379,9 @@ servizi) né la logica di business.
 
 ## 6. Mini-Guida Completa alle Librerie ed Annotazioni Java
 
+Per ogni libreria: la tabella delle annotazioni, e sotto un esempio completo
+che dice **in quale modulo** va il codice.
+
 ### 6.1 Spring Web & MVC (`@RestController`, `@Controller`)
 
 | Annotazione | Scope / Uso | Spiegazione Pratica |
@@ -396,6 +399,128 @@ servizi) né la logica di business.
 | `@ModelAttribute` | Parametro metodo | Binda i dati inviati da un form HTML (Thymeleaf) ad un oggetto Java DTO. |
 | `@Validated` / `@Valid` | Classe / Parametro | Attiva la validazione automatica delle annotazioni di vincolo (es. `@NotNull`, `@Min`) sui parametri di input. |
 
+#### Esempio completo — un controller REST e uno Thymeleaf
+
+Il primo va in un **servizio** (`ordini-service`), il secondo in una **UI**
+(`ordini-ui`): stessa libreria, due usi diversi.
+
+```java
+// demo/ordini-service/src/main/java/.../OrdineController.java
+package com.example.ttfcloud_esame.ordiniservice;
+
+import com.example.ttfcloud_esame.commondto.OrdineDTO;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController                       // ogni metodo restituisce JSON
+@RequestMapping("/api/ordini")        // prefisso comune di tutti i path
+@RequiredArgsConstructor              // Lombok: costruttore con i campi final
+public class OrdineController {
+
+    private final OrdineService service;   // iniettato dal costruttore
+
+    // GET /api/ordini            -> elenco completo
+    // GET /api/ordini?cliente=X  -> filtrato
+    @GetMapping
+    public List<OrdineDTO> elenco(@RequestParam(required = false) String cliente) {
+        return (cliente == null) ? service.tutti() : service.perCliente(cliente);
+    }
+
+    // GET /api/ordini/7
+    @GetMapping("/{id}")
+    public ResponseEntity<OrdineDTO> uno(@PathVariable Long id) {
+        return service.trova(id)
+                .map(ResponseEntity::ok)                             // 200 col corpo
+                .orElseGet(() -> ResponseEntity.notFound().build()); // 404
+    }
+
+    // POST /api/ordini, col JSON dell'ordine nel corpo
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)   // 201 invece del 200 di default
+    public OrdineDTO crea(@Valid @RequestBody OrdineDTO nuovo) {
+        return service.salva(nuovo);
+    }
+
+    @PutMapping("/{id}")
+    public OrdineDTO aggiorna(@PathVariable Long id, @Valid @RequestBody OrdineDTO modifiche) {
+        return service.aggiorna(id, modifiche);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)   // 204: fatto, niente da restituire
+    public void elimina(@PathVariable Long id) {
+        service.elimina(id);
+    }
+}
+```
+
+```java
+// demo/ordini-ui/src/main/java/.../OrdineWebController.java
+package com.example.ttfcloud_esame.ordiniui;
+
+import com.example.ttfcloud_esame.commondto.OrdineDTO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+
+@Controller                    // NON @RestController: qui si restituiscono pagine
+@RequiredArgsConstructor
+public class OrdineWebController {
+
+    private final OrdiniClient ordiniClient;   // il @FeignClient, vedi 6.3
+
+    @GetMapping("/")
+    public String elenco(Model model) {
+        model.addAttribute("ordini", ordiniClient.tutti());
+        model.addAttribute("nuovo", new OrdineDTO());   // oggetto vuoto per il form
+        return "ordini";      // -> src/main/resources/templates/ordini.html
+    }
+
+    @PostMapping("/ordini")
+    public String crea(@ModelAttribute OrdineDTO nuovo) {   // dati del form HTML
+        ordiniClient.crea(nuovo);
+        return "redirect:/";   // dopo una POST: niente doppio invio col refresh
+    }
+}
+```
+
+```html
+<!-- demo/ordini-ui/src/main/resources/templates/ordini.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>Ordini</title></head>
+<body>
+    <table>
+        <tr th:each="o : ${ordini}">
+            <td th:text="${o.id}">1</td>
+            <td th:text="${o.cliente}">Rossi</td>
+            <td th:text="${o.quantita}">3</td>
+        </tr>
+    </table>
+
+    <form th:action="@{/ordini}" th:object="${nuovo}" method="post">
+        <input type="text" th:field="*{cliente}">
+        <input type="number" th:field="*{quantita}">
+        <button type="submit">Aggiungi</button>
+    </form>
+</body>
+</html>
+```
+
+> Tre cose che all'esame fanno perdere tempo: `@RestController` su una classe
+> che dovrebbe restituire pagine (il browser si ritrova il nome del template
+> come testo), il `redirect:` dimenticato dopo una POST, e `@RequestBody` al
+> posto di `@ModelAttribute` per i dati di un form — un form HTML non manda
+> JSON.
+
 ---
 
 ### 6.2 OpenAPI / Springdoc (`Swagger`)
@@ -408,6 +533,99 @@ servizi) né la logica di business.
 | `@ApiResponse(responseCode = "200", description = "...")` | Metodo REST | Documenta l'esito HTTP di risposta restituito dall'API (200 OK, 400 Bad Request, 404 Not Found). |
 | `@Schema(description = "...", example = "...")` | Campo DTO / Class | Documenta il significato ed i valori di esempio per le proprietà dei DTO nella sezione Schemas. |
 
+#### Esempio completo — lo stesso controller, documentato
+
+Va nel **servizio REST**; il `@Schema` dei campi va sul DTO, quindi in
+**common-dto**. Senza nessuna di queste annotazioni Swagger funziona lo stesso
+(elenca gli endpoint e li fa provare): servono a farlo leggere bene alla
+commissione, ed è il punto della traccia che chiede il "descrittore".
+
+```java
+// demo/ordini-service/src/main/java/.../OrdineController.java
+package com.example.ttfcloud_esame.ordiniservice;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+@RestController
+@RequestMapping("/api/ordini")
+@RequiredArgsConstructor
+@Tag(name = "Ordini", description = "Creazione e consultazione degli ordini")
+public class OrdineController {
+
+    private final OrdineService service;
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Un ordine per id",
+               description = "Restituisce l'ordine, o 404 se quell'id non esiste")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Ordine trovato"),
+        @ApiResponse(responseCode = "404", description = "Nessun ordine con quell'id",
+                     content = @Content)   // 404 senza corpo: nessuno schema da mostrare
+    })
+    public ResponseEntity<OrdineDTO> uno(
+            @Parameter(description = "Id dell'ordine", example = "7")
+            @PathVariable Long id) {
+        return service.trova(id).map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+}
+```
+
+```java
+// demo/common-dto/src/main/java/.../OrdineDTO.java
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Schema(description = "Un ordine di magazzino")
+public class OrdineDTO {
+
+    @Schema(description = "Assegnato dal servizio", example = "7",
+            accessMode = Schema.AccessMode.READ_ONLY)
+    private Long id;
+
+    @Schema(description = "Ragione sociale del cliente", example = "Rossi S.r.l.")
+    private String cliente;
+
+    @Schema(description = "Pezzi ordinati", example = "3")
+    private int quantita;
+}
+```
+
+Titolo e versione dell'API, se non vuoi che la pagina si chiami "OpenAPI
+definition" — una classe di configurazione, nello stesso servizio:
+
+```java
+// demo/ordini-service/src/main/java/.../OpenApiConfig.java
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI openApi() {
+        return new OpenAPI().info(new Info()
+                .title("Ordini Service")
+                .version("1.0")
+                .description("API degli ordini — prova finale"));
+    }
+}
+```
+
+> `@Tag` di Swagger è `io.swagger.v3.oas.annotations.tags.Tag`: se l'IDE
+> importa `org.junit.jupiter.api.Tag`, il progetto non compila e l'errore parla
+> di tutt'altro. Nel template la dipendenza c'è già in ogni modulo generato;
+> altrimenti `task enable-swagger SERVICE=<modulo>`.
+
 ---
 
 ### 6.3 Spring Cloud (Eureka & OpenFeign)
@@ -418,6 +636,115 @@ servizi) né la logica di business.
 | `@EnableDiscoveryClient` | Classe Main | Abilita l'applicazione client a registrarsi presso il registro Eureka Naming Server. |
 | `@EnableFeignClients` | Classe Main / Config | Attiva la scansione e la generazione automatica delle interfacce OpenFeign. |
 | `@FeignClient(name = "ORDINI-SERVICE")` | Interfaccia Java | Dichiara un client REST dichiarativo. Spring imposta automaticamente il bilanciamento del carico verso il servizio registrato su Eureka con quel nome logico. |
+
+#### Esempio completo — il server, il client, e la chiamata
+
+Tre moduli diversi. **Il server** (`naming-server`) è già nel template e non lo
+tocchi quasi mai:
+
+```java
+// demo/naming-server/src/main/java/.../Main.java
+package com.example.ttfcloud_esame.namingserver;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.netflix.eureka.server.EnableEurekaServer;
+
+@EnableEurekaServer          // questa applicazione E' il registro
+@SpringBootApplication
+public class Main {
+    public static void main(String[] args) {
+        SpringApplication.run(Main.class, args);
+    }
+}
+```
+
+```yaml
+# demo/naming-server/src/main/resources/application.yml
+server:
+  port: ${SERVER_PORT:8761}
+eureka:
+  client:
+    register-with-eureka: false   # il registro non si registra su se stesso
+    fetch-registry: false
+```
+
+**Chi chiama** (una UI, o un servizio che ne consuma un altro): l'annotazione
+sulla `Main` e un'interfaccia. Nei moduli creati da `task new-service` la
+`Main` è già così:
+
+```java
+// demo/ordini-ui/src/main/java/.../Main.java
+@EnableDiscoveryClient       // mi registro su Eureka
+@EnableFeignClients          // cerca le interfacce @FeignClient e le implementa
+@SpringBootApplication
+public class Main {
+    public static void main(String[] args) {
+        SpringApplication.run(Main.class, args);
+    }
+}
+```
+
+```java
+// demo/ordini-ui/src/main/java/.../OrdiniClient.java
+package com.example.ttfcloud_esame.ordiniui;
+
+import com.example.ttfcloud_esame.commondto.OrdineDTO;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+// "ORDINI-SERVICE" e' lo spring.application.name dell'altro modulo,
+// non un indirizzo: host e porta li chiede a Eureka.
+@FeignClient(name = "ORDINI-SERVICE")
+public interface OrdiniClient {
+
+    @GetMapping("/api/ordini")
+    List<OrdineDTO> tutti();
+
+    @GetMapping("/api/ordini/{id}")
+    OrdineDTO uno(@PathVariable("id") Long id);
+
+    @GetMapping("/api/ordini")
+    List<OrdineDTO> perCliente(@RequestParam("cliente") String cliente);
+
+    @PostMapping("/api/ordini")
+    OrdineDTO crea(@RequestBody OrdineDTO nuovo);
+}
+```
+
+Usarla è come chiamare un metodo normale — l'HTTP è nascosto:
+
+```java
+// demo/ordini-ui/src/main/java/.../OrdineFacade.java
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class OrdineFacade {
+
+    private final OrdiniClient ordiniClient;
+
+    public List<OrdineDTO> elenco() {
+        try {
+            return ordiniClient.tutti();
+        } catch (Exception e) {
+            // Se il servizio e' spento, la UI resta in piedi con l'elenco vuoto:
+            // e' la "resilienza" che la commissione chiede spesso di mostrare.
+            log.warn("ORDINI-SERVICE non risponde: {}", e.getMessage());
+            return List.of();
+        }
+    }
+}
+```
+
+> Nel `@FeignClient` i `@PathVariable` e i `@RequestParam` **devono avere il
+> nome scritto** (`@PathVariable("id")`): in un'interfaccia i nomi dei
+> parametri non sopravvivono alla compilazione, e senza quella stringa parte un
+> errore poco leggibile all'avvio.
+>
+> E ricorda i 10-15 secondi: un client appena avviato non ha ancora la lista
+> delle istanze, e la prima chiamata può fallire anche se è tutto a posto.
 
 ---
 
@@ -435,6 +762,150 @@ servizi) né la logica di business.
 | `@ManyToOne` / `@OneToMany` | Campo Entity | Definisce le relazioni tra tabelle (Molti-a-Uno, Uno-a-Molti) con gestione delle Foreign Key. |
 | `JpaRepository<Entity, IdType>` | Interfaccia Repo | Interfaccia Spring Data che fornisce gratuitamente tutti i metodi CRUD (`save`, `findById`, `findAll`, `deleteById`). |
 
+#### Esempio completo — entity, repository, service, dati di prova
+
+Tutto dentro **il servizio che possiede quei dati**: le `@Entity` non si
+condividono e non vanno in `common-dto`.
+
+```java
+// demo/ordini-service/src/main/java/.../persistence/OrdineEntity.java
+package com.example.ttfcloud_esame.ordiniservice.persistence;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.LocalDate;
+
+@Entity
+@Table(name = "ordini")
+@Getter @Setter          // su una @Entity meglio questi che @Data (vedi 6.5)
+@NoArgsConstructor       // richiesto da JPA
+@AllArgsConstructor
+public class OrdineEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "cliente", nullable = false, length = 120)
+    private String cliente;
+
+    @Column(nullable = false)
+    private int quantita;
+
+    @Enumerated(EnumType.STRING)     // salva "IN_CORSO", non 0
+    @Column(nullable = false)
+    private StatoOrdine stato;
+
+    private LocalDate consegna;
+
+    @Transient                       // calcolato, non salvato
+    private boolean urgente;
+
+    // Molti ordini appartengono a un magazzino: la FK sta qui.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "magazzino_id")
+    private MagazzinoEntity magazzino;
+}
+```
+
+```java
+// demo/ordini-service/src/main/java/.../persistence/OrdineRepository.java
+package com.example.ttfcloud_esame.ordiniservice.persistence;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+
+// save, findById, findAll, deleteById, count... arrivano gratis.
+public interface OrdineRepository extends JpaRepository<OrdineEntity, Long> {
+
+    // Query derivate dal nome del metodo: Spring le traduce in SQL da sola.
+    List<OrdineEntity> findByCliente(String cliente);
+    List<OrdineEntity> findByQuantitaGreaterThanOrderByQuantitaDesc(int soglia);
+    boolean existsByCliente(String cliente);
+
+    // Quando il nome non basta, JPQL (sulle CLASSI, non sulle tabelle):
+    @Query("SELECT o FROM OrdineEntity o WHERE o.stato = :stato AND o.quantita >= :min")
+    List<OrdineEntity> daEvadere(@Param("stato") StatoOrdine stato, @Param("min") int min);
+}
+```
+
+```java
+// demo/ordini-service/src/main/java/.../OrdineService.java
+package com.example.ttfcloud_esame.ordiniservice;
+
+import com.example.ttfcloud_esame.commondto.OrdineDTO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class OrdineService {
+
+    private final OrdineRepository repository;
+
+    public List<OrdineDTO> tutti() {
+        return repository.findAll().stream().map(this::toDto).toList();
+    }
+
+    public Optional<OrdineDTO> trova(Long id) {
+        return repository.findById(id).map(this::toDto);
+    }
+
+    @Transactional                       // scrittura: tutto o niente
+    public OrdineDTO salva(OrdineDTO dto) {
+        OrdineEntity entity = new OrdineEntity();
+        entity.setCliente(dto.getCliente());
+        entity.setQuantita(dto.getQuantita());
+        entity.setStato(StatoOrdine.IN_CORSO);
+        return toDto(repository.save(entity));   // save() torna l'entity con l'id
+    }
+
+    // L'@Entity resta dentro il servizio, fuori esce il DTO condiviso.
+    private OrdineDTO toDto(OrdineEntity e) {
+        return new OrdineDTO(e.getId(), e.getCliente(), e.getQuantita());
+    }
+}
+```
+
+I **dati di prova** valgono punti nella griglia d'esame ("dati di test"). Il
+modo più corto è un `CommandLineRunner`, che gira all'avvio:
+
+```java
+// demo/ordini-service/src/main/java/.../DatiDiProva.java
+@Configuration
+@RequiredArgsConstructor
+public class DatiDiProva {
+
+    @Bean
+    CommandLineRunner inizializza(OrdineRepository repository) {
+        return args -> {
+            if (repository.count() > 0) return;   // solo su database vuoto
+            repository.save(new OrdineEntity(null, "Rossi S.r.l.", 3, StatoOrdine.IN_CORSO, null, false, null));
+            repository.save(new OrdineEntity(null, "Bianchi SPA", 12, StatoOrdine.EVASO, null, false, null));
+        };
+    }
+}
+```
+
+In alternativa, un `demo/ordini-service/src/main/resources/data.sql` con degli
+`INSERT`: Spring Boot lo esegue da solo dopo che Hibernate ha creato le tabelle.
+
+> Con H2 in memoria le tabelle nascono e muoiono a ogni riavvio, quindi i dati
+> di prova si ricreano sempre. Passando a PostgreSQL
+> (`task use-postgres SERVICE=ordini-service`) restano: per questo il
+> `CommandLineRunner` qui sopra controlla `count() > 0` prima di inserire.
+
 ---
 
 ### 6.5 Lombok (Riduzione del Codice Boilerplate)
@@ -449,6 +920,76 @@ servizi) né la logica di business.
 | `@Builder` | Classe | Pattern Builder per la creazione fluida degli oggetti (es. `Prodotto.builder().nome("X").build()`). |
 | `@Slf4j` | Classe | Inietta un logger SLF4J denominato `log` per stampare log nel codice (`log.info(...)`, `log.error(...)`). |
 
+#### Esempio completo — un DTO e un service, prima e dopo
+
+Il DTO sta in **common-dto**, il service nel **modulo che lo usa**.
+
+```java
+// demo/common-dto/src/main/java/.../OrdineDTO.java
+package com.example.ttfcloud_esame.commondto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data                  // getter, setter, equals, hashCode, toString
+@Builder               // OrdineDTO.builder().cliente("Rossi").build()
+@NoArgsConstructor     // serve a Jackson per ricostruire l'oggetto dal JSON
+@AllArgsConstructor    // serve al @Builder e ai costruttori a mano
+public class OrdineDTO {
+    private Long id;
+    private String cliente;
+    private int quantita;
+}
+```
+
+Le stesse tre righe, senza Lombok, sarebbero una sessantina: due costruttori,
+sei fra getter e setter, `equals`, `hashCode` e `toString`.
+
+```java
+// demo/ordini-service/src/main/java/.../OrdineService.java
+package com.example.ttfcloud_esame.ordiniservice;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor   // costruttore con i soli campi final: niente @Autowired
+@Slf4j                     // mette a disposizione "log"
+public class OrdineService {
+
+    private final OrdineRepository repository;   // final = iniettato
+    private final ProdottiClient prodottiClient;
+
+    public OrdineDTO salva(OrdineDTO dto) {
+        log.info("Nuovo ordine per {}, {} pezzi", dto.getCliente(), dto.getQuantita());
+        ...
+    }
+}
+```
+
+Uso del builder, comodo quando i campi sono tanti e non vuoi ricordarne
+l'ordine:
+
+```java
+OrdineDTO dto = OrdineDTO.builder()
+        .cliente("Rossi S.r.l.")
+        .quantita(3)
+        .build();          // gli altri campi restano a null / 0
+```
+
+> **Su una `@Entity` non mettere `@Data`.** Genera `equals` e `hashCode` su
+> tutti i campi, relazioni comprese: con un `@ManyToOne` Hibernate finisce per
+> caricare mezzo database (o cicla all'infinito) solo per confrontare due
+> oggetti. Su un'entity: `@Getter @Setter @NoArgsConstructor`, e se ti serve
+> `equals` scrivilo sull'id.
+>
+> Se i getter "non esistono" in compilazione, il processore di annotazioni non
+> sta girando: in VS Code serve l'estensione Lombok, e in ogni caso `task
+> compile` da terminale compila lo stesso, perché Maven ce l'ha configurato.
+
 ---
 
 ### 6.6 Jakarta Validation (`jakarta.validation.constraints`)
@@ -460,6 +1001,105 @@ servizi) né la logica di business.
 | `@NotEmpty` | Campo Collection/String | La collezione o stringa non deve essere vuota. |
 | `@Min(valore)` / `@Max(valore)` | Campo Numerico | Imposta i limiti numerici minimo e massimo ammessi. |
 | `@Size(min = X, max = Y)` | Campo String/Collection | Controlla la lunghezza minima e massima di caratteri o elementi. |
+
+#### Esempio completo — vincoli sul DTO, controllo nel controller, errore leggibile
+
+I vincoli stanno sul DTO (**common-dto**), il `@Valid` nel controller del
+**servizio**, e il gestore degli errori nello stesso servizio.
+
+```java
+// demo/common-dto/src/main/java/.../OrdineDTO.java
+package com.example.ttfcloud_esame.commondto;
+
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class OrdineDTO {
+
+    private Long id;    // lo assegna il servizio: nessun vincolo
+
+    @NotBlank(message = "il cliente e' obbligatorio")
+    @Size(max = 120, message = "il nome del cliente supera i 120 caratteri")
+    private String cliente;
+
+    @Min(value = 1, message = "la quantita' deve essere almeno 1")
+    private int quantita;
+}
+```
+
+```java
+// nel controller del servizio: @Valid fa scattare i vincoli
+@PostMapping
+@ResponseStatus(HttpStatus.CREATED)
+public OrdineDTO crea(@Valid @RequestBody OrdineDTO nuovo) {
+    return service.salva(nuovo);
+}
+```
+
+Senza altro, una richiesta non valida torna **400** con un corpo lungo e poco
+leggibile. Una classe sola lo trasforma in un messaggio pulito — e fa una bella
+figura in Swagger:
+
+```java
+// demo/ordini-service/src/main/java/.../GestioneErrori.java
+package com.example.ttfcloud_esame.ordiniservice;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice          // vale per tutti i controller del modulo
+public class GestioneErrori {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)     // 400
+    public Map<String, String> vincoliViolati(MethodArgumentNotValidException e) {
+        Map<String, String> errori = new HashMap<>();
+        e.getBindingResult().getFieldErrors()
+                .forEach(err -> errori.put(err.getField(), err.getDefaultMessage()));
+        return errori;   // {"cliente": "il cliente e' obbligatorio"}
+    }
+}
+```
+
+Nella UI Thymeleaf i vincoli si controllano con `@Valid` + `BindingResult`, e
+il messaggio si mostra accanto al campo:
+
+```java
+@PostMapping("/ordini")
+public String crea(@Valid @ModelAttribute("nuovo") OrdineDTO nuovo,
+                   BindingResult errori,          // DEVE stare subito dopo l'oggetto
+                   Model model) {
+    if (errori.hasErrors()) {
+        model.addAttribute("ordini", ordiniClient.tutti());
+        return "ordini";      // torna al form, coi messaggi
+    }
+    ordiniClient.crea(nuovo);
+    return "redirect:/";
+}
+```
+
+```html
+<input type="text" th:field="*{cliente}">
+<span th:if="${#fields.hasErrors('cliente')}" th:errors="*{cliente}"></span>
+```
+
+> `@Valid` senza la dipendenza `validation` nel pom non fa niente, in silenzio:
+> l'annotazione compila e i vincoli non scattano. `task add-dep
+> SERVICE=<modulo> DEPS=validation` (nei moduli generati c'è già).
+>
+> E `BindingResult` va **subito dopo** l'oggetto annotato con `@Valid`: se ci
+> metti un altro parametro in mezzo, Spring lancia l'eccezione invece di
+> passarti gli errori.
 
 ---
 

@@ -166,6 +166,46 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/remove-service.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/remove-service.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{end}}'
 
+  use-postgres:
+    desc: "Collega un modulo al PostgreSQL del progetto, al posto dell'H2 (task use-postgres SERVICE=<modulo>)"
+    summary: |
+      Sposta un modulo da H2 in memoria al PostgreSQL che sta gia' nel
+      docker-compose: dipendenze nel pom, url/utente/password
+      nell'application.yml, le stesse variabili nel compose (dove il database
+      si chiama "postgres", non "localhost"), depends_on sul database, e
+      `task dev` che d'ora in poi lo avvia.
+
+      Variabili:
+        SERVICE=<modulo>   OBBLIGATORIA, la cartella sotto demo/
+        DBNAME=<database>  facoltativa: un database dedicato a questo modulo,
+                           invece di quello condiviso del compose
+
+      Esempi:
+        task use-postgres SERVICE=ordini-service
+        task use-postgres SERVICE=ordini-service DBNAME=ordini
+
+      Con DBNAME crea anche lo script di init del database: PostgreSQL li
+      esegue solo a volume vuoto, quindi la prima volta serve
+      `task docker-reset`.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/use-postgres.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .DBNAME}} -DbName {{.DBNAME}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/use-postgres.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .DBNAME}} --db-name {{.DBNAME}}{{end}} {{.CLI_ARGS}}{{end}}'
+
+  enable-swagger:
+    desc: "Accende Swagger UI su un modulo che non ce l'ha (task enable-swagger SERVICE=<modulo>)"
+    summary: |
+      I moduli creati con `task new-service` hanno gia' Swagger: dipendenza nel
+      pom e blocco nell'application.yml, quindi /swagger-ui.html risponde dal
+      primo avvio. Questo comando serve per un modulo scritto a mano o da cui
+      la dipendenza e' stata tolta, ed e' idempotente.
+
+      Variabili:
+        SERVICE=<modulo>   OBBLIGATORIA, la cartella sotto demo/
+
+      Esempio:
+        task enable-swagger SERVICE=ordini-service
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/enable-swagger.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/enable-swagger.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{end}}'
+
   check:
     desc: "Controlla che il progetto sia coerente: moduli, porte, Docker, lista dei servizi"
     summary: |

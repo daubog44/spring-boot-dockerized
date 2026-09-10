@@ -203,6 +203,62 @@ if assert_ok "set-port su naming-server" &&
 fi
 end_case
 
+start_case "enable-swagger e' idempotente su un modulo che ce l'ha gia'"
+before="$(cat "$DEMO/alfa-service/pom.xml")"
+run_tool enable-swagger.sh --module alfa-service
+if assert_ok "enable-swagger"; then
+  [ "$before" = "$(cat "$DEMO/alfa-service/pom.xml")" ] || fail "ha toccato un pom che era gia' a posto"
+  assert_out_contains "gia' presente"
+fi
+end_case
+
+start_case "enable-swagger rimette springdoc dove manca"
+# Simuliamo un modulo scritto a mano: via il blocco <dependency> di springdoc
+# dal pom e il blocco springdoc: dallo yml.
+awk '
+  /<dependency>/ { inb = 1; buf = $0 "\n"; next }
+  inb {
+    buf = buf $0 "\n"
+    if (/<\/dependency>/) { inb = 0; if (buf !~ /springdoc/) printf "%s", buf }
+    next
+  }
+  { print }
+' "$DEMO/beta-ui/pom.xml" >"$DEMO/beta-ui/pom.tmp" && mv "$DEMO/beta-ui/pom.tmp" "$DEMO/beta-ui/pom.xml"
+sed -n '/^springdoc:/q;p' "$DEMO/beta-ui/src/main/resources/application.yml" >"$DEMO/beta-ui/yml.tmp" &&
+  mv "$DEMO/beta-ui/yml.tmp" "$DEMO/beta-ui/src/main/resources/application.yml"
+
+run_tool enable-swagger.sh --module beta-ui
+assert_ok "enable-swagger" &&
+  assert_contains demo/beta-ui/pom.xml "<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>" &&
+  assert_contains demo/beta-ui/src/main/resources/application.yml "swagger-ui:"
+end_case
+
+start_case "use-postgres collega il modulo al database condiviso"
+run_tool use-postgres.sh --module alfa-service
+if assert_ok "use-postgres" &&
+  assert_contains demo/alfa-service/src/main/resources/application.yml "jdbc:postgresql://localhost:5432/" &&
+  assert_not_contains demo/alfa-service/src/main/resources/application.yml "jdbc:h2:mem" &&
+  assert_contains demo/docker-compose.yml "jdbc:postgresql://postgres:5432/" &&
+  assert_contains demo/alfa-service/pom.xml "<artifactId>postgresql</artifactId>" &&
+  assert_contains scripts/dev.sh "USES_POSTGRES=1"; then
+  run_tool check.sh --project-only && assert_ok "task check dopo use-postgres"
+fi
+end_case
+
+start_case "use-postgres con DBNAME crea il database dedicato"
+run_tool use-postgres.sh --module beta-ui --db-name betadb
+assert_ok "use-postgres con DBNAME" &&
+  assert_file demo/postgres-init/create-betadb.sql &&
+  assert_contains demo/postgres-init/create-betadb.sql "CREATE DATABASE betadb" &&
+  assert_contains demo/docker-compose.yml "postgres-init:/docker-entrypoint-initdb.d" &&
+  assert_contains demo/beta-ui/src/main/resources/application.yml "betadb"
+end_case
+
+start_case "use-postgres rifiuta un modulo che non esiste"
+run_tool use-postgres.sh --module questo-non-esiste
+assert_fails "use-postgres su un modulo inventato"
+end_case
+
 start_case "remove-service toglie il modulo da tutti i file"
 run_tool remove-service.sh --module gamma-service
 if assert_ok "remove-service" &&
