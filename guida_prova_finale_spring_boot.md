@@ -67,7 +67,7 @@ Per massimizzare il punteggio e completare l'esame senza stress, segui questa ta
   4. Implementa il form HTML e, facoltativamente, la chiamata `fetch()` JavaScript per aggiornamenti asincroni senza reload.
 
 - **Fase 5 (4:15 - 5:15) - Domande Teoriche A e B**:
-  1. Compila le risposte teoriche (utilizzando il testo precompilato della Sezione 6 di questo manuale).
+  1. Compila le risposte teoriche (utilizzando il testo precompilato della Sezione 9 di questo manuale).
   2. Verifica di aver coperto: Docker vs VM, Docker Compose, OAuth2/Keycloak/Gateway per la Domanda A; SQL vs NoSQL (MongoDB/Redis) e JEE vs Spring Boot per la Domanda B.
 
 - **Fase 6 (5:15 - 6:00) - Containerizzazione Docker, Collaudo & Consegna**:
@@ -93,6 +93,11 @@ Nelle tracce d'esame è espressamente richiesto:
        <version>2.8.5</version>
    </dependency>
    ```
+
+   > In **questo** template la versione non si scrive: la governa il `pom.xml`
+   > padre, che la fissa una volta per tutti i moduli. E i servizi creati con
+   > `task new-service` hanno già springdoc dentro. Per aggiungerlo altrove:
+   > `task add-dep SERVICE=<modulo> DEPS=springdoc`.
 
 2. **Configurazione in `application.yml`**:
    ```yaml
@@ -141,7 +146,7 @@ server:
 
 spring:
   application:
-    name: TOURIST-SERVICE # Nome logico registrato su Eureka (sempre MAIUSCOLO per convenzione)
+    name: ORDINI-SERVICE # Nome logico registrato su Eureka (sempre MAIUSCOLO per convenzione)
 
 # ===================================================================
 # CONFIGURAZIONE EUREKA NAMING SERVER (CLIENT DISCOVERY)
@@ -163,7 +168,7 @@ eureka:
 # ===================================================================
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/event_suggestions # URL JDBC di connessione
+    url: jdbc:postgresql://localhost:5432/esame # URL JDBC di connessione
     username: exam
     password: exam
     driver-class-name: org.postgresql.Driver
@@ -211,9 +216,170 @@ logging:
 
 ---
 
-## 5. Mini-Guida Completa alle Librerie ed Annotazioni Java
+## 5. Come funziona il tutto insieme
 
-### 5.1 Spring Web & MVC (`@RestController`, `@Controller`)
+Le librerie di questo progetto non sono pezzi indipendenti: ognuna accende un
+anello della stessa catena. Vale la pena vederla una volta intera, perché
+quando qualcosa non funziona il punto è quasi sempre uno di questi anelli.
+
+### 5.1 Il giro completo di una richiesta
+
+```
+browser
+   │  GET /
+   ▼
+<nome>-ui            Spring Web + Thymeleaf: un @Controller restituisce il nome
+   │                 di una pagina, Thymeleaf la riempie coi dati del Model
+   │  ordiniClient.tutti()
+   ▼
+OpenFeign            l'interfaccia @FeignClient(name = "ORDINI-SERVICE"),
+   │                 a runtime, diventa una vera chiamata HTTP
+   │  "dove sta ORDINI-SERVICE?"
+   ▼
+Eureka  :8761        il registro risponde con indirizzo e porta dell'istanza
+   │
+   │  GET http://10.1.2.3:8081/api/ordini
+   ▼
+<nome>-service       un @RestController riceve la richiesta
+   │  ordineRepository.findAll()
+   ▼
+Spring Data JPA      l'interfaccia JpaRepository diventa una query, senza che
+   │                 tu scriva l'implementazione
+   ▼
+Hibernate            traduce in SQL e rimappa le righe sulle @Entity
+   │
+   ▼
+H2 in memoria (o PostgreSQL)
+```
+
+Nel frattempo, in parallelo e senza che tu scriva niente:
+
+- **springdoc** legge gli stessi `@RestController` e pubblica `/v3/api-docs` e `/swagger-ui.html`;
+- **Lombok** ha già generato getter, setter e costruttori delle classi che passano di lì;
+- **devtools** tiene d'occhio le classi compilate: dopo `task compile` il servizio si riavvia da solo.
+
+### 5.2 Chi accende cosa
+
+Ogni pezzo si accende con una dipendenza nel `pom.xml` (che è quello che fa
+`task add-dep`), e spesso con un'annotazione sulla classe `Main`.
+
+| Cosa vuoi | Dipendenza (nome breve) | Annotazione / configurazione | Come te ne accorgi |
+| :--- | :--- | :--- | :--- |
+| Endpoint REST | `web` | `@RestController`, `@RequestMapping` | il servizio risponde su `http://localhost:<porta>/api/...` |
+| Pagine HTML | `thymeleaf` | `@Controller` + file in `resources/templates/` | il browser mostra la pagina invece del JSON |
+| Registrarsi su Eureka | `eureka-client` | `@EnableDiscoveryClient` + `eureka.client.service-url.defaultZone` | compare in `task status`, sezione REGISTRO EUREKA |
+| Chiamare un altro servizio | `feign` | `@EnableFeignClients` + `@FeignClient(name = "ALTRO-SERVICE")` | la chiamata parte senza che tu scriva un URL |
+| Persistenza | `data-jpa` + `h2` o `postgresql` | `@Entity`, `JpaRepository`, `spring.datasource.*` | Hibernate stampa le query nei log |
+| Contratti OpenAPI | `springdoc` | nessuna: legge i controller | `http://localhost:<porta>/swagger-ui.html` |
+| Meno codice ripetuto | `lombok` | `@Data`, `@RequiredArgsConstructor`, `@Slf4j` | le classi restano corte |
+| Validazione degli input | `validation` | `@Valid` + `@NotNull`, `@Size`, ... | una richiesta sbagliata torna 400 invece di rompersi dopo |
+
+I moduli creati con `task new-service` nascono già con quasi tutto questo
+collegato: `Main` ha `@EnableDiscoveryClient` e `@EnableFeignClients`,
+l'`application.yml` ha Eureka, il datasource e springdoc.
+
+### 5.3 I nomi: dove nascono e chi li usa
+
+È il punto che confonde di più, e vale un paragrafo suo.
+
+```yaml
+# demo/ordini-service/src/main/resources/application.yml
+spring:
+  application:
+    name: ORDINI-SERVICE      # <-- il nome con cui si registra su Eureka
+```
+
+```java
+// dentro un ALTRO modulo, che vuole chiamarlo
+@FeignClient(name = "ORDINI-SERVICE")   // <-- lo stesso nome, non un URL
+public interface OrdiniClient {
+    @GetMapping("/api/ordini")
+    List<OrdineDTO> tutti();
+}
+```
+
+Le due stringhe devono coincidere: è l'unico collegamento fra chi chiama e chi
+risponde. Da qui discendono tre conseguenze pratiche:
+
+1. **Nel codice non compaiono mai host e porte.** Per questo `task set-port`
+   può spostare un servizio senza rompere niente.
+2. **Se sbagli il nome, l'errore arriva a runtime**, non in compilazione: una
+   `500` con dentro un messaggio tipo *"Load balancer does not contain an
+   instance for the service ORDINI-SERVICE"*. Controlla `task status`.
+3. **Il registro non è immediato.** Dopo l'avvio (o un riavvio da devtools) i
+   client impiegano 10-15 secondi ad accorgersi dell'istanza. Una `500` nei
+   primi secondi spesso non è un bug: riprova.
+
+### 5.4 `common-dto`: il contratto condiviso
+
+Quando due moduli si scambiano un oggetto, quell'oggetto deve avere **la stessa
+forma da entrambe le parti**. Le strade sono due: duplicare la classe in ogni
+modulo — e scoprire a metà esame che una delle due copie ha un campo in più —
+oppure tenerla in un modulo solo, che gli altri usano come libreria. Quel
+modulo è `common-dto`.
+
+Non è un servizio: non ha `Main`, non ha una porta, non si registra su Eureka.
+È un barattolo di classi.
+
+**Aggiungere un DTO**: crei la classe dentro `demo/common-dto/src/main/java/...`
+
+```java
+package com.example.ttfcloud_esame.commondto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data                 // getter, setter, equals, toString
+@NoArgsConstructor    // Jackson ne ha bisogno per ricostruire l'oggetto dal JSON
+@AllArgsConstructor
+public class OrdineDTO {
+    private Long id;
+    private String cliente;
+    private int quantita;
+}
+```
+
+`@NoArgsConstructor` non è decorativo: senza costruttore vuoto Jackson non sa
+ricostruire l'oggetto, e la chiamata Feign fallisce con un errore che parla di
+deserializzazione e non di DTO.
+
+**Usarlo**: i moduli lo dichiarano già nel loro `pom.xml`, con la versione
+presa dal progetto stesso —
+
+```xml
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>common-dto</artifactId>
+    <version>${project.version}</version>
+</dependency>
+```
+
+— quindi ti basta importarlo. Lo usa chi risponde:
+
+```java
+@GetMapping("/api/ordini")
+public List<OrdineDTO> tutti() { ... }
+```
+
+e lo usa chi chiama, nella firma del `@FeignClient`. Stessa classe, stesso
+JSON, nessuna sorpresa.
+
+**La trappola**: `common-dto` è una dipendenza compilata, non un servizio. Se
+lo modifichi, gli altri moduli continuano a usare la versione già installata
+finché non li ricompili — e `task compile` fa esattamente questo, per tutti,
+in un colpo solo. Se dopo una modifica a un DTO vedi un campo sparire dal
+JSON, la causa è quasi sempre questa.
+
+**Cosa ci va e cosa no**: DTO e piccoli `enum` condivisi. Non ci vanno le
+`@Entity` (sono il modello del database di *un* servizio, non un contratto fra
+servizi) né la logica di business.
+
+---
+
+## 6. Mini-Guida Completa alle Librerie ed Annotazioni Java
+
+### 6.1 Spring Web & MVC (`@RestController`, `@Controller`)
 
 | Annotazione | Scope / Uso | Spiegazione Pratica |
 | :--- | :--- | :--- |
@@ -232,7 +398,7 @@ logging:
 
 ---
 
-### 5.2 OpenAPI / Springdoc (`Swagger`)
+### 6.2 OpenAPI / Springdoc (`Swagger`)
 
 | Annotazione | Scope / Uso | Spiegazione Pratica |
 | :--- | :--- | :--- |
@@ -244,18 +410,18 @@ logging:
 
 ---
 
-### 5.3 Spring Cloud (Eureka & OpenFeign)
+### 6.3 Spring Cloud (Eureka & OpenFeign)
 
 | Annotazione | Scope / Uso | Spiegazione Pratica |
 | :--- | :--- | :--- |
 | `@EnableEurekaServer` | Classe Main | Trasforma l'applicazione Spring Boot nel Server Eureka per il Service Discovery. |
 | `@EnableDiscoveryClient` | Classe Main | Abilita l'applicazione client a registrarsi presso il registro Eureka Naming Server. |
 | `@EnableFeignClients` | Classe Main / Config | Attiva la scansione e la generazione automatica delle interfacce OpenFeign. |
-| `@FeignClient(name = "STORE-SERVICE")` | Interfaccia Java | Dichiara un client REST dichiarativo. Spring imposta automaticamente il bilanciamento del carico verso il servizio registrato su Eureka con quel nome logico. |
+| `@FeignClient(name = "ORDINI-SERVICE")` | Interfaccia Java | Dichiara un client REST dichiarativo. Spring imposta automaticamente il bilanciamento del carico verso il servizio registrato su Eureka con quel nome logico. |
 
 ---
 
-### 5.4 Spring Data JPA & Hibernate
+### 6.4 Spring Data JPA & Hibernate
 
 | Annotazione | Scope / Uso | Spiegazione Pratica |
 | :--- | :--- | :--- |
@@ -271,7 +437,7 @@ logging:
 
 ---
 
-### 5.5 Lombok (Riduzione del Codice Boilerplate)
+### 6.5 Lombok (Riduzione del Codice Boilerplate)
 
 | Annotazione | Scope / Uso | Spiegazione Pratica |
 | :--- | :--- | :--- |
@@ -285,7 +451,7 @@ logging:
 
 ---
 
-### 5.6 Jakarta Validation (`jakarta.validation.constraints`)
+### 6.6 Jakarta Validation (`jakarta.validation.constraints`)
 
 | Annotazione | Scope / Uso | Spiegazione Pratica |
 | :--- | :--- | :--- |
@@ -297,7 +463,7 @@ logging:
 
 ---
 
-## 6. Risoluzione Guidata delle 3 Tracce d'Esame
+## 7. Risoluzione Guidata delle 3 Tracce d'Esame
 
 ### Traccia 1: WMS Magazzino ("Spostati S.r.l.")
 - **Obiettivo**: Gestione magazzino diviso in armadi (griglia $R \times C$) contenenti ubicazioni con ingombro massimo.
@@ -332,7 +498,7 @@ logging:
 
 ---
 
-## 7. Template Standard per l'Allegato Tecnico (8 Punti)
+## 8. Template Standard per l'Allegato Tecnico (8 Punti)
 
 Copia ed adatta questa struttura per il file `ALLEGATO_TECNICO.docx` / `ALLEGATO_TECNICO.pdf` da consegnare:
 
@@ -365,7 +531,7 @@ Data: [DATA ESAME]
 
 ---
 
-## 8. Svolgimento Completo delle Domande Teoriche (A e B)
+## 9. Svolgimento Completo delle Domande Teoriche (A e B)
 
 ### Domanda Teorica A: Containerizzazione Docker, Compose, Sicurezza e Federazione
 
