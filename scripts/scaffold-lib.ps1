@@ -137,3 +137,25 @@ function Write-Step {
     param([Parameter(Mandatory = $true)][string]$Message)
     Write-Host "  $Message"
 }
+
+# La cartella dell'aggregatore Maven (quella che di solito si chiama demo).
+# La verita' sta nel Taskfile, che la nomina in "dir:": cercarla a naso fra le
+# cartelle con un pom.xml sbaglierebbe bersaglio, per esempio con consegna/.
+function Get-AggregatorName {
+    param([string]$RepoRoot)
+    $taskfile = Join-Path $RepoRoot 'Taskfile.yml'
+    if (Test-Path $taskfile) {
+        $hit = [regex]::Match((Read-TextFile $taskfile), "(?m)^\s*dir:\s*'?([A-Za-z0-9_.-]+)'?\s*$")
+        if ($hit.Success) {
+            $name = $hit.Groups[1].Value
+            if (Test-Path (Join-Path $RepoRoot "$name/pom.xml")) { return $name }
+        }
+    }
+    foreach ($dir in (Get-ChildItem -Path $RepoRoot -Directory)) {
+        if ($dir.Name -eq 'consegna') { continue }
+        if ((Test-Path (Join-Path $dir.FullName 'pom.xml')) -and (Test-Path (Join-Path $dir.FullName 'docker-compose.yml'))) {
+            return $dir.Name
+        }
+    }
+    throw "Non trovo la cartella dell'aggregatore (pom.xml + docker-compose.yml) sotto $RepoRoot."
+}

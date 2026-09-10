@@ -29,7 +29,7 @@ echo ""
 # La copia esclude quello che non serve alle prove e pesa (build, git, log).
 tar -cf - -C "$REPO_ROOT" \
   --exclude=target --exclude=.git --exclude=.dev-logs \
-  --exclude=node_modules --exclude=.task . | tar -xf - -C "$SANDBOX"
+  --exclude=node_modules --exclude=.task --exclude=consegna . | tar -xf - -C "$SANDBOX"
 
 PASSED=0
 FAILED=""
@@ -275,6 +275,137 @@ end_case
 start_case "remove-service rifiuta un modulo che non esiste"
 run_tool remove-service.sh --module questo-non-esiste
 assert_fails "remove-service su un modulo inventato"
+end_case
+
+# --- Database: credenziali, dati di prova, schema ----------------------------
+
+start_case "db-config stampa la configurazione del database"
+run_tool db-config.sh
+assert_ok "db-config senza variabili"
+assert_out_contains "esame"
+assert_out_contains "alfa-service"
+end_case
+
+start_case "db-config cambia le credenziali dappertutto"
+run_tool db-config.sh --db-name collaudo --user tester --password segreta --port 5544
+assert_ok "db-config"
+assert_contains "demo/docker-compose.yml" "POSTGRES_DB: collaudo" "il container"
+assert_contains "demo/docker-compose.yml" "POSTGRES_USER: tester" "il container"
+assert_contains "demo/docker-compose.yml" "pg_isready -U tester -d collaudo" "la healthcheck"
+assert_contains "demo/docker-compose.yml" '"5544:5432"' "la porta pubblicata"
+assert_contains "demo/docker-compose.yml" "jdbc:postgresql://postgres:5432/collaudo" "il modulo nel compose"
+assert_contains "demo/alfa-service/src/main/resources/application.yml" "jdbc:postgresql://localhost:5544/collaudo" "application.yml"
+assert_contains "demo/alfa-service/src/main/resources/application.yml" "_DB_USERNAME:tester}" "application.yml"
+assert_contains "demo/postgres-init/create-betadb.sql" "TO tester;" "la GRANT del database dedicato"
+run_tool check.sh --project-only
+assert_ok "task check dopo db-config"
+end_case
+
+start_case "db-config rifiuta un valore che PostgreSQL non accetterebbe"
+run_tool db-config.sh --db-name "non valido!"
+assert_fails "db-config con un nome impossibile"
+end_case
+
+# Da qui in poi serve un dominio con delle @Entity: lo scriviamo noi.
+ENTITY_DIR="$DEMO/alfa-service/src/main/java/com/example/ttfcloud_esame/alfaservice"
+cat >"$ENTITY_DIR/DepositoEntity.java" <<'JAVA'
+package com.example.ttfcloud_esame.alfaservice;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
+@Entity
+public class DepositoEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String citta;
+}
+JAVA
+cat >"$ENTITY_DIR/StatoArticolo.java" <<'JAVA'
+package com.example.ttfcloud_esame.alfaservice;
+
+public enum StatoArticolo { DISPONIBILE, ESAURITO }
+JAVA
+cat >"$ENTITY_DIR/ArticoloEntity.java" <<'JAVA'
+package com.example.ttfcloud_esame.alfaservice;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "articoli")
+public class ArticoloEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 80)
+    private String nome;
+
+    private Integer quantita;
+
+    @Enumerated(EnumType.STRING)
+    private StatoArticolo stato;
+
+    @ManyToOne
+    @JoinColumn(name = "deposito_id")
+    private DepositoEntity deposito;
+}
+JAVA
+
+start_case "seed-data ricava le INSERT dalle @Entity"
+run_tool seed-data.sh --module alfa-service --rows 3
+assert_ok "seed-data"
+SQL="demo/alfa-service/src/main/resources/data.sql"
+# Senza @Table il nome della tabella e' quello della classe, suffisso compreso:
+# e' cosi' che la chiama Hibernate.
+assert_contains "$SQL" "INSERT INTO deposito_entity" "la tabella senza @Table"
+assert_contains "$SQL" "INSERT INTO articoli (nome, quantita, stato, deposito_id)" "le colonne (la PK generata non va scritta)"
+assert_contains "$SQL" "DISPONIBILE" "gli enum dal file Java"
+# La tabella padre va riempita prima, o la chiave esterna punterebbe a niente.
+riga_deposito="$(grep -n 'INSERT INTO deposito_entity' "$SANDBOX/$SQL" | head -n 1 | cut -d: -f1)"
+riga_articolo="$(grep -n 'INSERT INTO articoli' "$SANDBOX/$SQL" | head -n 1 | cut -d: -f1)"
+[ -n "$riga_deposito" ] && [ -n "$riga_articolo" ] && [ "$riga_deposito" -lt "$riga_articolo" ] ||
+  fail "le righe figlie vengono prima di quelle padre"
+righe="$(grep -c 'INSERT INTO articoli' "$SANDBOX/$SQL")"
+[ "$righe" = "3" ] || fail "ROWS=3 ha prodotto $righe righe"
+# Senza queste due proprieta' il file non verrebbe eseguito.
+assert_contains "demo/alfa-service/src/main/resources/application.yml" "defer-datasource-initialization: true" "application.yml"
+assert_contains "demo/alfa-service/src/main/resources/application.yml" "mode: always" "application.yml"
+end_case
+
+start_case "db-schema ricava tabelle e relazioni dalle @Entity"
+run_tool db-schema.sh
+assert_ok "db-schema"
+assert_out_contains "Modello concettuale"
+assert_out_contains "Modello logico"
+assert_out_contains 'Tabella `articoli`'
+assert_out_contains 'Tabella `deposito_entity`'
+assert_out_contains "erDiagram"
+assert_out_contains "FK"
+end_case
+
+# Questa cambia il nome della cartella dei moduli: va per ultima.
+start_case "rename-project rinomina la cartella e i file che la nominano"
+run_tool rename-project.sh --name collaudo-modules
+assert_ok "rename-project"
+assert_file "collaudo-modules/pom.xml"
+assert_no_file "demo"
+assert_contains "Taskfile.yml" "dir: collaudo-modules" "il Taskfile"
+assert_contains "scripts/check.sh" "/collaudo-modules" "gli script"
+run_tool check.sh --project-only
+assert_ok "task check dopo rename-project"
 end_case
 
 start_case "gli script POSIX hanno sintassi valida"

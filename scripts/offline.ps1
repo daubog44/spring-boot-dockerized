@@ -1,0 +1,187 @@
+<#
+.SYNOPSIS
+    Prepara e verifica il progetto per un esame senza rete.
+
+.DESCRIPTION
+    Il giorno dell'esame potresti non avere internet. Maven e Docker, lasciati
+    a se stessi, scaricano: il primo le dipendenze in ~/.m2, il secondo le
+    immagini di base. Se quella roba non c'e' gia' sul disco, senza rete non
+    parte niente.
+
+    Due modi:
+
+      task offline-prep   (CON rete, la sera prima) scarica tutto quello che
+                          servira': dipendenze Maven, immagini Docker, e la
+                          prima build dei container, che riempie la cache;
+      task offline        (quando vuoi) dice cosa c'e' e cosa manca, e cosa
+                          funzionerebbe adesso a rete staccata.
+
+.PARAMETER Prep
+    Scarica invece di limitarsi a controllare.
+
+.EXAMPLE
+    task offline-prep
+    task offline
+#>
+param([switch]$Prep)
+
+$ErrorActionPreference = 'Continue'
+. (Join-Path $PSScriptRoot 'scaffold-lib.ps1')
+
+$repoRoot = Get-ScaffoldRepoRoot
+$demoDir = Join-Path $repoRoot 'demo'
+$javaHome = 'C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot'
+
+function Write-Line {
+    param([string]$Label, [string]$Value, [string]$Color = 'Green')
+    Write-Host ('  {0,-26}{1}' -f $Label, $Value) -ForegroundColor $Color
+}
+
+# Le immagini che servono: quelle del Dockerfile piu' quella del compose.
+$images = @()
+foreach ($line in (Select-String -Path (Join-Path $demoDir 'Dockerfile') -Pattern '^FROM\s+(\S+)')) {
+    $images += ($line.Matches[0].Groups[1].Value)
+}
+$composeImage = Select-String -Path (Join-Path $demoDir 'docker-compose.yml') -Pattern '^\s+image:\s*(\S+)'
+foreach ($hit in $composeImage) { $images += $hit.Matches[0].Groups[1].Value }
+$images = @($images | Select-Object -Unique)
+
+$problems = 0
+
+if ($Prep) {
+    Write-Host ''
+    Write-Host 'PREPARAZIONE PER L''ESAME SENZA RETE' -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '  Serve internet ADESSO. Ci vogliono alcuni minuti.' -ForegroundColor DarkGray
+    Write-Host ''
+
+    # 1. Le dipendenze Maven, nella cache di casa (~/.m2).
+    Write-Host '==> Dipendenze Maven' -ForegroundColor Cyan
+    Push-Location $demoDir
+    try {
+        cmd /c "set JAVA_HOME=$javaHome&& .\mvnw.cmd -B -q dependency:go-offline"
+        $goOffline = $LASTEXITCODE
+        cmd /c "set JAVA_HOME=$javaHome&& .\mvnw.cmd -B -q clean package -Dmaven.test.skip=true"
+        $package = $LASTEXITCODE
+    } finally { Pop-Location }
+    if ($goOffline -eq 0 -and $package -eq 0) {
+        Write-Line 'maven' 'scaricate e compilate'
+    } else {
+        Write-Line 'maven' 'qualcosa non ha funzionato: guarda l''output sopra' 'Yellow'
+        $problems++
+    }
+
+    # 2. Le immagini di base, che Docker altrimenti va a prendere al volo.
+    Write-Host ''
+    Write-Host '==> Immagini Docker' -ForegroundColor Cyan
+    foreach ($image in $images) {
+        & docker pull $image 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) { Write-Line $image 'scaricata' }
+        else { Write-Line $image 'non scaricata' 'Yellow'; $problems++ }
+    }
+
+    # 3. La build dei container: riempie la cache dei livelli, compreso quello
+    #    con curl (che a rete staccata non si potrebbe piu' installare).
+    Write-Host ''
+    Write-Host '==> Build delle immagini del progetto' -ForegroundColor Cyan
+    Push-Location $demoDir
+    try {
+        & docker compose build
+        $built = $LASTEXITCODE
+    } finally { Pop-Location }
+    if ($built -eq 0) { Write-Line 'docker compose build' 'fatta' }
+    else { Write-Line 'docker compose build' 'fallita' 'Yellow'; $problems++ }
+
+    Write-Host ''
+    if ($problems -eq 0) {
+        Write-Host 'Pronto: da adesso il progetto parte anche senza rete.' -ForegroundColor Green
+    } else {
+        Write-Host "Finito con $problems problema/i: rileggi sopra." -ForegroundColor Yellow
+    }
+    Write-Host ''
+    Write-Host '  Verifica quando vuoi con: task offline' -ForegroundColor DarkGray
+    Write-Host ''
+    exit 0
+}
+
+# --- Controllo ----------------------------------------------------------------
+
+Write-Host ''
+Write-Host 'PRONTI PER UN ESAME SENZA RETE?' -ForegroundColor Cyan
+Write-Host ''
+
+# 1. Gli attrezzi.
+$taskVersion = (& task --version 2>$null)
+if ($LASTEXITCODE -eq 0) { Write-Line 'go-task' ($taskVersion -join ' ') } else { Write-Line 'go-task' 'non trovato' 'Red'; $problems++ }
+
+if (Test-Path $javaHome) {
+    Write-Line 'JDK' $javaHome
+} else {
+    $java = Get-Command java -ErrorAction SilentlyContinue
+    if ($java) { Write-Line 'JDK' ("dal PATH: " + $java.Source) 'Yellow' }
+    else { Write-Line 'JDK' 'non trovato' 'Red'; $problems++ }
+}
+
+# 2. La cache Maven: senza questa, offline non si compila.
+$m2 = Join-Path $env:USERPROFILE '.m2/repository'
+if (Test-Path $m2) {
+    $bootJars = @(Get-ChildItem -Path (Join-Path $m2 'org/springframework/boot') -Directory -ErrorAction SilentlyContinue)
+    if ($bootJars.Count -gt 0) {
+        Write-Line 'cache Maven (~/.m2)' ("piena (" + $bootJars.Count + " artefatti Spring Boot)")
+    } else {
+        Write-Line 'cache Maven (~/.m2)' 'c''e'', ma senza Spring Boot' 'Red'
+        $problems++
+    }
+} else {
+    Write-Line 'cache Maven (~/.m2)' 'non c''e''' 'Red'
+    $problems++
+}
+
+# La prova vera: compilare a rete finta staccata (-o = offline).
+Write-Host ''
+Write-Host '  Provo a compilare in modalita'' offline...' -ForegroundColor DarkGray
+Push-Location $demoDir
+try {
+    cmd /c "set JAVA_HOME=$javaHome&& .\mvnw.cmd -B -q -o clean package -Dmaven.test.skip=true > `"$env:TEMP\offline-build.log`" 2>&1"
+    $offlineBuild = $LASTEXITCODE
+} finally { Pop-Location }
+if ($offlineBuild -eq 0) {
+    Write-Line 'build offline (mvnw -o)' 'RIESCE'
+} else {
+    Write-Line 'build offline (mvnw -o)' 'FALLISCE: lancia task offline-prep con la rete' 'Red'
+    $problems++
+}
+
+# 3. Docker.
+Write-Host ''
+& docker info 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Line 'Docker' 'non risponde (Docker Desktop e'' acceso?)' 'Yellow'
+} else {
+    $local = @(& docker images --format '{{.Repository}}:{{.Tag}}' 2>$null)
+    foreach ($image in $images) {
+        # Le immagini tirate giu' da una build di buildx finiscono nella sua
+        # cache, non nell'elenco locale: qui vogliamo proprio l'elenco locale,
+        # perche' e' quello che sopravvive a tutto.
+        if ($local -contains $image) { Write-Line $image 'scaricata' }
+        else { Write-Line $image 'non scaricata: task offline-prep' 'Red'; $problems++ }
+    }
+}
+
+# --- Il verdetto --------------------------------------------------------------
+
+Write-Host ''
+if ($problems -eq 0) {
+    Write-Host 'Tutto pronto: il progetto parte anche a rete staccata.' -ForegroundColor Green
+} else {
+    Write-Host "$problems cosa/e da sistemare: lancia task offline-prep finche' hai rete." -ForegroundColor Yellow
+}
+Write-Host ''
+Write-Host '  Come presentare senza rete, in ordine di sicurezza:' -ForegroundColor DarkGray
+Write-Host '    1. task dev      + task run-db   (Maven offline + il solo PostgreSQL in Docker)'
+Write-Host '    2. task docker-up                (tutto in container: rifa'' le build, piu'' fragile)'
+Write-Host ''
+Write-Host '  Il primo modo non ricompila niente dentro Docker: e'' quello che' -ForegroundColor DarkGray
+Write-Host '  regge meglio senza rete.' -ForegroundColor DarkGray
+Write-Host ''
+if ($problems -gt 0) { exit 1 }

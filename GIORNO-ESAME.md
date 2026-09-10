@@ -6,9 +6,64 @@ serve.
 
 ---
 
+## La sera prima — l'esame senza rete
+
+Il giorno dell'esame potresti non avere internet. Non è un dettaglio: Maven
+scarica le dipendenze in `~/.m2`, Docker le immagini di base, e senza rete
+nessuno dei due può farlo. Va preparato **adesso**, con la connessione.
+
+Un comando solo, e ci mette qualche minuto:
+
+```bash
+task offline-prep
+```
+
+Scarica le dipendenze Maven, compila una volta, scarica le immagini Docker e
+fa una prima `docker compose build` (che riempie la cache dei livelli, compreso
+quello che installa `curl` dentro l'immagine: senza rete non si potrebbe più
+fare). Poi verifica:
+
+```bash
+task offline
+```
+
+Deve dire **Tutto pronto**. Se dice che manca qualcosa, hai ancora la rete per
+rimediare.
+
+**Portati il progetto su una chiavetta.** Non serve un `.exe` né un
+generatore: il template *è* la cartella, e i comandi stanno tutti dentro. Copia
+sulla chiavetta:
+
+| Cosa | Perché |
+| :--- | :--- |
+| la cartella del progetto, `.git` compreso | è il template, e con `.git` puoi tornare indietro con `git checkout .` |
+| la cartella `~/.m2/repository` | le dipendenze Maven: è la parte che senza rete non si recupera |
+| l'installatore di go-task, del JDK e di Docker Desktop | solo se non sei sicuro della macchina d'esame |
+
+Sul portatile d'esame: copi la cartella dove vuoi, copi `.m2` dentro la tua
+home, e sei operativo. Il nome della cartella che contiene tutto non lo guarda
+nessuno script: rinominala pure a mano.
+
+> Se invece la rete c'è, `git clone` resta la strada più veloce. Ma non
+> contarci.
+
+**Come presentare senza rete**, in ordine di sicurezza:
+
+1. `task dev` per i servizi e `task run-db` per il solo PostgreSQL: Maven
+   lavora offline dalla `~/.m2` e Docker deve solo far partire un'immagine che
+   hai già. È il modo che regge meglio.
+2. `task docker-up`: ricostruisce le immagini, quindi rifà anche i passaggi
+   Maven **dentro** il container. Funziona se hai lanciato `task offline-prep`
+   (la cache di Maven del Dockerfile sopravvive fra una build e l'altra), ma
+   dipende da più cose.
+
+---
+
 ## Fase 0 — Prima di scrivere una riga di codice (10 minuti)
 
 Fallo appena ti siedi, non quando ti serve.
+
+Se hai la rete:
 
 ```bash
 git clone https://github.com/daubog44/spring-boot-dockerized.git
@@ -18,8 +73,15 @@ git clone https://github.com/daubog44/spring-boot-dockerized.git
 cd spring-boot-dockerized
 ```
 
-Poi un giro a vuoto, che serve a scaricare dipendenze Maven e immagini Docker
-**prima** di averne bisogno:
+Se non ce l'hai, copia dalla chiavetta la cartella del progetto e la cartella
+`.m2` dentro la tua home (vedi *La sera prima*), poi entra nella cartella e
+controlla di essere a posto:
+
+```bash
+task offline
+```
+
+Poi un giro a vuoto, che serve a scaldare tutto **prima** di averne bisogno:
 
 ```bash
 task dev
@@ -44,6 +106,42 @@ macchina: quando ti serviranno, non dovrai scoprirlo.
 
 > Le porte le libera `task dev` da solo, chiudendo quello che le tiene occupate:
 > non devi controllare niente prima.
+
+---
+
+## Fase 0-bis — Il wizard, per montare il progetto della traccia
+
+Letta la traccia, sai quanti microservizi ti servono e che cosa fa ognuno. Un
+comando solo li mette tutti in piedi, facendoti le domande giuste:
+
+```bash
+task wizard
+```
+
+Ti chiede, nell'ordine:
+
+1. **come si chiama la cartella con i moduli Maven** — di default `demo`,
+   perché così nasce da Spring Initializr; dagli il nome del progetto e la
+   rinomina ovunque sia scritta (Taskfile, script, guide);
+2. **se il progetto usa PostgreSQL**, e con quale database, utente e password;
+3. **i microservizi, uno per uno**: nome, che cos'è (servizio REST con
+   database, servizio REST senza, interfaccia Thymeleaf), su quale porta, e se
+   usa H2 in memoria o PostgreSQL — condiviso o tutto suo.
+
+Alla fine lancia `task check` da solo. Non fa niente di magico: chiama
+`rename-project`, `db-config`, `new-service` e `use-postgres` nell'ordine
+giusto, gli stessi comandi che puoi dare a mano.
+
+Per un microservizio solo, quando la traccia te ne fa venire in mente un altro
+a metà giornata:
+
+```bash
+task wizard SERVICE=spedizioni-service
+```
+
+Quello che vale per **tutti** i servizi non te lo chiede, perché non c'è niente
+da decidere: Eureka, OpenFeign, Swagger, Lombok, validation, actuator e
+`common-dto` sono già nel modulo appena nasce.
 
 ---
 
@@ -210,6 +308,75 @@ di init **solo quando il volume è vuoto**: la prima volta serve un
 > container** PostgreSQL, con più database dentro. Non serve un secondo
 > container, e non conviene: sono altri 300 MB e un'altra porta da gestire.
 
+### Cambiare nome, utente, password o porta del database
+
+Senza variabili ti dice com'è configurato adesso e chi ci è collegato — è il
+modo più veloce per ricordarsi la password mentre la commissione guarda:
+
+```bash
+task db-config
+```
+
+Con le variabili cambia i valori **dappertutto in una volta**: nel container
+`postgres` del compose (compresa la sua healthcheck, che interroga il database
+con quelle stesse credenziali, e la porta pubblicata sulla macchina), nelle
+variabili d'ambiente di ogni modulo collegato, nell'`application.yml` di
+ognuno, e negli script di init dei database dedicati.
+
+```bash
+task db-config DBNAME=magazzino USER=wms PASSWORD=wms123
+```
+
+```bash
+task db-config PORT=5433
+```
+
+> PostgreSQL crea utente e database **solo al primo avvio, su volume vuoto**.
+> Dopo aver cambiato nome, utente o password serve un `task docker-reset`,
+> altrimenti il container continua a rispondere con i vecchi.
+>
+> `PORT=` cambia solo la porta pubblicata sulla macchina: dentro Docker i
+> servizi parlano con `postgres:5432` e non cambia niente.
+
+### Riempire il database di dati di prova
+
+Scritte le entity, questo comando le legge e scrive un `data.sql` per modulo:
+
+```bash
+task seed-data
+```
+
+Spring Boot lo esegue all'avvio, dopo che Hibernate ha creato le tabelle. I
+valori sono inventati ma plausibili — le stringhe seguono il nome della colonna
+(un campo `citta` prende nomi di città, un `email` degli indirizzi), gli `enum`
+vengono presi davvero dai valori dichiarati nel file Java, e le tabelle con
+chiave esterna vengono riempite **dopo** quelle a cui puntano, così i
+riferimenti esistono.
+
+```bash
+task seed-data SERVICE=ordini-service ROWS=10
+```
+
+Aggiunge da solo all'`application.yml` le due proprietà senza cui il file non
+verrebbe eseguito, o verrebbe eseguito prima che le tabelle esistano:
+
+```yaml
+spring:
+  jpa:
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: always
+```
+
+Il `data.sql` è tuo: modificalo pure, non viene riscritto se non rilanci il
+comando. Su PostgreSQL le INSERT vengono rieseguite a ogni avvio: se ti trovi
+righe doppie, svuota con `task docker-reset`. Con H2 in memoria non succede,
+perché il database riparte vuoto ogni volta.
+
+I dati di prova valgono punti: una demo su tabelle vuote non si vede.
+
+
 ### Accendere Swagger dove manca
 
 I moduli creati da `task new-service` hanno **già** Swagger: dipendenza nel pom
@@ -252,6 +419,22 @@ task test
 Collauda gli strumenti stessi su una copia usa-e-getta del progetto (il
 progetto vero non viene toccato): serve a sapere che funzionano **prima** di
 averne bisogno. Con `task test FULL=1` compila anche il modulo generato.
+
+### Rinominare la cartella dei moduli
+
+Si chiama `demo` perché così nasce da Spring Initializr. Se all'esame preferisci
+il nome del progetto:
+
+```bash
+task rename-project NAME=wms
+```
+
+Rinomina la cartella e aggiorna insieme a lei il Taskfile, gli script e le
+guide che la nominano; alla fine lancia `task check`. I comandi non cambiano:
+cambia solo il percorso dei sorgenti (`wms/<modulo>/src/...`).
+
+La cartella che contiene *tutto* (quella del repository) rinominala pure a mano
+da Esplora risorse: nessuno script dipende dal suo nome.
 
 ### Cambiare configurazione (`application.yml`)
 
@@ -307,6 +490,45 @@ task docker-down
 
 ---
 
+## Fase 4 — La consegna
+
+```bash
+task consegna NOME=COGNOME_NOME
+```
+
+Prepara la cartella `consegna/` con dentro tutto quello che va consegnato, e
+niente di quello che non serve:
+
+| File | Cos'è |
+| :--- | :--- |
+| `moduli/<modulo>.zip` | i sorgenti di ogni microservizio, **senza** `target/` |
+| `ALLEGATO-TECNICO.md` | già compilato con moduli, porte, endpoint e schema del database |
+| `SCHEMA-DATABASE.md` | lo schema concettuale e logico da solo, comodo da copiare |
+| `ISTRUZIONI-ESECUZIONE.md` | come far girare il progetto, con e senza Docker |
+| `docker-compose.yml` + `Dockerfile` + pom + wrapper | bastano a rimettere in piedi lo stack dai sorgenti |
+| `COGNOME_NOME.zip` | tutto quanto sopra in un archivio solo: **è quello da consegnare** |
+
+Le cartelle `target/` restano fuori apposta: sono megabyte di roba
+ricompilabile.
+
+Prima di consegnare apri `ALLEGATO-TECNICO.md` e riempi le parti fra parentesi
+quadre — analisi, algoritmo, descrizione dei moduli. Il resto (elenco dei
+moduli con porte e nome Eureka, endpoint di ogni controller, schema del
+database) è già dentro, ricavato dal codice.
+
+Lo schema del database lo puoi anche guardare da solo, in qualunque momento:
+
+```bash
+task db-schema
+```
+
+Legge le classi `@Entity` e ne ricava tabelle, colonne, tipi SQL, chiavi e
+relazioni, più un diagramma ER in mermaid che GitHub e VS Code disegnano da
+soli. Non si collega a nessun database: funziona anche a stack spento, e dice
+la verità su quello che Hibernate creerà.
+
+---
+
 ## Se qualcosa va storto
 
 | Sintomo | Cosa fare |
@@ -333,6 +555,7 @@ task docker-down
 
 | Comando | Cosa fa |
 | :--- | :--- |
+| `task wizard` | Fa le domande e monta il progetto (`SERVICE=<modulo>` per uno solo) |
 | `task dev` | Libera le porte, compila e avvia tutto in background con hot reload |
 | `task logs` | Segue i log di tutti i servizi in un terminale solo |
 | `task compile` | Ricompila: i servizi toccati si riavviano da soli |
@@ -344,6 +567,13 @@ task docker-down
 | `task remove-service` | Toglie un modulo dal progetto e da tutti i file |
 | `task use-postgres` | Collega un modulo a PostgreSQL (`DBNAME=` per un database suo) |
 | `task enable-swagger` | Rimette Swagger su un modulo che non ce l'ha |
+| `task db-config` | Stampa o cambia database, utente, password e porta di PostgreSQL |
+| `task rename-project` | Rinomina la cartella dei moduli Maven, ovunque sia nominata |
+| `task seed-data` | Dati di prova ricavati dalle `@Entity` (`data.sql`) |
+| `task db-schema` | Schema concettuale e logico ricavato dalle `@Entity` |
+| `task consegna` | Prepara la cartella da consegnare (`NOME=COGNOME_NOME`) |
+| `task offline-prep` | **Con la rete**: scarica tutto quello che servirà all'esame |
+| `task offline` | Dice se il progetto partirebbe a rete staccata |
 | `task check` | Moduli, porte, Docker e liste sono coerenti? |
 | `task test` | Collauda gli strumenti su una copia usa-e-getta |
 | `task help` | Questa guida, dal terminale |

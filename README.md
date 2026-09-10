@@ -61,7 +61,19 @@ E, già pronto e configurato per i moduli che creerai:
 
 ## Come si lavora
 
-Una volta sola, all'inizio:
+Il giorno dell'esame, letta la traccia, il modo più rapido per montare il
+progetto è il wizard: chiede come si chiama la cartella dei moduli, se serve
+PostgreSQL e con quali credenziali, e poi i microservizi uno per uno.
+
+```bash
+task wizard
+```
+
+Per un microservizio solo: `task wizard SERVICE=<nome>`. Non fa niente di
+magico: chiama `rename-project`, `db-config`, `new-service` e `use-postgres`
+nell'ordine giusto, e finisce con `task check`.
+
+Poi, una volta sola:
 
 ```bash
 task dev
@@ -118,6 +130,14 @@ task use-postgres SERVICE=ordini-service
 task enable-swagger SERVICE=ordini-service
 ```
 
+```bash
+task db-config DBNAME=magazzino USER=wms PASSWORD=wms123
+```
+
+```bash
+task rename-project NAME=wms
+```
+
 Tutti si usano con variabili `NOME=valore`, mai con trattini. Dopo una
 dipendenza o un modulo nuovo ci vuole `task dev`: `task compile` non basta,
 perché il classpath di un servizio è fissato quando parte.
@@ -137,6 +157,47 @@ task test
 
 Collauda gli strumenti stessi su una copia usa-e-getta del progetto. Lancialo
 appena ti siedi: se passa, sai che funzionano quando ti serviranno.
+
+### Il database e la consegna
+
+Scritte le entity, due comandi le leggono e ne ricavano il resto:
+
+```bash
+task seed-data
+```
+
+Scrive un `data.sql` per modulo con dati di prova plausibili, che Spring Boot
+esegue all'avvio dopo che Hibernate ha creato le tabelle. Una demo su tabelle
+vuote non si vede.
+
+```bash
+task db-schema
+```
+
+Lo schema concettuale e logico della base dati — tabelle, colonne, tipi SQL,
+chiavi, relazioni e un diagramma ER — ricavato dalle `@Entity`, non ricordato a
+memoria. È quello che chiede l'allegato tecnico.
+
+```bash
+task consegna NOME=COGNOME_NOME
+```
+
+Prepara `consegna/`: i moduli zippati senza `target/`, l'allegato tecnico già
+compilato con moduli, porte, endpoint e schema, le istruzioni di esecuzione, il
+compose per far girare tutto, e un archivio unico da consegnare.
+
+### Esame senza rete
+
+La sera prima, con la connessione:
+
+```bash
+task offline-prep
+```
+
+Scarica le dipendenze Maven in `~/.m2`, le immagini Docker di base e fa una
+prima build dei container. Poi `task offline` dice se il progetto partirebbe a
+rete staccata. Portati la cartella del progetto e la `~/.m2` su una chiavetta:
+il template *è* la cartella, non serve altro.
 
 ### Per la demo
 

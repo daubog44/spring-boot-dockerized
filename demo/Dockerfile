@@ -15,11 +15,14 @@ COPY naming-server/pom.xml naming-server/pom.xml
 ARG MODULE="naming-server"
 
 RUN chmod +x mvnw
-RUN ./mvnw -B -pl ${MODULE} -am dependency:go-offline
+# La cache di Maven vive fuori dall'immagine e sopravvive alle build: cosi'
+# una modifica ai pom non rimanda a scaricare tutto da capo, e il giorno
+# dell'esame senza rete le dipendenze sono gia' qui (task offline-prep).
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -pl ${MODULE} -am dependency:go-offline
 
 COPY . .
 
-RUN ./mvnw -B -pl ${MODULE} -am clean package -Dmaven.test.skip=true
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -pl ${MODULE} -am clean package -Dmaven.test.skip=true
 
 FROM eclipse-temurin:25-jre
 # curl serve all'healthcheck di Eureka in docker-compose.yml.
