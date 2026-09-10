@@ -3,8 +3,8 @@
 # Equivalente POSIX di scripts/logs.ps1.
 #
 #   task logs              tutti i servizi
-#   task logs -- wms       solo wms
-#   task logs -- wms crm   solo quei due
+#   task logs SERVICE=<nome>   solo quel servizio
+#   task logs -- <a> <b>       piu' servizi insieme
 #
 # Ctrl+C chiude solo questa vista: i servizi restano in esecuzione.
 set -uo pipefail

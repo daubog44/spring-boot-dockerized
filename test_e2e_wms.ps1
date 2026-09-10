@@ -4,7 +4,7 @@
 
 param(
     # Porta su cui risponde la UI. Va allineata a quella usata all'avvio: con
-    # `task dev -- -UiPort 9080` passa 9080, altrimenti il controllo interrogherebbe
+    # `task dev UI_PORT=9080` passa 9080, altrimenti il controllo interrogherebbe
     # qualunque altra applicazione occupi la 8080, dando un falso positivo.
     [int]$UiPort = 8080
 )

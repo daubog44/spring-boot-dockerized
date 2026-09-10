@@ -22,6 +22,10 @@ $portNames = Get-DevServiceMap -LogDir $logDir
 # Ripiego per quando .dev-logs non c'e' ancora (subito dopo un clone).
 $fallbackNames = [ordered]@{
     '8761' = 'eureka'
+    '8081' = 'product'
+    '8082' = 'crm'
+    '8083' = 'wms'
+    '8080' = 'wms-ui'
     '5432' = 'postgres'
 }
 foreach ($port in (Get-DevPorts -LogDir $logDir)) {
@@ -78,7 +82,7 @@ foreach ($entry in $portNames.GetEnumerator()) {
 foreach ($item in $hijacked) {
     Write-Host ''
     Write-Host ("  ATTENZIONE: http://localhost:{0} risponde da {1} (PID {2}), non dal tuo servizio." -f $item.Port, $item.Listener.Name, $item.Listener.Id) -ForegroundColor Red
-    Write-Host '  Chiudi quel processo, oppure usa un''altra porta: task dev -- -UiPort 9080' -ForegroundColor Yellow
+    Write-Host '  Chiudi quel processo, oppure usa un''altra porta: task dev UI_PORT=9080' -ForegroundColor Yellow
 }
 
 # --- Container ----------------------------------------------------------------
