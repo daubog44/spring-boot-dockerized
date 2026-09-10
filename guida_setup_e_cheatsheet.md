@@ -69,7 +69,7 @@ I servizi girano in background: niente finestre sparse, un terminale solo. Per v
 task logs
 ```
 
-`Ctrl+C` chiude solo la vista, i servizi restano su. Per uno solo: `task logs -- store`. I log restano comunque su file in `.dev-logs/`.
+`Ctrl+C` chiude solo la vista, i servizi restano su. Per uno solo: `task logs SERVICE=store`. I log restano comunque su file in `.dev-logs/`.
 
 Dopo una modifica al codice, ricompila e i servizi interessati si riavviano da soli grazie a `spring-boot-devtools`:
 
@@ -98,6 +98,12 @@ Dice chi occupa ogni porta (un tuo servizio, i container, o un'applicazione estr
 ### C. Avvio Manuale dei Singoli Moduli
 
 Se ti serve isolare un servizio, in terminali distinti:
+
+```bash
+task run SERVICE=<modulo>
+```
+
+Le scorciatoie di questa traccia:
 
 ```bash
 task run-db
@@ -172,13 +178,39 @@ Perché conta: Tomcat non riesce a fare il bind nemmeno quando l'altro processo 
 
 Se su una di quelle porte gira qualcosa che ti serve viva, dillo e sposta la UI:
 ```bash
-task dev -- -KeepForeign -UiPort 9080
+task dev KEEPFOREIGN=1 UI_PORT=9080
 ```
 
 ### 🚨 Emergenza 1-bis: "container exam-eureka is unhealthy"
 `task docker-up` si interrompe con `dependency failed to start: container exam-eureka is unhealthy`, ma nei log Eureka scrive `Started Eureka Server`. L'healthcheck usa `curl`, che l'immagine `eclipse-temurin:25-jre` non contiene. Il `demo/Dockerfile` di questo repo lo installa già; se aggiungi un healthcheck HTTP a un altro servizio vale la stessa regola. Per leggere l'esito delle probe:
 ```bash
 docker inspect exam-eureka --format "{{json .State.Health}}"
+```
+
+### 🚨 Emergenza 1-ter: "porta occupata da processo sconosciuto"
+
+`task dev` dice che una porta è occupata, `task status` la segna **RISERVATA** e
+nessun processo risulta in ascolto. Non c'è niente da chiudere: Windows si
+riserva interi intervalli di porte (Hyper-V, WSL, **l'avvio di Docker
+Desktop**), e dentro quegli intervalli non fa il bind nessuno — né un servizio
+locale né un container, per cui anche `task docker-up` fallirebbe con
+`bind: An attempt was made to access a socket in a way forbidden by its access permissions`.
+
+Per vedere gli intervalli:
+```bash
+netsh interface ipv4 show excludedportrange protocol=tcp
+```
+
+Due strade: spostare il servizio fuori dagli intervalli,
+```bash
+task set-port SERVICE=<modulo> PORT=<porta libera>
+```
+oppure liberare le riserve, da terminale **amministratore** (chiude Docker):
+```bash
+net stop winnat
+```
+```bash
+net start winnat
 ```
 
 ### 🚨 Emergenza 2: "Docker Compose non aggiorna il codice modificato"
