@@ -32,18 +32,28 @@ PERSONE=('Mario Rossi' 'Anna Bianchi' 'Luca Verdi' 'Giulia Neri' 'Paolo Gialli' 
 DESCRIZIONI=('Prima consegna del mese' 'Ordine urgente' 'Riassortimento magazzino' 'Reso da cliente' 'Fornitura periodica' 'Campione gratuito' 'Ordine ricorrente' 'Spedizione parziale')
 PRODOTTI=('Vite M6' 'Dado esagonale' 'Cuscinetto 6203' 'Guarnizione 40mm' 'Molla a trazione' 'Rondella piana' 'Perno filettato' 'Boccola in ottone')
 
+# Un valore dalla tabella, con il numero di riga appeso quando la tabella
+# finisce: cosi' anche con ROWS=50 non nascono due righe uguali, che su una
+# colonna unique = true farebbero fallire l'avvio.
+pick() {
+  local idx="$1"; shift
+  local n=$# value
+  value="${@:$(( (idx - 1) % n + 1 )):1}"
+  if [ "$idx" -gt "$n" ]; then value="$value $idx"; fi
+  printf '%s' "$value"
+}
+
 string_value() {
-  local col="$1" idx="$2" i
-  i=$(( idx - 1 ))
+  local col="$1" idx="$2"
   case "$col" in
     *email*)                                        printf 'utente%s@esempio.it' "$idx" ;;
-    *citta*|*city*|*comune*|*luogo*)                printf '%s' "${CITTA[$(( i % ${#CITTA[@]} ))]}" ;;
+    *citta*|*city*|*comune*|*luogo*)                pick "$idx" "${CITTA[@]}" ;;
     *indirizzo*|*via*|*address*)                    printf 'Via Roma %s' "$(( idx * 3 ))" ;;
     *codice*|*sigla*|*targa*|*cod*)                 printf 'COD-%03d' "$idx" ;;
-    *descrizione*|*note*|*testo*)                   printf '%s' "${DESCRIZIONI[$(( i % ${#DESCRIZIONI[@]} ))]}" ;;
-    *prodotto*|*articolo*|*item*)                   printf '%s' "${PRODOTTI[$(( i % ${#PRODOTTI[@]} ))]}" ;;
-    *cliente*|*fornitore*|*ragione*|*azienda*|*societa*) printf '%s' "${NOMI[$(( i % ${#NOMI[@]} ))]}" ;;
-    *nome*|*cognome*|*utente*|*referente*|*responsabile*) printf '%s' "${PERSONE[$(( i % ${#PERSONE[@]} ))]}" ;;
+    *descrizione*|*note*|*testo*)                   pick "$idx" "${DESCRIZIONI[@]}" ;;
+    *prodotto*|*articolo*|*item*)                   pick "$idx" "${PRODOTTI[@]}" ;;
+    *cliente*|*fornitore*|*ragione*|*azienda*|*societa*) pick "$idx" "${NOMI[@]}" ;;
+    *nome*|*cognome*|*utente*|*referente*|*responsabile*) pick "$idx" "${PERSONE[@]}" ;;
     *stato*|*status*|*tipo*)                        printf 'VALORE_%s' "$idx" ;;
     *)                                              printf '%s %s' "${col//_/ }" "$idx" ;;
   esac
