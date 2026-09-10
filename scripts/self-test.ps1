@@ -315,7 +315,9 @@ Test-Case 'remove-service rifiuta un modulo che non esiste' {
 Test-Case 'db-config stampa la configurazione del database' {
     $r = Invoke-Tool 'db-config.ps1'
     Assert-Ok $r 'db-config senza variabili e'' fallito'
-    Assert-Contains $r.Output 'esame' 'non stampa il nome del database'
+    # Il nome del database cambia da un branch all'altro: lo leggiamo dal compose.
+    $dbNow = [regex]::Match((Get-Text 'demo/docker-compose.yml'), '(?m)^\s+POSTGRES_DB:\s*(\S+)').Groups[1].Value
+    Assert-Contains $r.Output $dbNow 'non stampa il nome del database'
     Assert-Contains $r.Output 'alfa-service' 'non elenca i moduli collegati'
 }
 

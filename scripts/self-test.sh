@@ -282,7 +282,9 @@ end_case
 start_case "db-config stampa la configurazione del database"
 run_tool db-config.sh
 assert_ok "db-config senza variabili"
-assert_out_contains "esame"
+# Il nome del database cambia da un branch all'altro: lo leggiamo dal compose.
+dbnow="$(grep -E '^[[:space:]]+POSTGRES_DB:' "$DEMO/docker-compose.yml" | head -n 1 | awk '{print $2}')"
+assert_out_contains "$dbnow"
 assert_out_contains "alfa-service"
 end_case
 
