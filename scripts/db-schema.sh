@@ -58,7 +58,8 @@ EOF
       return out
     }
     function sqltype(t, isEnum, len) {
-      if (isEnum) return "VARCHAR(255)"
+      # Un enum salvato come stringa rispetta anche lui @Column(length = N).
+      if (isEnum) return (len > 0) ? "VARCHAR(" len ")" : "VARCHAR(255)"
       if (t == "String") return (len > 0) ? "VARCHAR(" len ")" : "VARCHAR(255)"
       if (t == "Long" || t == "long") return "BIGINT"
       if (t == "Integer" || t == "int") return "INTEGER"

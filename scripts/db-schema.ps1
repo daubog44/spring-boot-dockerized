@@ -30,7 +30,8 @@ $demoDir = Join-Path $repoRoot 'demo'
 
 function Get-SqlType {
     param([string]$JavaType, [bool]$IsEnum, [int]$Length)
-    if ($IsEnum) { return 'VARCHAR(255)' }
+    # Un enum salvato come stringa rispetta anche lui @Column(length = N).
+    if ($IsEnum) { if ($Length -gt 0) { return "VARCHAR($Length)" } else { return 'VARCHAR(255)' } }
     switch -Regex ($JavaType) {
         '^(String)$'                    { if ($Length -gt 0) { return "VARCHAR($Length)" } else { return 'VARCHAR(255)' } }
         '^(Long|long)$'                 { return 'BIGINT' }

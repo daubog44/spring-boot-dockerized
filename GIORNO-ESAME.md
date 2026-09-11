@@ -441,9 +441,10 @@ spring:
 ```
 
 Il `data.sql` è tuo: modificalo pure, non viene riscritto se non rilanci il
-comando. Su PostgreSQL le INSERT vengono rieseguite a ogni avvio: se ti trovi
-righe doppie, svuota con `task docker-reset`. Con H2 in memoria non succede,
-perché il database riparte vuoto ogni volta.
+comando. Spring Boot lo esegue a **ogni** avvio, ma ogni INSERT scatta solo se
+la tabella non è ancora piena: su PostgreSQL, che i dati li conserva, un
+riavvio o un hot reload non duplicano niente, e una colonna `unique` non fa
+fallire l'avvio. Per ripartire dai soli dati di prova: `task docker-reset`.
 
 I dati di prova valgono punti: una demo su tabelle vuote non si vede.
 

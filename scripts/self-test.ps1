@@ -501,11 +501,34 @@ public class ArticoloEntity {
     private Integer quantita;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     private StatoArticolo stato;
 
     @ManyToOne
     @JoinColumn(name = "deposito_id")
     private DepositoEntity deposito;
+}
+'@
+
+# Nome e cognome, un anno, un id che punta a un altro servizio: i valori
+# devono sembrare veri, non "nome 1", 10, 20.
+Write-TextFile -Path (Join-Path $entityDir 'SocioEntity.java') -Text @'
+package com.example.ttfcloud_esame.alfaservice;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
+@Entity
+public class SocioEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String nome;
+    private String cognome;
+    private Integer annoIscrizione;
+    private Long tesseraId;
 }
 '@
 
@@ -518,6 +541,10 @@ Test-Case 'seed-data ricava le INSERT dalle @Entity' {
     Assert-Contains $sql 'INSERT INTO deposito_entity' 'manca la tabella senza @Table'
     Assert-Contains $sql 'INSERT INTO articoli (nome, quantita, stato, deposito_id)' 'colonne sbagliate (la PK generata non va scritta)'
     Assert-Contains $sql 'DISPONIBILE' 'gli enum non arrivano dal file Java'
+    # Ogni riga scatta solo se la tabella non e' ancora piena: un riavvio su
+    # PostgreSQL non la duplica e una colonna unique non fa fallire l'avvio.
+    Assert-Contains $sql 'WHERE (SELECT COUNT(*) FROM articoli) < 3;' 'le INSERT si ripeterebbero a ogni avvio'
+    Assert-Contains $sql "INSERT INTO socio_entity (nome, cognome, anno_iscrizione, tessera_id) SELECT 'Mario', 'Rossi', 2017, 1 WHERE (SELECT COUNT(*) FROM socio_entity) < 1;" 'nome, cognome, anno o id non sembrano veri'
 
     # La tabella padre va riempita prima, o la chiave esterna punterebbe a niente.
     $primoDeposito = $sql.IndexOf('INSERT INTO deposito_entity')
@@ -540,7 +567,8 @@ Test-Case 'seed-data non ripete i valori quando le righe superano la tabella' {
     Assert-Ok (Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '12')) 'seed-data con 12 righe e'' fallito'
     $righe = @((Get-Text 'demo/alfa-service/src/main/resources/data.sql') -split "`r?`n" | Where-Object { $_ -match '^INSERT INTO articoli' })
     Assert-That ($righe.Count -eq 12) ("righe generate: " + $righe.Count)
-    $unici = @($righe | Select-Object -Unique)
+    # Il conteggio in fondo cambia da riga a riga: confrontiamo solo i valori.
+    $unici = @($righe | ForEach-Object { $_ -replace ' WHERE .*$', '' } | Select-Object -Unique)
     Assert-That ($unici.Count -eq 12) ("righe uguali fra loro: " + (12 - $unici.Count))
 }
 
@@ -553,6 +581,7 @@ Test-Case 'db-schema ricava tabelle e relazioni dalle @Entity' {
     Assert-Contains $r.Output 'Tabella `deposito_entity`' 'manca la tabella senza @Table'
     Assert-Contains $r.Output 'erDiagram' 'manca il diagramma ER'
     Assert-Contains $r.Output 'FK' 'la chiave esterna non e'' segnata'
+    Assert-Contains $r.Output '| `stato` | VARCHAR(20) |' 'la lunghezza di un enum con @Column(length) e'' ignorata'
 }
 
 # Questa cambia il nome della cartella dei moduli: va per ultima.

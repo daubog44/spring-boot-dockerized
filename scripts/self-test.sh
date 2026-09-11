@@ -462,11 +462,34 @@ public class ArticoloEntity {
     private Integer quantita;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     private StatoArticolo stato;
 
     @ManyToOne
     @JoinColumn(name = "deposito_id")
     private DepositoEntity deposito;
+}
+JAVA
+
+# Nome e cognome, un anno, un id che punta a un altro servizio: i valori
+# devono sembrare veri, non "nome 1", 10, 20.
+cat >"$ENTITY_DIR/SocioEntity.java" <<'JAVA'
+package com.example.ttfcloud_esame.alfaservice;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
+@Entity
+public class SocioEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String nome;
+    private String cognome;
+    private Integer annoIscrizione;
+    private Long tesseraId;
 }
 JAVA
 
@@ -479,6 +502,10 @@ SQL="demo/alfa-service/src/main/resources/data.sql"
 assert_contains "$SQL" "INSERT INTO deposito_entity" "la tabella senza @Table"
 assert_contains "$SQL" "INSERT INTO articoli (nome, quantita, stato, deposito_id)" "le colonne (la PK generata non va scritta)"
 assert_contains "$SQL" "DISPONIBILE" "gli enum dal file Java"
+# Ogni riga scatta solo se la tabella non e' ancora piena: un riavvio su
+# PostgreSQL non la duplica e una colonna unique non fa fallire l'avvio.
+assert_contains "$SQL" "WHERE (SELECT COUNT(*) FROM articoli) < 3;" "le INSERT si ripeterebbero a ogni avvio"
+assert_contains "$SQL" "INSERT INTO socio_entity (nome, cognome, anno_iscrizione, tessera_id) SELECT 'Mario', 'Rossi', 2017, 1 WHERE (SELECT COUNT(*) FROM socio_entity) < 1;" "nome, cognome, anno e id verosimili"
 # La tabella padre va riempita prima, o la chiave esterna punterebbe a niente.
 riga_deposito="$(grep -n 'INSERT INTO deposito_entity' "$SANDBOX/$SQL" | head -n 1 | cut -d: -f1)"
 riga_articolo="$(grep -n 'INSERT INTO articoli' "$SANDBOX/$SQL" | head -n 1 | cut -d: -f1)"
@@ -497,7 +524,8 @@ start_case "seed-data non ripete i valori quando le righe superano la tabella"
 run_tool seed-data.sh --module alfa-service --rows 12
 assert_ok "seed-data con 12 righe"
 tot="$(grep -c '^INSERT INTO articoli' "$SANDBOX/$SQL")"
-uniche="$(grep '^INSERT INTO articoli' "$SANDBOX/$SQL" | sort -u | wc -l)"
+# Il conteggio in fondo cambia da riga a riga: confrontiamo solo i valori.
+uniche="$(grep '^INSERT INTO articoli' "$SANDBOX/$SQL" | sed 's/ WHERE .*$//' | sort -u | wc -l)"
 [ "$tot" = "12" ] || fail "righe generate: $tot"
 [ "$uniche" = "12" ] || fail "righe uguali fra loro: $(( tot - uniche ))"
 end_case
@@ -511,6 +539,7 @@ assert_out_contains 'Tabella `articoli`'
 assert_out_contains 'Tabella `deposito_entity`'
 assert_out_contains "erDiagram"
 assert_out_contains "FK"
+assert_out_contains '| `stato` | VARCHAR(20) |'
 end_case
 
 # Questa cambia il nome della cartella dei moduli: va per ultima.

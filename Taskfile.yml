@@ -359,8 +359,9 @@ tasks:
         task seed-data
         task seed-data SERVICE=ordini-service ROWS=10
 
-      Su PostgreSQL le INSERT vengono rieseguite a ogni avvio: se ti trovi
-      righe doppie, svuota con `task docker-reset`.
+      Ogni INSERT scatta solo se la tabella non e' ancora piena: un riavvio
+      (o un hot reload) su PostgreSQL non duplica niente. Per ripartire dai
+      soli dati di prova: `task docker-reset`.
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/seed-data.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .ROWS}} -Rows {{.ROWS}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/seed-data.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .ROWS}} --rows {{.ROWS}}{{end}} {{.CLI_ARGS}}{{end}}'
 
