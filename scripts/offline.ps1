@@ -81,6 +81,28 @@ if ($Prep) {
     Write-Host '  Serve internet ADESSO. Ci vogliono alcuni minuti.' -ForegroundColor DarkGray
     Write-Host ''
 
+    # 0. Il comando task, di scorta: se il PC dell'esame non ce l'ha, o il
+    #    dominio che lo distribuisce (GitHub) non passa dalla whitelist, ne
+    #    teniamo gia' una copia dentro il progetto. Viaggia con la cartella,
+    #    come tutto il resto: niente installer da portarsi dietro apposta.
+    Write-Host '==> Il comando task, di scorta (in .tools/task)' -ForegroundColor Cyan
+    $taskToolsDir = Join-Path $repoRoot '.tools/task'
+    $taskArch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
+    $taskAsset = "task_windows_$taskArch.zip"
+    $taskUrl = "https://github.com/go-task/task/releases/latest/download/$taskAsset"
+    try {
+        $taskZip = Join-Path ([System.IO.Path]::GetTempPath()) $taskAsset
+        Invoke-WebRequest -Uri $taskUrl -OutFile $taskZip -TimeoutSec 60
+        $null = New-Item -ItemType Directory -Force -Path $taskToolsDir
+        Expand-Archive -Path $taskZip -DestinationPath $taskToolsDir -Force
+        Remove-Item $taskZip -Force -ErrorAction SilentlyContinue
+        $localTaskVersion = (& (Join-Path $taskToolsDir 'task.exe') --version 2>$null)
+        Write-Line 'task (copia locale)' ($localTaskVersion -join ' ')
+    } catch {
+        Write-Line 'task (copia locale)' 'download fallito: non e'' bloccante, riprova con la rete' 'Yellow'
+    }
+    Write-Host ''
+
     # 1. Le dipendenze Maven, nella cache di casa (~/.m2).
     Write-Host '==> Dipendenze Maven' -ForegroundColor Cyan
     Push-Location $demoDir
@@ -183,7 +205,16 @@ Write-Host ''
 
 # 1. Gli attrezzi.
 $taskVersion = (& task --version 2>$null)
-if ($LASTEXITCODE -eq 0) { Write-Line 'go-task' ($taskVersion -join ' ') } else { Write-Line 'go-task' 'non trovato' 'Red'; $problems++ }
+if ($LASTEXITCODE -eq 0) {
+    Write-Line 'go-task' ($taskVersion -join ' ')
+} else {
+    $localTask = Join-Path $repoRoot '.tools/task/task.exe'
+    if (Test-Path $localTask) {
+        Write-Line 'go-task' 'non sul PATH, ma c''e'' una copia in .tools/task: . .\scripts\usa-task-locale.ps1' 'Yellow'
+    } else {
+        Write-Line 'go-task' 'non trovato' 'Red'; $problems++
+    }
+}
 
 if (Test-Path $javaHome) {
     Write-Line 'JDK' $javaHome

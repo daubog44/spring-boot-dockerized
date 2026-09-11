@@ -12,3 +12,7 @@ corso/contenuti.js
 
 # il nome del progetto Docker Compose di questa copia: lo scrive dev-lib
 .env
+
+# la copia di scorta di task che scarica task offline-prep: e' per questa
+# macchina (un eseguibile per sistema operativo), non per il repository
+.tools/

@@ -575,10 +575,14 @@ tasks:
   offline-prep:
     desc: "DA FARE CON LA RETE: scarica tutto quello che servira' il giorno dell'esame"
     summary: |
-      Da lanciare la sera prima, con internet. Scarica le dipendenze Maven in
-      ~/.m2, compila una volta, scarica le immagini Docker di base e fa una
-      prima `docker compose build`, che riempie la cache dei livelli (compreso
-      quello con curl, che a rete staccata non si potrebbe piu' installare).
+      Da lanciare la sera prima, con internet. Scarica anche una copia di
+      scorta del comando task stesso, in .tools/task (per quando la macchina
+      dell'esame non ce l'ha, o GitHub non passa dalla whitelist): se task non
+      risponde, attivala con scripts/usa-task-locale.ps1 (o .sh), col punto
+      davanti. Poi scarica le dipendenze Maven in ~/.m2, compila una volta,
+      scarica le immagini Docker di base e fa una prima `docker compose
+      build`, che riempie la cache dei livelli (compreso quello con curl, che
+      a rete staccata non si potrebbe piu' installare).
 
       Scarica anche quello che serve ai moduli che creerai all'esame: in un
       progetto di prova crea con new-service un servizio con database e

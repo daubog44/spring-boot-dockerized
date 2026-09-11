@@ -37,6 +37,7 @@ che non va, col nome breve che vedi nel primo (`catalogo`, `prestiti`,
 | `task docker-up` si ferma su *unhealthy* | `docker compose ps` e `docker compose logs <servizio>` dalla cartella `demo` |
 | la build Docker non scarica le immagini | `task rete`: se Docker Hub non passa, servono quelle della sera prima (`task offline`) |
 | Maven non scarica una dipendenza nuova | `task rete`: se Maven Central non passa, vale solo la `~/.m2` |
+| `task` non è un comando riconosciuto | `. .\scripts\usa-task-locale.ps1` (o `source scripts/usa-task-locale.sh`): c'è già una copia in `.tools/task`, se hai lanciato `task offline-prep` la sera prima |
 | è tutto ingarbugliato | `task dev-down`, poi `task dev` |
 
 ## Due comandi da non usare

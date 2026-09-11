@@ -221,8 +221,12 @@ task rete
 Dice, dominio per dominio (Maven Central, Docker Hub, Ubuntu, GitHub, le
 estensioni di VS Code), se risponde e che cosa fare se no. La sera prima, con
 la connessione di casa, `task offline-prep` scarica quello che potrebbe non
-passare, e `task offline` verifica. Portati la cartella del progetto e la
-`~/.m2` su una chiavetta: il template *e'* la cartella, non serve altro.
+passare: le dipendenze Maven, anche quelle dei moduli che creerai, le immagini
+Docker, una prima build dei container e una copia di scorta del comando
+`task` stesso (in `.tools/task`, per quando GitHub non passa o la macchina
+dell'esame non ce l'ha: si attiva con `scripts/usa-task-locale.ps1`/`.sh`).
+`task offline` verifica. Portati la cartella del progetto e la `~/.m2` su una
+chiavetta: il template *e'* la cartella, non serve altro.
 
 ---
 

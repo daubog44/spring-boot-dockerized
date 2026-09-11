@@ -68,14 +68,24 @@ task offline-prep
 Ci mette qualche minuto e fa tutto quello che il giorno dopo potrebbe servire
 dalla rete:
 
-1. scarica le dipendenze Maven del progetto e lo compila;
-2. in una copia usa-e-getta crea con `new-service` un servizio con database e
+1. scarica una copia del comando `task` stesso, dentro `.tools/task`: se sulla
+   macchina dell'esame non c'è, o GitHub (il dominio che lo distribuisce) non
+   passa dalla whitelist, l'hai già qui. Viaggia con la cartella del progetto,
+   come tutto il resto: niente installer da portarsi dietro apposta;
+2. scarica le dipendenze Maven del progetto e lo compila;
+3. in una copia usa-e-getta crea con `new-service` un servizio con database e
    un'interfaccia, e li compila: così in `~/.m2` c'è anche quello che serve ai
    moduli che creerai all'esame (JPA, H2, PostgreSQL, Feign, Swagger,
    Thymeleaf);
-3. scarica le immagini Docker di base;
-4. fa una prima `docker compose build`, che riempie la cache dei livelli,
+4. scarica le immagini Docker di base;
+5. fa una prima `docker compose build`, che riempie la cache dei livelli,
    compreso quello che installa `curl`.
+
+Se il giorno dell'esame `task` non risponde (PATH diverso, macchina pulita),
+`task offline` te lo segnala e `scripts/usa-task-locale.ps1` (o
+`usa-task-locale.sh`) mette la copia locale sul PATH di quella sessione: va
+lanciato col punto davanti (`. .\scripts\usa-task-locale.ps1`, o
+`source scripts/usa-task-locale.sh`), altrimenti l'effetto sparisce subito.
 
 Con `ALL=1` scarica anche tutto il catalogo di `add-dep` (security, kafka,
 mongodb...): più lento, ma non resta niente di imprevisto. Poi controlla:
@@ -96,7 +106,7 @@ Il template è la cartella: niente da installare. Portati:
 | :--- | :--- |
 | la cartella del progetto, `.git` compreso | è il template, e con `.git` torni indietro con `git checkout .` |
 | la cartella `~/.m2/repository` | le dipendenze Maven, se Maven Central non dovesse passare |
-| gli installatori di go-task, del JDK e di Docker Desktop | solo se non sei sicuro della macchina |
+| gli installatori del JDK e di Docker Desktop | solo se non sei sicuro della macchina (`task` non serve: c'è già in `.tools/task`) |
 
 ## Appena ti siedi
 

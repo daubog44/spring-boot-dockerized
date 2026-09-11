@@ -76,6 +76,7 @@ cmd "task rete" "quali domini passano da qui, e cosa fare se no"
 cmd "task offline-prep" "LA SERA PRIMA, A CASA: scarica tutto"
 cmd "task offline" "dice se partirebbe anche senza rete"
 note "Se Docker Hub non passa: task dev + task run-db, che non ricompila dentro Docker."
+note "Se task non risponde: source scripts/usa-task-locale.sh (c'e' gia' una copia in .tools/task)."
 
 echo ""
 echo "Docker, per la demo"

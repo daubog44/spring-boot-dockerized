@@ -22,10 +22,16 @@ Un comando solo, e ci mette qualche minuto:
 task offline-prep
 ```
 
-Scarica le dipendenze Maven, compila una volta, scarica le immagini Docker e
-fa una prima `docker compose build` (che riempie la cache dei livelli, compreso
-quello che installa `curl` dentro l'immagine: senza rete non si potrebbe più
-fare). Poi verifica:
+Scarica anche una copia del comando `task` stesso, dentro `.tools/task`: se
+sulla macchina dell'esame non c'è o GitHub non passa dalla whitelist, l'hai
+già nella cartella del progetto. Se `task` non risponde, attivala con
+`. .\scripts\usa-task-locale.ps1` (o `source scripts/usa-task-locale.sh`) —
+col punto davanti, altrimenti l'effetto sparisce subito.
+
+Poi scarica le dipendenze Maven, compila una volta, scarica le immagini Docker
+e fa una prima `docker compose build` (che riempie la cache dei livelli,
+compreso quello che installa `curl` dentro l'immagine: senza rete non si
+potrebbe più fare). Alla fine verifica:
 
 ```bash
 task offline
@@ -44,7 +50,7 @@ sulla chiavetta:
 | :--- | :--- |
 | la cartella del progetto, `.git` compreso | è il template, e con `.git` puoi tornare indietro con `git checkout .` |
 | la cartella `~/.m2/repository` | le dipendenze Maven, se Maven Central non dovesse passare |
-| l'installatore di go-task, del JDK e di Docker Desktop | solo se non sei sicuro della macchina d'esame |
+| l'installatore del JDK e di Docker Desktop | solo se non sei sicuro della macchina d'esame (`task` non serve: c'è già in `.tools/task`) |
 
 Sul portatile d'esame: copi la cartella dove vuoi, copi `.m2` dentro la tua
 home, e sei operativo. Il nome della cartella che contiene tutto non lo guarda
