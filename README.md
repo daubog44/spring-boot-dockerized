@@ -9,6 +9,7 @@ Flusso applicativo: la UI riceve coordinate, raggio e numero di alternative, int
 ## 📚 Documentazione & Guide per l'Esame
 
 - **[🚨 Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. Parti da qui.
+- **[📓 Il corso: Quaderno d'esame](./corso/index.html)** — la stessa giornata in nove fasi, con i comandi da provare, quello che devi vedere, un esercizio per fase e una lavagna che legge le lezioni ad alta voce. Aprilo nel browser (doppio clic sul file). Il video, voce sintetica compresa, lo registra la macchina: `powershell -File corso/genera-video.ps1` (servono la voce italiana di Windows, Edge e ffmpeg) scrive `corso/quaderno-esame.mp4`, che resta fuori dal repository: è il file da allegare a una release.
 - [📖 Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
 - [📘 Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — con il **cheat sheet di Thymeleaf** (§ 6.7)
 - [🛠️ Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
