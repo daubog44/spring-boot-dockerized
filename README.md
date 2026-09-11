@@ -109,6 +109,7 @@ Il comando `task` da solo stampa questo elenco.
 Sviluppo:
 
 - `task wizard`: Fa le domande e monta il progetto (`SERVICE=<modulo>` per uno solo).
+- `task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=...`: Genera entity, repository, service e controller.
 - `task consegna NOME=COGNOME_NOME`: Prepara la cartella da consegnare.
 - `task seed-data`: Dati di prova ricavati dalle `@Entity`.
 - `task db-schema`: Schema concettuale e logico ricavato dalle `@Entity`.

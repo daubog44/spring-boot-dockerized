@@ -216,6 +216,38 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-service.ps1{{if .NAME}} -Name {{.NAME}}{{end}}{{if .PORT}} -Port {{.PORT}}{{end}}{{if .UI}} -Ui{{end}}{{if .NODB}} -NoDb{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-service.sh{{if .NAME}} --name {{.NAME}}{{end}}{{if .PORT}} --port {{.PORT}}{{end}}{{if .UI}} --ui{{end}}{{if .NODB}} --no-db{{end}} {{.CLI_ARGS}}{{end}}'
 
+  new-entity:
+    desc: "Genera entity, repository, service e controller per una tabella (task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=...)"
+    summary: |
+      Ogni tabella si scrive con lo stesso schema: una classe @Entity, un
+      repository che estende JpaRepository, un service col CRUD e un
+      controller REST con Swagger. Questo comando le scrive tutte e quattro,
+      dentro un modulo che esiste gia' (task new-service). Tu decidi solo i
+      campi (in FIELDS) e, dopo, le relazioni e le regole della tua traccia:
+      quelle NON le genera, apposta -- vedi la lezione 8 del corso
+      (task learn).
+
+      Variabili:
+        SERVICE=<modulo>   OBBLIGATORIA, deve avere un database (niente
+                            NODB=1 o UI=1)
+        NAME=<Entita>      OBBLIGATORIA, in PascalCase: Libro, RigaOrdine
+        FIELDS=<campi>     facoltativa, separati da virgola:
+                            nome:tipo[:modificatore]*
+                            Tipi: string, string(N), text, int, long,
+                            decimal, bool, date, datetime, email,
+                            enum(A|B|C)
+                            Modificatori: required, unique, min(N), max(N)
+        TABLE=<nome>       facoltativa: di default il nome dell'entity in
+                            minuscolo (niente plurali indovinati)
+
+      Esempio:
+        task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):unique,annoPubblicazione:int:min(1450):max(2100),disponibile:bool:required,genere:enum(ROMANZO|SAGGIO|GIALLO)
+
+      Dopo serve `task dev` (non `task compile`): l'entity nuova non e'
+      ancora nel classpath del servizio acceso.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-entity.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .TABLE}} -Table {{.TABLE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-entity.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .TABLE}} --table {{.TABLE}}{{end}} {{.CLI_ARGS}}{{end}}'
+
   add-dep:
     desc: "Aggiunge dipendenze al pom di un modulo (task add-dep SERVICE=wms-service DEPS=security,mail)"
     summary: |
