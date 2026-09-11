@@ -500,143 +500,52 @@ Test-Case 'il wizard monta database e servizi rispondendo alle domande' {
     Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo il wizard il progetto non e'' coerente'
 }
 
-# Da qui in poi serve un dominio con delle @Entity: lo scriviamo noi.
+# Da qui in poi serve un dominio con delle @Entity: il "serraglio" di
+# scripts/self-test-entities, con i casi che rompevano i generatori a regex
+# (sequenze, UUID, chiavi composte, ereditarieta', @MapsId, @Pattern...).
 $alfaPackage = (Get-SandboxPackagePath 'alfa-service') -replace '/', '.'
 $entityDir = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service'))
-Write-TextFile -Path (Join-Path $entityDir 'DepositoEntity.java') -Text @'
-package __PKG__;
-
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-
-@Entity
-public class DepositoEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String citta;
+$fixtures = @(Get-ChildItem -Path (Join-Path $sandboxScripts 'self-test-entities') -Filter '*.java.txt')
+foreach ($fixture in $fixtures) {
+    $text = (Read-TextFile $fixture.FullName) -replace '__PKG__', $alfaPackage
+    Write-TextFile -Path (Join-Path $entityDir ($fixture.Name -replace '\.txt$', '')) -Text $text
 }
-'@
-Write-TextFile -Path (Join-Path $entityDir 'StatoArticolo.java') -Text @'
-package __PKG__;
+# Le entity concrete: quante devono riempirsi.
+$entityCount = @($fixtures | Where-Object { $t = Read-TextFile $_.FullName; $t -match '(?m)^@Entity' -and $t -notmatch 'abstract class' }).Count
 
-public enum StatoArticolo { DISPONIBILE, ESAURITO }
-'@
-Write-TextFile -Path (Join-Path $entityDir 'ArticoloEntity.java') -Text @'
-package __PKG__;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "articoli")
-public class ArticoloEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, length = 80)
-    private String nome;
-
-    private Integer quantita;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20)
-    private StatoArticolo stato;
-
-    @ManyToOne
-    @JoinColumn(name = "deposito_id")
-    private DepositoEntity deposito;
-}
-'@
-
-# Nome e cognome, un anno, un id che punta a un altro servizio: i valori
-# devono sembrare veri, non "nome 1", 10, 20.
-Write-TextFile -Path (Join-Path $entityDir 'SocioEntity.java') -Text @'
-package __PKG__;
-
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-
-@Entity
-public class SocioEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String nome;
-    private String cognome;
-    private Integer annoIscrizione;
-    private Long tesseraId;
-}
-'@
-
-# I file qui sopra dicono __PKG__: al suo posto va il pacchetto del modulo.
-foreach ($file in (Get-ChildItem -Path $entityDir -Filter '*.java')) {
-    [void](Edit-TextFile -Path $file.FullName -Pattern '__PKG__' -Replacement $alfaPackage)
-}
-
-Test-Case 'seed-data ricava le INSERT dalle @Entity' {
-    Assert-Ok (Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '3')) 'seed-data e'' fallito'
-    $sql = Get-Text 'demo/alfa-service/src/main/resources/data.sql'
-
-    # Senza @Table il nome della tabella e' quello della classe, suffisso
-    # compreso: e' cosi' che la chiama Hibernate.
-    Assert-Contains $sql 'INSERT INTO deposito_entity' 'manca la tabella senza @Table'
-    Assert-Contains $sql 'INSERT INTO articoli (nome, quantita, stato, deposito_id)' 'colonne sbagliate (la PK generata non va scritta)'
-    Assert-Contains $sql 'DISPONIBILE' 'gli enum non arrivano dal file Java'
-    # Ogni riga scatta solo se la tabella non e' ancora piena: un riavvio su
-    # PostgreSQL non la duplica e una colonna unique non fa fallire l'avvio.
-    Assert-Contains $sql 'WHERE (SELECT COUNT(*) FROM articoli) < 3;' 'le INSERT si ripeterebbero a ogni avvio'
-    Assert-Contains $sql "INSERT INTO socio_entity (nome, cognome, anno_iscrizione, tessera_id) SELECT 'Mario', 'Rossi', 2017, 1 WHERE (SELECT COUNT(*) FROM socio_entity) < 1;" 'nome, cognome, anno o id non sembrano veri'
-
-    # La tabella padre va riempita prima, o la chiave esterna punterebbe a niente.
-    $primoDeposito = $sql.IndexOf('INSERT INTO deposito_entity')
-    $primoArticolo = $sql.IndexOf('INSERT INTO articoli')
-    Assert-That ($primoDeposito -lt $primoArticolo) 'le righe figlie vengono prima di quelle padre'
-
-    $righe = ([regex]'INSERT INTO articoli').Matches($sql).Count
-    Assert-That ($righe -eq 3) "ROWS=3 ha prodotto $righe righe"
-
-    # Senza queste due proprieta' il file non verrebbe eseguito.
+Test-Case 'seed-data scrive dev-data.rows e toglie il vecchio data.sql' {
+    $sql = Join-Path $demo 'alfa-service/src/main/resources/data.sql'
+    Write-TextFile -Path $sql -Text "-- Dati di prova generati da task seed-data.`nINSERT INTO x VALUES (1);`n"
+    Assert-Ok (Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '3', '-NoCheck')) 'seed-data -NoCheck e'' fallito'
+    Assert-That (-not (Test-Path $sql)) 'il data.sql della versione vecchia e'' rimasto'
+    Assert-Ok (Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '4', '-NoCheck')) 'seed-data rilanciato e'' fallito'
     $yml = Get-Text 'demo/alfa-service/src/main/resources/application.yml'
-    Assert-Contains $yml 'defer-datasource-initialization: true' 'manca la proprieta'' che rimanda data.sql dopo Hibernate'
-    Assert-Contains $yml 'mode: always' 'manca spring.sql.init.mode'
+    Assert-That (([regex]'(?m)^dev-data:').Matches($yml).Count -eq 1) 'dev-data compare piu'' di una volta'
+    Assert-Contains $yml '  rows: 4' 'il numero di righe non e'' stato aggiornato'
 }
 
-Test-Case 'seed-data non ripete i valori quando le righe superano la tabella' {
-    # Le tabelle di valori hanno otto voci: oltre l'ottava riga il valore deve
-    # portarsi dietro il numero, o una colonna unique = true farebbe fallire
-    # l'avvio.
-    Assert-Ok (Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '12')) 'seed-data con 12 righe e'' fallito'
-    $righe = @((Get-Text 'demo/alfa-service/src/main/resources/data.sql') -split "`r?`n" | Where-Object { $_ -match '^INSERT INTO articoli' })
-    Assert-That ($righe.Count -eq 12) ("righe generate: " + $righe.Count)
-    # Il conteggio in fondo cambia da riga a riga: confrontiamo solo i valori.
-    $unici = @($righe | ForEach-Object { $_ -replace ' WHERE .*$', '' } | Select-Object -Unique)
-    Assert-That ($unici.Count -eq 12) ("righe uguali fra loro: " + (12 - $unici.Count))
+Test-Case 'seed-data riempie ogni tabella passando da Hibernate (Maven + H2)' {
+    $r = Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '12')
+    Assert-Ok $r 'seed-data con la prova e'' fallito'
+    Assert-NotContains $r.Output 'ERRORE' 'una entity non si e'' riempita'
+    Assert-Contains $r.Output "$entityCount entity riempite" 'non tutte le entity si sono riempite'
+    # Le righe che puntano ad altre arrivano dopo: la tabella di collegamento
+    # del molti a molti e l'elenco di valori non restano vuoti.
+    Assert-That ($r.Output -match 'studente_entity_corsi [1-9]') 'la tabella di collegamento e'' vuota'
+    Assert-That ($r.Output -match 'ordine_entity_etichette [1-9]') 'l''@ElementCollection e'' vuota'
+    Assert-Contains $r.Output 'veicolo_entity 24' 'le due sottoclassi non hanno 12 righe ciascuna'
 }
 
-Test-Case 'db-schema ricava tabelle e relazioni dalle @Entity' {
-    $r = Invoke-Tool 'db-schema.ps1'
+Test-Case 'db-schema legge tabelle, chiavi e vincoli dal database' {
+    $r = Invoke-Tool 'db-schema.ps1' @('-NoBuild')
     Assert-Ok $r 'db-schema e'' fallito'
-    Assert-Contains $r.Output 'Modello concettuale' 'manca il modello concettuale'
-    Assert-Contains $r.Output 'Modello logico' 'manca il modello logico'
-    Assert-Contains $r.Output 'Tabella `articoli`' 'manca la tabella con @Table'
-    Assert-Contains $r.Output 'Tabella `deposito_entity`' 'manca la tabella senza @Table'
-    Assert-Contains $r.Output 'erDiagram' 'manca il diagramma ER'
-    Assert-Contains $r.Output 'FK' 'la chiave esterna non e'' segnata'
-    Assert-Contains $r.Output '| `stato` | VARCHAR(20) |' 'la lunghezza di un enum con @Column(length) e'' ignorata'
+    foreach ($needle in @('## Modulo `alfa-service`', 'Modello concettuale', 'Modello logico', 'erDiagram',
+            'Tabella `articoli`', 'Tabella `deposito_entity`', '| `stato` | VARCHAR(20) |', 'valori ammessi: DISPONIBILE',
+            'generato da Hibernate con una sequenza', 'enum salvato come numero', 'Tabella `studente_entity_corsi`',
+            'Chiave primaria composta', 'una sola tabella per tutta la gerarchia', '**Studente** <-> **Corso**: molti a molti',
+            'riferimento a `deposito_entity`(`id`)', 'DEPOSITO_ENTITY |o--o{ ARTICOLI')) {
+        Assert-Contains $r.Output $needle 'lo schema non dice tutto'
+    }
 }
 
 Test-Case 'set-package sposta i sorgenti e riscrive package, import e mainClass' {

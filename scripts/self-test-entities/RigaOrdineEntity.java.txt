@@ -1,0 +1,20 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+public class RigaOrdineEntity {
+    @EmbeddedId
+    private RigaId id;
+    @ManyToOne
+    private OrdineEntity ordine;
+    @Min(1) @Max(99)
+    private int quantita;
+    @Positive
+    private double prezzo;
+}

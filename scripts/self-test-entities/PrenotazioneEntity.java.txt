@@ -1,0 +1,21 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+public class PrenotazioneEntity extends BaseEntity {
+    @NotNull
+    private LocalDate dataInizio;
+    @NotNull
+    private LocalDate dataFine;
+    @NotBlank @Size(max = 3)
+    private String stanza;
+    private LocalTime ora;
+    @AssertTrue
+    public boolean isPeriodoValido() { return dataInizio == null || dataFine == null || !dataFine.isBefore(dataInizio); }
+}

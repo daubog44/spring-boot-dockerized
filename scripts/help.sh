@@ -16,10 +16,10 @@ Dall'inizio alla consegna
 EOF
 cmd "task wizard" "fa le domande e monta il progetto"
 cmd "task wizard SERVICE=<modulo>" "le domande di un microservizio solo"
-cmd "task seed-data" "dati di prova dalle @Entity (data.sql)"
-cmd "task db-schema" "schema concettuale e logico, dalle @Entity"
+cmd "task seed-data" "dati di prova a ogni avvio, passando da Hibernate"
+cmd "task db-schema" "schema concettuale e logico, letto dal database"
 cmd "task consegna NOME=COGNOME_NOME" "la cartella da consegnare"
-note "Il wizard e' anche task init. seed-data: SERVICE=<modulo>, ROWS=<n>."
+note "Il wizard e' anche task init. seed-data: SERVICE=<modulo>, ROWS=<n> (0 = spenti)."
 note "db-schema: OUT=<file>. consegna genera l'allegato tecnico gia' compilato."
 
 echo ""

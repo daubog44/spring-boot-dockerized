@@ -1,0 +1,20 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+public class TesseraEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @OneToOne(optional = false) @JoinColumn(unique = true)
+    private ClienteEntity cliente;
+    @Column(unique = true)
+    private String codice;
+    @Future
+    private LocalDate scadenza;
+}

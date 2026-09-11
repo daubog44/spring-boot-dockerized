@@ -1,375 +1,138 @@
 #!/usr/bin/env bash
-# Genera dati di prova a partire dalle @Entity: un data.sql per modulo.
+# Dati di prova: all'avvio le tabelle ancora vuote si riempiono da sole.
 # Equivalente POSIX di scripts/seed-data.ps1.
 #
-# Legge le classi @Entity, ne ricava tabelle, colonne e relazioni, e scrive un
-# src/main/resources/data.sql con le INSERT. Spring Boot lo esegue all'avvio,
-# dopo che Hibernate ha creato le tabelle.
+# Scrive "dev-data: rows: N" nell'application.yml dei moduli con un database:
+# da li' in poi, a ogni avvio, il pacchetto devdata di common-dto riempie le
+# tabelle vuote passando da Hibernate (id generati, relazioni, enum, vincoli
+# rispettati). Poi compila e prova ogni modulo su un H2 usa-e-getta.
 #
 #   task seed-data
 #   task seed-data SERVICE=ordini-service ROWS=10
+#   task seed-data ROWS=0          spegne i dati di prova
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEMO_DIR="$REPO_ROOT/demo"
+. "$SCRIPT_DIR/scaffold-lib.sh"
 
 MODULE=""
 ROWS=5
+CHECK=1
 while [ $# -gt 0 ]; do
   case "$1" in
     -Module|--module) MODULE="$2"; shift 2 ;;
     -Rows|--rows) ROWS="$2"; shift 2 ;;
+    -NoCheck|--no-check) CHECK=0; shift ;;
     *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
   esac
 done
+case "$ROWS" in ''|*[!0-9]*) echo "ROWS deve essere un numero (0 spegne i dati di prova)." >&2; exit 1 ;; esac
 
-# --- Valori inventati, ma che sembrano veri ----------------------------------
-
-NOMI=('Rossi S.r.l.' 'Bianchi SPA' 'Verdi & Figli' 'Neri Logistica' 'Gialli Trasporti' 'Azzurri Import' 'Ferrari Componenti' 'Moretti Distribuzione')
-CITTA=('Bolzano' 'Trento' 'Verona' 'Milano' 'Bologna' 'Padova' 'Brescia' 'Modena')
-PERSONE=('Mario Rossi' 'Anna Bianchi' 'Luca Verdi' 'Giulia Neri' 'Paolo Gialli' 'Sara Azzurri' 'Marco Ferrari' 'Elena Moretti')
-DESCRIZIONI=('Prima consegna del mese' 'Ordine urgente' 'Riassortimento magazzino' 'Reso da cliente' 'Fornitura periodica' 'Campione gratuito' 'Ordine ricorrente' 'Spedizione parziale')
-PRODOTTI=('Vite M6' 'Dado esagonale' 'Cuscinetto 6203' 'Guarnizione 40mm' 'Molla a trazione' 'Rondella piana' 'Perno filettato' 'Boccola in ottone')
-NOMI_PROPRI=('Mario' 'Anna' 'Luca' 'Giulia' 'Paolo' 'Sara' 'Marco' 'Elena')
-COGNOMI=('Rossi' 'Bianchi' 'Verdi' 'Neri' 'Gialli' 'Azzurri' 'Ferrari' 'Moretti')
-TITOLI=('La casa sul lago' 'Il viaggio di Marta' 'Ombre sul fiume' 'Le stagioni del grano' 'Lettere da Trieste' 'Il silenzio del bosco' 'Cronache di provincia' "L'ultima estate")
-NAZIONALITA=('Italiana' 'Francese' 'Inglese' 'Tedesca' 'Spagnola' 'Americana' 'Austriaca' 'Svizzera')
-
-# Un valore dalla tabella, con il numero di riga appeso quando la tabella
-# finisce: cosi' anche con ROWS=50 non nascono due righe uguali, che su una
-# colonna unique = true farebbero fallire l'avvio.
-pick() {
-  local idx="$1"; shift
-  local n=$# value
-  value="${@:$(( (idx - 1) % n + 1 )):1}"
-  if [ "$idx" -gt "$n" ]; then value="$value $idx"; fi
-  printf '%s' "$value"
-}
-
-string_value() {
-  local col="$1" idx="$2"
-  case "$col" in
-    *email*)                                        printf 'utente%s@esempio.it' "$idx" ;;
-    *telefono*|*cellulare*|*phone*)                 printf '+39 347 %s' "$(( 1000000 + idx * 1357 ))" ;;
-    *isbn*)                                         printf '978-88-%s-%s' "$(( 1000 + idx * 37 ))" "$(( idx % 10 ))" ;;
-    *citta*|*city*|*comune*|*luogo*)                pick "$idx" "${CITTA[@]}" ;;
-    *nazionalita*|*nazione*|*paese*)                pick "$idx" "${NAZIONALITA[@]}" ;;
-    *indirizzo*|*via*|*address*)                    printf 'Via Roma %s' "$(( idx * 3 ))" ;;
-    *codice*|*sigla*|*targa*|*cod*)                 printf 'COD-%03d' "$idx" ;;
-    *titolo*|*title*)                               pick "$idx" "${TITOLI[@]}" ;;
-    *descrizione*|*note*|*testo*)                   pick "$idx" "${DESCRIZIONI[@]}" ;;
-    *prodotto*|*articolo*|*item*)                   pick "$idx" "${PRODOTTI[@]}" ;;
-    *cliente*|*fornitore*|*ragione*|*azienda*|*societa*) pick "$idx" "${NOMI[@]}" ;;
-    # Prima il cognome: "cognome" contiene "nome".
-    *cognome*|*surname*)                            pick "$idx" "${COGNOMI[@]}" ;;
-    nome)                                           pick "$idx" "${NOMI_PROPRI[@]}" ;;
-    *nome*|*utente*|*referente*|*responsabile*)     pick "$idx" "${PERSONE[@]}" ;;
-    *stato*|*status*|*tipo*)                        printf 'VALORE_%s' "$idx" ;;
-    *)                                              printf '%s %s' "${col//_/ }" "$idx" ;;
-  esac
-}
-
-# Apici singoli raddoppiati: e' l'escape dell'SQL.
-sql_quote() {
-  local v="$1"
-  printf "'%s'" "${v//\'/\'\'}"
-}
-
-gen_value() {
-  # $1 colonna, $2 tipo java, $3 valori enum (separati da spazi), $4 indice
-  local col="$1" type="$2" enums="$3" idx="$4"
-  if [ -n "$enums" ]; then
-    local arr=($enums)
-    printf "'%s'" "${arr[$(( (idx - 1) % ${#arr[@]} ))]}"
-    return
+# "nome|entity|h2" dei moduli da configurare.
+TARGETS=()
+while IFS= read -r row; do
+  [ -n "$row" ] || continue
+  name="${row%%|*}"
+  rest="${row#*|}"
+  if [ -n "$MODULE" ]; then
+    [ "$name" = "$MODULE" ] && TARGETS+=("$row")
+  elif [ "${rest%%|*}" = "1" ]; then
+    TARGETS+=("$row")
   fi
-  case "$type" in
-    String)
-      sql_quote "$(string_value "$col" "$idx")" ;;
-    Long|long|Integer|int|Short|short)
-      case "$col" in
-        *quantita*|*pezzi*|*numero*|*qta*|*scorta*) printf '%s' "$(( (idx * 7) % 50 + 1 ))" ;;
-        # Un anno deve sembrare un anno, non 10, 20, 30.
-        anno|anno_*|*_anno|*_anno_*|year|year_*|*_year) printf '%s' "$(( 2024 - (idx * 7) % 60 ))" ;;
-        # Un id senza chiave esterna punta di solito a una riga di un altro
-        # servizio (libro_id in prestiti-service): gli id veri partono da 1.
-        *_id) printf '%s' "$idx" ;;
-        *) printf '%s' "$(( idx * 10 ))" ;;
-      esac ;;
-    Double|double|Float|float|BigDecimal)
-      awk -v i="$idx" 'BEGIN { printf "%.2f", i * 12.5 + 0.5 }' ;;
-    Boolean|boolean)
-      if [ $(( idx % 2 )) -eq 0 ]; then printf 'true'; else printf 'false'; fi ;;
-    LocalDate)
-      # Le scadenze un po' passate e un po' future: cosi' i ritardi si vedono.
-      local off
-      case "$col" in
-        *scadenza*|*termine*|*fine*|*consegna*) off=$(( 7 - 3 * idx )) ;;
-        *) off=$(( -idx )) ;;
-      esac
-      printf "'%s'" "$(date -d "$off days" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)" ;;
-    LocalDateTime|Instant)
-      printf "'%s'" "$(date -d "-$idx hours" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')" ;;
-    LocalTime)
-      printf "'%s'" "$(date -d "-$idx hours" '+%H:%M:%S' 2>/dev/null || date '+%H:%M:%S')" ;;
-    *)
-      printf "'valore%s'" "$idx" ;;
-  esac
-}
+done < <(jpa_modules "$DEMO_DIR")
 
-# I valori veri di un enum stanno nel suo file .java.
-enum_values() {
-  local srcdir="$1" type="$2" file
-  file="$(find "$srcdir" -name "$type.java" -print -quit 2>/dev/null || true)"
-  if [ -z "$file" ]; then echo "VALORE_A VALORE_B"; return; fi
-  local found
-  found="$(awk -v t="$type" '
-    !on && $0 ~ ("enum[ \t]+" t "([ \t{]|$)") { on = 1; sub(/.*\{/, "") }
-    on {
-      line = $0
-      gsub(/\([^)]*\)/, "", line)
-      if (match(line, /[;}]/)) { line = substr(line, 1, RSTART - 1); stop = 1 }
-      n = split(line, parts, /[,  \t]+/)
-      for (i = 1; i <= n; i++) if (parts[i] ~ /^[A-Z][A-Z0-9_]*$/) print parts[i]
-      if (stop) exit
-    }' "$file" | awk '!seen[$0]++' | tr '\n' ' ')"
-  if [ -z "${found// /}" ]; then echo "VALORE_A VALORE_B"; else echo "$found"; fi
-}
+echo ""
+echo "==> Dati di prova"
+echo ""
 
-# --- Lettura delle entity di un modulo ---------------------------------------
-# Emette una specifica a righe:
-#   E|Classe|tabella
-#   C|Classe|colonna|TipoJava|TipoEnumOppureVuoto
-#   F|Classe|colonna_fk|ClasseBersaglio
-
-read_entities() {
-  local srcdir="$1"
-  local files
-  files="$(grep -rl -E '^[[:space:]]*@Entity\b' "$srcdir" --include='*.java' 2>/dev/null | sort || true)"
-  [ -z "$files" ] && return 0
-  # shellcheck disable=SC2086
-  awk '
-    function snake(s,   out, i, c) {
-      out = ""
-      for (i = 1; i <= length(s); i++) {
-        c = substr(s, i, 1)
-        if (c ~ /[A-Z]/ && i > 1) out = out "_" tolower(c)
-        else out = out tolower(c)
-      }
-      return out
-    }
-    function register() {
-      if (regDone) return
-      regDone = 1
-      print "E|" className "|" table
-    }
-    function flush_field(   ann, fk, target, colName, enumType, inner) {
-      if (fieldName == "") return
-      ann = pending
-      pending = ""
-      if (ann ~ /@Transient/ || ann ~ /@OneToMany/ || ann ~ /@ManyToMany/) { fieldName = ""; return }
-      register()
-
-      if (ann ~ /@ManyToOne/ || ann ~ /@OneToOne/) {
-        fk = ""
-        if (match(ann, /@JoinColumn[^)]*name[[:space:]]*=[[:space:]]*"[^"]+"/)) {
-          fk = substr(ann, RSTART, RLENGTH)
-          sub(/.*name[[:space:]]*=[[:space:]]*"/, "", fk)
-          sub(/".*/, "", fk)
-        }
-        if (fk == "") fk = snake(fieldName) "_id"
-        print "F|" className "|" fk "|" fieldType
-        fieldName = ""
-        return
-      }
-      # La chiave primaria generata la lascia fare al database.
-      if (ann ~ /@Id[^A-Za-z]/ && ann ~ /@GeneratedValue/) { fieldName = ""; return }
-
-      colName = snake(fieldName)
-      if (match(ann, /@Column[^)]*name[[:space:]]*=[[:space:]]*"[^"]+"/)) {
-        colName = substr(ann, RSTART, RLENGTH)
-        sub(/.*name[[:space:]]*=[[:space:]]*"/, "", colName)
-        sub(/".*/, "", colName)
-      }
-      enumType = (ann ~ /@Enumerated/) ? fieldType : ""
-      print "C|" className "|" colName "|" fieldType "|" enumType
-      fieldName = ""
-    }
-
-    FNR == 1 {
-      className = FILENAME
-      sub(/.*\//, "", className); sub(/\.java$/, "", className)
-      table = snake(className)
-      pending = ""; fieldName = ""; regDone = 0
-    }
-    /@Table[[:space:]]*\([^)]*name[[:space:]]*=/ {
-      t = $0
-      sub(/.*name[[:space:]]*=[[:space:]]*"/, "", t); sub(/".*/, "", t)
-      if (t != "") table = t
-    }
-    /^[[:space:]]*@[A-Za-z]/ { pending = pending " " $0 " "; next }
-    /^[[:space:]]*(private|protected|public)[[:space:]]+[A-Za-z0-9_<>,\[\] .]+[[:space:]]+[A-Za-z0-9_]+[[:space:]]*(=[^;]*)?;[[:space:]]*$/ {
-      line = $0
-      sub(/^[[:space:]]*(private|protected|public)[[:space:]]+/, "", line)
-      sub(/[[:space:]]*(=[^;]*)?;[[:space:]]*$/, "", line)
-      fieldName = line; sub(/.*[[:space:]]/, "", fieldName)
-      fieldType = line; sub(/[[:space:]]+[A-Za-z0-9_]+$/, "", fieldType)
-      gsub(/[[:space:]]/, "", fieldType)
-      flush_field()
-      next
-    }
-    { pending = "" }
-  ' $files
-}
-
-# --- Ordine di inserimento: prima chi non dipende da nessuno -----------------
-
-insert_order() {
-  awk -F'|' '
-    $1 == "E" { cls[++n] = $2 }
-    $1 == "F" { dep[$2] = dep[$2] " " $4 }
-    END {
-      for (i = 1; i <= n; i++) known[cls[i]] = 1
-      placed = 0
-      while (placed < n) {
-        progress = 0
-        for (i = 1; i <= n; i++) {
-          c = cls[i]
-          if (out[c]) continue
-          ready = 1
-          m = split(dep[c], d, " ")
-          for (j = 1; j <= m; j++) {
-            t = d[j]
-            if (t == "" || t == c) continue
-            if (known[t] && !out[t]) { ready = 0; break }
-          }
-          if (ready) { print c; out[c] = 1; placed++; progress = 1 }
-        }
-        if (!progress) {
-          # Ciclo fra entity: se ne sceglie una e si va avanti.
-          for (i = 1; i <= n; i++) if (!out[cls[i]]) { print cls[i]; out[cls[i]] = 1; placed++; break }
-        }
-      }
-    }' "$1"
-}
-
-# --- Generazione --------------------------------------------------------------
-
-TARGETS=""
-if [ -n "$MODULE" ]; then
-  if [ ! -f "$DEMO_DIR/$MODULE/pom.xml" ]; then
-    echo "Modulo '$MODULE' non trovato." >&2
+if [ ${#TARGETS[@]} -eq 0 ]; then
+  if [ -n "$MODULE" ]; then
+    echo "Il modulo '$MODULE' non c'e' o non usa un database (manca spring-boot-starter-data-jpa nel suo pom)." >&2
     exit 1
   fi
-  TARGETS="$DEMO_DIR/$MODULE"
-else
-  for dir in "$DEMO_DIR"/*/; do
-    [ -f "$dir/pom.xml" ] && TARGETS="$TARGETS ${dir%/}"
-  done
-fi
-
-echo ""
-echo "==> Dati di prova dalle @Entity"
-echo ""
-
-GENERATED=0
-for target in $TARGETS; do
-  name="$(basename "$target")"
-  srcdir="$target/src/main/java"
-  [ -d "$srcdir" ] || continue
-
-  spec="$(mktemp)"
-  read_entities "$srcdir" >"$spec"
-  if [ ! -s "$spec" ]; then rm -f "$spec"; continue; fi
-
-  sql="$(mktemp)"
-  {
-    echo "-- Dati di prova generati da task seed-data."
-    echo "-- Spring Boot esegue questo file a ogni avvio, dopo che Hibernate ha"
-    echo "-- creato le tabelle. Ogni INSERT scatta solo se la tabella ha meno righe"
-    echo "-- del suo numero d'ordine: al primo avvio la riempie, poi non la tocca"
-    echo "-- piu'. Cosi' un riavvio (o un hot reload) non duplica niente, e una"
-    echo "-- colonna unique non fa fallire l'avvio."
-    echo "-- Modificalo pure: non viene sovrascritto se non rilanci il comando."
-    echo ""
-  } >"$sql"
-
-  tables=0
-  for class in $(insert_order "$spec"); do
-    table="$(awk -F'|' -v c="$class" '$1 == "E" && $2 == c { print $3; exit }' "$spec")"
-    [ -n "$table" ] || continue
-    cols="$(awk -F'|' -v c="$class" '($1 == "C" || $1 == "F") && $2 == c { print $1 "|" $3 "|" $4 "|" $5 }' "$spec")"
-    [ -n "$cols" ] || continue
-    tables=$(( tables + 1 ))
-    echo "-- $class" >>"$sql"
-    for idx in $(seq 1 "$ROWS"); do
-      names=""
-      values=""
-      while IFS='|' read -r kind col type enumtype; do
-        [ -z "$kind" ] && continue
-        names="$names, $col"
-        if [ "$kind" = "F" ]; then
-          # Punta a una riga che esiste di sicuro: la tabella a cui punta e'
-          # stata riempita prima, con lo stesso numero di righe.
-          values="$values, $(( ((idx - 1) % ROWS) + 1 ))"
-        else
-          enums=""
-          [ -n "$enumtype" ] && enums="$(enum_values "$srcdir" "$enumtype")"
-          values="$values, $(gen_value "$col" "$type" "$enums" "$idx")"
-        fi
-      done <<<"$cols"
-      # INSERT ... SELECT invece di VALUES: la condizione sul conteggio
-      # funziona uguale su H2 e su PostgreSQL.
-      echo "INSERT INTO $table (${names#, }) SELECT ${values#, } WHERE (SELECT COUNT(*) FROM $table) < $idx;" >>"$sql"
-    done
-    echo "" >>"$sql"
-  done
-
-  mkdir -p "$target/src/main/resources"
-  mv "$sql" "$target/src/main/resources/data.sql"
-  echo "  demo/$name/src/main/resources/data.sql  ($tables tabella/e x $ROWS righe)"
-
-  # Senza queste due proprieta' il file non viene eseguito, o viene eseguito
-  # prima che le tabelle esistano.
-  yml="$target/src/main/resources/application.yml"
-  if [ -f "$yml" ]; then
-    if ! grep -q 'defer-datasource-initialization' "$yml"; then
-      N="$(grep -nE '^[[:space:]]+jpa:' "$yml" | head -n 1 | cut -d: -f1)"
-      if [ -n "$N" ]; then
-        awk -v n="$N" '{ print } NR == n { print "    defer-datasource-initialization: true" }' "$yml" >"$yml.tmp" && mv "$yml.tmp" "$yml"
-      else
-        N="$(grep -nE '^eureka:' "$yml" | head -n 1 | cut -d: -f1)"
-        [ -n "$N" ] && awk -v n="$((N - 1))" '{ print } NR == n { print "  jpa:"; print "    defer-datasource-initialization: true"; print "" }' "$yml" >"$yml.tmp" && mv "$yml.tmp" "$yml"
-      fi
-    fi
-    if ! grep -qE '^[[:space:]]+sql:' "$yml"; then
-      N="$(grep -nE '^eureka:' "$yml" | head -n 1 | cut -d: -f1)"
-      if [ -n "$N" ]; then
-        awk -v n="$((N - 1))" '{ print } NR == n { print "  sql:"; print "    init:"; print "      mode: always"; print "" }' "$yml" >"$yml.tmp" && mv "$yml.tmp" "$yml"
-      fi
-    fi
-    echo "  demo/$name/src/main/resources/application.yml (esecuzione di data.sql)"
-  fi
-
-  rm -f "$spec"
-  GENERATED=$(( GENERATED + 1 ))
-done
-
-echo ""
-if [ "$GENERATED" -eq 0 ]; then
-  echo "Nessuna @Entity trovata: non c'e' niente da popolare."
+  echo "Nessun modulo con delle @Entity: non c'e' niente da riempire."
   echo ""
   echo "  Crea prima le entity del tuo dominio, poi rilancia questo comando."
   echo ""
   exit 0
 fi
-echo "Dati di prova generati."
+
+for row in "${TARGETS[@]}"; do
+  name="${row%%|*}"
+  set_devdata_rows "$DEMO_DIR/$name/src/main/resources/application.yml" "$ROWS"
+  echo "  $name/src/main/resources/application.yml  dev-data.rows: $ROWS"
+  # Il data.sql della versione vecchia di questo comando: adesso ci pensa
+  # devdata, e le sue INSERT scritte a mano farebbero doppio lavoro.
+  old="$DEMO_DIR/$name/src/main/resources/data.sql"
+  if [ -f "$old" ] && head -n 1 "$old" | grep -q '^-- Dati di prova generati da task seed-data\.'; then
+    rm -f "$old"
+    echo "  $name/src/main/resources/data.sql  tolto (lo scriveva la versione vecchia di questo comando)"
+  fi
+done
 echo ""
-echo "  task dev          riavvia: le tabelle si riempiono da sole"
-echo "  task db-schema    lo schema che questi dati rispettano"
+
+if [ "$ROWS" -eq 0 ]; then
+  echo "Dati di prova spenti: all'avvio non si aggiunge piu' niente."
+  echo ""
+  exit 0
+fi
+if [ "$CHECK" = "0" ]; then
+  echo "Configurazione scritta: al prossimo avvio (task dev) le tabelle vuote si riempiono."
+  echo ""
+  exit 0
+fi
+
+LIST=""
+for row in "${TARGETS[@]}"; do
+  rest="${row#*|}"
+  [ "${rest%%|*}" = "1" ] && LIST="${LIST:+$LIST,}${row%%|*}"
+done
+if [ -z "$LIST" ]; then
+  echo "Il modulo non ha ancora delle @Entity: si riempira' quando le avra'."
+  echo ""
+  exit 0
+fi
+
+echo "==> Prova su un database H2 usa-e-getta"
+echo "  compilo con Maven..."
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+if ! build_modules "$DEMO_DIR" "$WORK/build.log" "$LIST"; then
+  echo "  La compilazione e' fallita:"
+  grep 'ERROR' "$WORK/build.log" | head -n 15 | sed 's/^/    /'
+  echo ""
+  exit 1
+fi
+
+FAILED=0
+for row in "${TARGETS[@]}"; do
+  name="${row%%|*}"
+  rest="${row#*|}"
+  [ "${rest%%|*}" = "1" ] || continue
+  echo ""
+  echo "  $name"
+  if [ "${rest#*|}" != "1" ]; then
+    echo "    senza H2 non c'e' un database usa-e-getta per provare: la prova vera sara' al prossimo avvio"
+    continue
+  fi
+  devdata_run "$DEMO_DIR" "$name" 1 "$WORK/$name.log" "--dev-data.rows=$ROWS"
+  code=$?
+  devdata_report "$name" "$code" "$WORK/$name.log" || FAILED=$((FAILED + 1))
+done
 echo ""
-echo "  Le INSERT scattano solo su tabelle ancora da riempire: riavvii e hot"
-echo "  reload non duplicano niente. Per ripartire dai soli dati di prova su"
-echo "  PostgreSQL: task docker-reset (cancella anche quello che hai inserito)."
+
+if [ "$FAILED" -gt 0 ]; then
+  echo "Qualche tabella non si riempie: sopra c'e' il motivo, tabella per tabella."
+  echo "  Le altre si riempiono lo stesso, e l'avvio non fallisce mai per i dati di prova."
+  echo ""
+  exit 1
+fi
+echo "Dati di prova pronti."
+echo ""
+echo "  task dev               all'avvio le tabelle vuote si riempiono da sole"
+echo "                         (anche su PostgreSQL e in Docker)"
+echo "  task db-schema         lo schema di queste tabelle, letto dal database"
+echo "  task seed-data ROWS=0  per spegnerli"
 echo ""
