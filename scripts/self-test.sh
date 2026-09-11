@@ -18,6 +18,10 @@ while [ $# -gt 0 ]; do
 done
 
 SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/esame-selftest-XXXXXX")"
+# La copia di prova ha il suo progetto Docker Compose: il nome del progetto vero
+# (lo passa task test) non deve arrivarle, se no un suo docker compose
+# toccherebbe i tuoi container. Gli script lo ricavano dalla cartella della copia.
+unset COMPOSE_PROJECT_NAME
 SB_SCRIPTS="$SANDBOX/scripts"
 DEMO="$SANDBOX/demo"
 
@@ -80,6 +84,16 @@ end_case() {
 
 start_case "il progetto di partenza e' coerente (task check)"
 run_tool check.sh --project-only && assert_ok "task check"
+end_case
+
+# Col nome di default (demo) la copia di prova e quella dell'esame si prendevano
+# container e volume del database: con credenziali diverse PostgreSQL rifiutava
+# la seconda ("password authentication failed").
+start_case "ogni copia del progetto ha il suo progetto Docker Compose"
+NOME_COMPOSE="$(unset COMPOSE_PROJECT_NAME; . "$SB_SCRIPTS/dev-lib.sh"; printf '%s' "$COMPOSE_PROJECT_NAME")"
+ATTESO_COMPOSE="$(basename "$SANDBOX" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9_-]+/-/g; s/^[^a-z0-9]+//')"
+{ [ "$NOME_COMPOSE" = "$ATTESO_COMPOSE" ] || fail "progetto Compose '$NOME_COMPOSE' invece di '$ATTESO_COMPOSE'"; } &&
+  assert_contains Taskfile.yml "COMPOSE_PROJECT_NAME:" "il Taskfile"
 end_case
 
 start_case "new-service crea il modulo e lo collega ovunque"

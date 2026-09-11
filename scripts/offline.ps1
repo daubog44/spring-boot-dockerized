@@ -143,12 +143,19 @@ if ($Prep) {
     # dipendenze nella cache di Maven delle build (--mount=type=cache nel
     # Dockerfile), che cosi' il giorno dell'esame le ha gia'.
     Push-Location $probeDemo
+    # Il progetto di prova ha un nome Compose suo: con quello del progetto
+    # vero, il down qui sotto spegnerebbe i tuoi container.
+    $previousProject = $env:COMPOSE_PROJECT_NAME
+    $env:COMPOSE_PROJECT_NAME = 'esame-offline-prova'
     try {
         & docker compose build $probeModules[0] 2>&1 | Out-Null
         $probeBuilt = $LASTEXITCODE
         # Le immagini di prova non servono: resta solo la cache.
         & docker compose down --rmi local 2>&1 | Out-Null
-    } finally { Pop-Location }
+    } finally {
+        $env:COMPOSE_PROJECT_NAME = $previousProject
+        Pop-Location
+    }
     if ($probeBuilt -eq 0) { Write-Line 'build di un modulo nuovo' 'fatta (cache Maven di Docker piena)' }
     else { Write-Line 'build di un modulo nuovo' 'fallita' 'Yellow'; $problems++ }
     Remove-Item -Recurse -Force $probe -ErrorAction SilentlyContinue

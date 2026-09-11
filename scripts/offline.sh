@@ -105,13 +105,15 @@ if [ "$PREP" -eq 1 ]; then
   # Anche dentro Docker: la build di un modulo nuovo scarica le sue dipendenze
   # nella cache di Maven delle build (--mount=type=cache nel Dockerfile), che
   # cosi' il giorno dell'esame le ha gia'. Le immagini di prova poi si tolgono.
-  if ( cd "$PROBE/demo" && docker compose build prova-offline-service >/dev/null 2>&1 ); then
+  # Il progetto di prova ha un nome Compose suo: con quello del progetto vero,
+  # il down qui sotto spegnerebbe i tuoi container.
+  if ( cd "$PROBE/demo" && COMPOSE_PROJECT_NAME=esame-offline-prova docker compose build prova-offline-service >/dev/null 2>&1 ); then
     line "build di un modulo nuovo" "fatta (cache Maven di Docker piena)"
   else
     line "build di un modulo nuovo" "fallita"
     PROBLEMS=$(( PROBLEMS + 1 ))
   fi
-  ( cd "$PROBE/demo" && docker compose down --rmi local >/dev/null 2>&1 )
+  ( cd "$PROBE/demo" && COMPOSE_PROJECT_NAME=esame-offline-prova docker compose down --rmi local >/dev/null 2>&1 )
   rm -rf "$PROBE"
 
   echo ""

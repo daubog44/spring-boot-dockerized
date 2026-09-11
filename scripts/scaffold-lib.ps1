@@ -13,6 +13,12 @@ function Get-ScaffoldRepoRoot {
     return (Split-Path -Parent $PSScriptRoot)
 }
 
+# Un progetto Docker Compose per copia del template, col nome della cartella
+# del repository (come fanno il Taskfile e dev-lib.ps1).
+if (-not $env:COMPOSE_PROJECT_NAME) {
+    $env:COMPOSE_PROJECT_NAME = (Split-Path -Leaf (Get-ScaffoldRepoRoot)).ToLowerInvariant() -replace '[^a-z0-9_-]+', '-' -replace '^[^a-z0-9]+', ''
+}
+
 function Read-TextFile {
     param([Parameter(Mandatory = $true)][string]$Path)
     if (-not (Test-Path $Path)) { throw "File non trovato: $Path" }
