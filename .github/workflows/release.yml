@@ -1,0 +1,78 @@
+# Una release a ogni tag v*: tre zip da scaricare dalla pagina di GitHub,
+# senza .git e senza niente di compilato.
+#
+#   git tag v1.1.0
+#   git push origin v1.1.0
+#
+# Il link al template dell'ultima versione non cambia mai:
+#   https://github.com/daubog44/spring-boot-dockerized/releases/latest/download/spring-boot-dockerized.zip
+#
+# Il template viene dal tag; le due soluzioni dalla punta dei loro branch,
+# cosi' com'e' al momento della release.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag da (ri)pubblicare, es. v1.1.0: deve esistere gia'"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      # Passa da una variabile, mai scritto dentro lo script: e' testo che
+      # arriva da fuori.
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tutta la storia e tutti i branch: servono le due soluzioni.
+          fetch-depth: 0
+
+      - name: I tre archivi
+        run: |
+          set -euo pipefail
+          mkdir dist
+          # git archive rispetta .gitattributes: script POSIX a fine riga LF,
+          # mvnw.cmd a CRLF, niente .github/ (export-ignore).
+          git archive --format=zip --prefix=spring-boot-dockerized/ \
+            -o dist/spring-boot-dockerized.zip "refs/tags/$TAG"
+          git archive --format=zip --prefix=soluzione-wms/ \
+            -o dist/soluzione-wms.zip origin/solution/wms
+          git archive --format=zip --prefix=esempio-tourist-events/ \
+            -o dist/esempio-tourist-events.zip origin/example/tourist-events
+          ls -l dist
+
+      - name: La release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > notes.md <<'EOF'
+          Tre archivi, pronti da scaricare:
+
+          | Archivio | Cosa c'è |
+          | :--- | :--- |
+          | `spring-boot-dockerized.zip` | il **template vuoto**: è da qui che si parte a ogni traccia |
+          | `soluzione-wms.zip` | la traccia WMS svolta (branch `solution/wms`) |
+          | `esempio-tourist-events.zip` | l'esempio eventi/turismo (branch `example/tourist-events`) |
+
+          Scompatta, apri la cartella nel terminale e lancia `task help`.
+          Servono JDK 25, Docker e go-task: vedi il README.
+
+          Link che punta sempre all'ultima versione del template:
+          https://github.com/daubog44/spring-boot-dockerized/releases/latest/download/spring-boot-dockerized.zip
+          EOF
+          sed -i 's/^          //' notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.zip --clobber
+          else
+            gh release create "$TAG" dist/*.zip --title "$TAG" --notes-file notes.md --verify-tag
+          fi

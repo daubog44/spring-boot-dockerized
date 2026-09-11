@@ -3,3 +3,7 @@
 # "#!/usr/bin/env bash\r" e risponde "bad interpreter: No such file or directory".
 *.sh text eol=lf
 mvnw text eol=lf
+
+# Gli zip della release (git archive) non si portano dietro l'automazione
+# che li prepara: a chi scarica il template non serve.
+.github export-ignore
