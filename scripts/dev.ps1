@@ -195,6 +195,19 @@ if ($usesPostgres) {
         if ($LASTEXITCODE -ne 0) {
             throw "Avvio di PostgreSQL fallito. Docker Desktop e' acceso? La porta $pgPort e' libera? (task status)"
         }
+        # Un container creato mentre la porta era di un altro (il PostgreSQL di
+        # un'altra copia) riparte senza porta pubblicata, e `up` non lo ricrea:
+        # lo ricreiamo noi. I dati stanno nel volume, non nel container.
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try { $published = "" + (docker compose port postgres 5432 2>$null) } finally { $ErrorActionPreference = $previous }
+        if ($published -notmatch ':[1-9]\d*') {
+            Write-Host '  il container di PostgreSQL non ha la porta sul PC: lo ricreo (i dati restano)' -ForegroundColor Yellow
+            docker compose up -d --force-recreate postgres
+            if ($LASTEXITCODE -ne 0) {
+                throw "Avvio di PostgreSQL fallito. Docker Desktop e' acceso? La porta $pgPort e' libera? (task status)"
+            }
+        }
     } finally {
         Pop-Location
     }

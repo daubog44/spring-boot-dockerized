@@ -18,6 +18,19 @@ $DevDefaultPorts = @(8761, 8081, 8082, 8083, 8080)
 if (-not $env:COMPOSE_PROJECT_NAME) {
     $env:COMPOSE_PROJECT_NAME = (Split-Path -Leaf (Split-Path -Parent $PSScriptRoot)).ToLowerInvariant() -replace '[^a-z0-9_-]+', '-' -replace '^[^a-z0-9]+', ''
 }
+# Anche un `docker compose` scritto a mano dentro demo/ (le guide lo usano per
+# fermare un servizio o leggerne i log) deve trovare lo stesso progetto:
+# Compose legge il nome da demo/.env, che git ignora.
+$composeEnv = Join-Path (Join-Path (Split-Path -Parent $PSScriptRoot) 'demo') '.env'
+if ($env:COMPOSE_PROJECT_NAME -and (Test-Path (Split-Path -Parent $composeEnv))) {
+    $composeLine = "COMPOSE_PROJECT_NAME=$env:COMPOSE_PROJECT_NAME"
+    $composeOld = @(if (Test-Path $composeEnv) { Get-Content $composeEnv })
+    if ($composeOld -notcontains $composeLine) {
+        $composeKeep = @($composeOld | Where-Object { $_ -notmatch '^\s*COMPOSE_PROJECT_NAME\s*=' })
+        # A capo Unix: il .env lo legge Compose, non Windows.
+        [System.IO.File]::WriteAllText($composeEnv, ((@($composeLine) + $composeKeep) -join "`n") + "`n")
+    }
+}
 
 function Get-DevLogDir {
     Join-Path (Split-Path -Parent $PSScriptRoot) '.dev-logs'

@@ -104,6 +104,13 @@ if [ "$USES_POSTGRES" -eq 1 ]; then
   # progetto di prima) terrebbe la porta: "port is already allocated".
   stop_foreign_containers "$PG_PORT" "$KEEP_FOREIGN"
   (cd "$DEMO_DIR" && docker compose up -d postgres)
+  # Un container creato mentre la porta era di un altro (il PostgreSQL di
+  # un'altra copia) riparte senza porta pubblicata, e `up` non lo ricrea:
+  # lo ricreiamo noi. I dati stanno nel volume, non nel container.
+  if ! (cd "$DEMO_DIR" && docker compose port postgres 5432 2>/dev/null) | grep -qE ':[1-9][0-9]*'; then
+    echo "  il container di PostgreSQL non ha la porta sul PC: lo ricreo (i dati restano)" >&2
+    (cd "$DEMO_DIR" && docker compose up -d --force-recreate postgres)
+  fi
   if ! wait_for_port "$PG_PORT" 60; then
     echo "PostgreSQL non risponde sulla porta $PG_PORT." >&2
     exit 1

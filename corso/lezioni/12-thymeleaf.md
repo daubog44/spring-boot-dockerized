@@ -98,6 +98,13 @@ public class HomeController {
   pagina, si rimanda a `/`. Se l'utente ricarica, il browser rifà la GET e non
   un secondo prestito. Il messaggio sopravvive al redirect perché è un *flash
   attribute*: vive per una richiesta sola.
+- **Il flash attribute sta nella sessione**, e al primo invio il browser non ne
+  ha ancora una: Tomcat allora la scrive nell'indirizzo del redirect
+  (`/;jsessionid=...`) e Spring non lo riconosce più come `/`. Il primo prestito
+  finisce in un 500 senza form, i successivi vanno. Per questo l'`application.yml`
+  della UI dice `server.servlet.session.tracking-modes: cookie` (con
+  `task new-service UI=1` c'è già). Il collaudo l'ha trovato così: con `curl`, che
+  segue il redirect com'è, il primo POST dava 500.
 - **Se il form è sbagliato non si fa redirect**: si ridisegna la pagina con
   `BindingResult`, che porta con sé i messaggi di ogni campo.
 - **Se un servizio non risponde**, la pagina lo dice e resta in piedi.

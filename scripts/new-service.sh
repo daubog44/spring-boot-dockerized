@@ -289,6 +289,18 @@ fi
 #   task set-port SERVICE=$MODULE PORT=<porta>
 server:
   port: \${SERVER_PORT:$PORT}
+EOF
+  if [ "$IS_UI" = "1" ]; then
+    cat <<'EOF'
+  servlet:
+    session:
+      # Solo cookie: senza, al primo invio di un form (quando il browser non ha
+      # ancora un JSESSIONID) Tomcat riscrive il redirect in "/;jsessionid=...",
+      # Spring non lo riconosce piu' come "/" e la pagina risponde 500.
+      tracking-modes: cookie
+EOF
+  fi
+  cat <<EOF
 
 spring:
   application:
