@@ -79,6 +79,12 @@ if [ -n "$ML" ]; then
   echo "  demo/docker-compose.yml"
 fi
 
+# --- Gli editor ---------------------------------------------------------------
+# Un launch.json che elenca servizi che non esistono e' peggio di non averlo.
+
+bash "$SCRIPT_DIR/ide-sync.sh" >/dev/null 2>&1
+echo "  configurazione di VS Code e Zed riallineata"
+
 # --- Fatto --------------------------------------------------------------------
 
 echo ""

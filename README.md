@@ -112,6 +112,7 @@ Sviluppo:
 - `task db-schema`: Schema concettuale e logico ricavato dalle `@Entity`.
 - `task db-config`: Stampa o cambia le credenziali del database.
 - `task rename-project NAME=<nome>`: Rinomina la cartella dei moduli Maven.
+- `task ide-sync`: Riallinea VS Code e Zed ai moduli veri.
 - `task offline-prep` / `task offline`: Preparazione e verifica per un esame senza rete.
 - `task dev`: Pulisce, compila e avvia l'intero stack in locale con hot reload.
 - `task dev-down`: Ferma i servizi locali e libera le porte.
@@ -136,6 +137,25 @@ Collaudo e pulizia:
 Avvio manuale dei singoli moduli, se ti serve isolarne uno: `task run-eureka`, `task run-product`, `task run-crm`, `task run-wms`, `task run-wms-ui`, `task run-db`.
 
 ---
+
+### L'editor
+
+Apri **la cartella del repository**, non quella di un singolo servizio: e' un
+progetto Maven multi-modulo.
+
+- **VS Code**: `F5` -> **Stack completo** avvia tutti i servizi in debug, Eureka
+  per primo. Serve l'*Extension Pack for Java*; le altre estensioni consigliate
+  te le propone VS Code stesso (`.vscode/extensions.json`).
+- **Zed**: palette -> *task: Spawn* per i comandi `task`. Per il Java serve
+  l'estensione *Java*; per il debug passa da VS Code o IntelliJ.
+- **IntelliJ IDEA**: niente da configurare, apri il pom aggregatore.
+
+`launch.json` e i due `tasks.json` sono generati: li riscrivono `new-service`,
+`remove-service` e `set-port`. Se l'elenco dei servizi non torna:
+
+```bash
+task ide-sync
+```
 
 ## Wizard, dati di prova e consegna
 

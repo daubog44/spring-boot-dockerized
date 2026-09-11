@@ -290,6 +290,37 @@ I client Eureka richiedono qualche secondo per aggiornare il registro locale del
 
 ---
 
+## 6. L'editor
+
+Apri **la cartella del repository**: e' un progetto Maven multi-modulo, e
+l'editor deve vedere il pom aggregatore.
+
+**VS Code** trova gia' nel repository `.vscode/launch.json` (un profilo di
+debug per servizio, piu' il compound *Stack completo* che li avvia tutti in
+ordine), `.vscode/tasks.json` (i comandi `task` dalla palette),
+`settings.json` ed `extensions.json`. L'unica estensione indispensabile e'
+**Extension Pack for Java**: senza, il tasto Debug non esiste. `F5` ->
+*Stack completo* e hai tutti i servizi con i breakpoint attivi.
+
+**Zed** ha `.zed/tasks.json` (palette -> *task: Spawn*) e `.zed/settings.json`.
+Per il Java serve l'estensione *Java* (jdtls); per il debug passa da VS Code o
+IntelliJ.
+
+**IntelliJ IDEA** non ha bisogno di niente: *File -> Open* sulla cartella del
+repository.
+
+`launch.json` e i due `tasks.json` sono **generati**: li riscrivono
+`new-service`, `remove-service` e `set-port`. Se li hai scavalcati modificando
+i moduli a mano:
+
+```bash
+task ide-sync
+```
+
+Se restano indietro lo segnala `task check`, alla voce *editor (launch.json)*.
+
+---
+
 ## Prima e dopo: preparazione offline e consegna
 
 Se il giorno dell'esame non avrai rete, la sera prima:

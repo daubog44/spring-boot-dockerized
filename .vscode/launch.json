@@ -1,26 +1,28 @@
+// Generato da `task ide-sync`: lo riscrivono new-service, remove-service
+// e set-port. Le modifiche a mano si perdono al prossimo comando.
 {
     "version": "0.2.0",
     "configurations": [
         {
             "type": "java",
-            "name": "1. eureka-server (:8761)",
+            "name": "1. naming-server (:8761)",
             "request": "launch",
             "mainClass": "com.example.ttfcloud_esame.namingserver.Main",
             "projectName": "naming-server"
         },
         {
             "type": "java",
-            "name": "2. product-service (:8081)",
-            "request": "launch",
-            "mainClass": "com.example.ttfcloud_esame.productservice.Main",
-            "projectName": "product-service"
-        },
-        {
-            "type": "java",
-            "name": "3. crm-service (:8082)",
+            "name": "2. crm-service (:8082)",
             "request": "launch",
             "mainClass": "com.example.ttfcloud_esame.crmservice.Main",
             "projectName": "crm-service"
+        },
+        {
+            "type": "java",
+            "name": "3. product-service (:8081)",
+            "request": "launch",
+            "mainClass": "com.example.ttfcloud_esame.productservice.Main",
+            "projectName": "product-service"
         },
         {
             "type": "java",
@@ -39,11 +41,11 @@
     ],
     "compounds": [
         {
-            "name": "Stack WMS completo",
+            "name": "Stack completo",
             "configurations": [
-                "1. eureka-server (:8761)",
-                "2. product-service (:8081)",
-                "3. crm-service (:8082)",
+                "1. naming-server (:8761)",
+                "2. crm-service (:8082)",
+                "3. product-service (:8081)",
                 "4. wms-service (:8083)",
                 "5. wms-ui (:8080)"
             ],

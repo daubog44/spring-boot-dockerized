@@ -277,6 +277,61 @@ run_tool remove-service.sh --module questo-non-esiste
 assert_fails "remove-service su un modulo inventato"
 end_case
 
+# --- La configurazione degli editor ------------------------------------------
+
+start_case "new-service mette il modulo nuovo nel launch.json"
+LAUNCH=".vscode/launch.json"
+assert_contains "$LAUNCH" '"projectName": "alfa-service"' "le configurazioni di debug"
+assert_contains "$LAUNCH" '"projectName": "naming-server"' "le configurazioni di debug"
+assert_contains "$LAUNCH" 'Stack completo' "il compound che li avvia tutti"
+# La classe Main deve essere quella vera, o il debug parte e non trova niente.
+assert_contains "$LAUNCH" 'com.example.ttfcloud_esame.alfaservice.Main' "la classe Main"
+# common-dto e' una libreria: non si avvia.
+assert_not_contains "$LAUNCH" '"projectName": "common-dto"' "una libreria non va fra le configurazioni di avvio"
+end_case
+
+start_case "launch.json e tasks.json sono JSON validi"
+# I file di configurazione degli editor ammettono i commenti //: li togliamo
+# prima di darli al parser.
+if command -v python3 >/dev/null 2>&1; then
+  for f in .vscode/launch.json .vscode/tasks.json .zed/tasks.json; do
+    python3 -c "
+import io, json, re, sys
+t = io.open(sys.argv[1], encoding='utf-8').read()
+json.loads(re.sub(r'^\s*//.*$', '', t, flags=re.M))
+" "$SANDBOX/$f" 2>/dev/null || fail "$f non e' JSON valido"
+  done
+else
+  echo "        (python3 non c'e': validazione JSON saltata)"
+fi
+end_case
+
+start_case "remove-service toglie il modulo anche dal launch.json"
+run_tool new-service.sh --name delta-service
+assert_ok "new-service"
+assert_contains ".vscode/launch.json" '"projectName": "delta-service"' "il launch.json"
+run_tool remove-service.sh --module delta-service
+assert_ok "remove-service"
+assert_not_contains ".vscode/launch.json" 'delta-service' "il launch.json"
+end_case
+
+start_case "set-port aggiorna la porta scritta nel launch.json"
+run_tool set-port.sh --module alfa-service --port 8399
+assert_ok "set-port"
+assert_contains ".vscode/launch.json" 'alfa-service (:8399)' "il launch.json"
+end_case
+
+start_case "check si accorge se il launch.json e' rimasto indietro"
+cp "$SANDBOX/.vscode/launch.json" "$SANDBOX/.vscode/launch.json.bak"
+sed -i 's/"projectName": "alfa-service"/"projectName": "servizio-fantasma"/' "$SANDBOX/.vscode/launch.json"
+run_tool check.sh --project-only
+assert_fails "check con un modulo fantasma nel launch.json"
+assert_out_contains "task ide-sync"
+mv "$SANDBOX/.vscode/launch.json.bak" "$SANDBOX/.vscode/launch.json"
+run_tool check.sh --project-only
+assert_ok "check dopo aver rimesso a posto il launch.json"
+end_case
+
 # --- Database: credenziali, dati di prova, schema ----------------------------
 
 start_case "db-config stampa la configurazione del database"

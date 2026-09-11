@@ -1,0 +1,94 @@
+// Generato da `task ide-sync`. Ctrl+Shift+P -> "Tasks: Run Task".
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "task dev",
+            "detail": "compila e avvia tutto in background",
+            "type": "shell",
+            "command": "task dev",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "task compile",
+            "detail": "ricompila: i servizi si riavviano da soli",
+            "type": "shell",
+            "command": "task compile",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "task logs",
+            "detail": "segue i log in un terminale solo",
+            "type": "shell",
+            "command": "task logs",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "task status",
+            "detail": "porte, container, registro Eureka",
+            "type": "shell",
+            "command": "task status",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "task dev-down",
+            "detail": "ferma tutto e libera le porte",
+            "type": "shell",
+            "command": "task dev-down",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "task check",
+            "detail": "il progetto e' coerente?",
+            "type": "shell",
+            "command": "task check",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "task test",
+            "detail": "collauda gli strumenti",
+            "type": "shell",
+            "command": "task test",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "task docker-up",
+            "detail": "lo stack in container, per la demo",
+            "type": "shell",
+            "command": "task docker-up",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "task docker-down",
+            "detail": "ferma i container, i dati restano",
+            "type": "shell",
+            "command": "task docker-down",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "task db-schema",
+            "detail": "lo schema del database dalle @Entity",
+            "type": "shell",
+            "command": "task db-schema",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+        {
+            "label": "task seed-data",
+            "detail": "dati di prova dalle @Entity",
+            "type": "shell",
+            "command": "task seed-data",
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        }
+    ]
+}

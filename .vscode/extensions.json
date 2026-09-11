@@ -1,0 +1,10 @@
+{
+    // Ctrl+Shift+P -> "Extensions: Show Recommended Extensions".
+    "recommendations": [
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-boot-dev-pack",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "task.vscode-task"
+    ]
+}
