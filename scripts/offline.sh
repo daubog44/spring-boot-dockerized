@@ -56,6 +56,46 @@ if [ "$PREP" -eq 1 ]; then
   echo "  Serve internet ADESSO. Ci vogliono alcuni minuti."
   echo ""
 
+  # 0. Il comando task, di scorta: se il PC dell'esame non ce l'ha, o il
+  #    dominio che lo distribuisce (GitHub) non passa dalla whitelist, ne
+  #    teniamo gia' una copia dentro il progetto. Viaggia con la cartella,
+  #    come tutto il resto: niente installer da portarsi dietro apposta.
+  echo "==> Il comando task, di scorta (in .tools/task)"
+  TASK_TOOLS_DIR="$REPO_ROOT/.tools/task"
+  UNAME_S_PREP="$(uname -s)"
+  UNAME_M_PREP="$(uname -m)"
+  case "$UNAME_S_PREP" in
+    Linux) TASK_OS=linux ;;
+    Darwin) TASK_OS=darwin ;;
+    MINGW*|MSYS*|CYGWIN*) TASK_OS=windows ;;
+    *) TASK_OS="" ;;
+  esac
+  case "$UNAME_M_PREP" in
+    x86_64|amd64) TASK_ARCH=amd64 ;;
+    arm64|aarch64) TASK_ARCH=arm64 ;;
+    i386|i686) TASK_ARCH=386 ;;
+    *) TASK_ARCH="" ;;
+  esac
+  if [ -n "$TASK_OS" ] && [ -n "$TASK_ARCH" ]; then
+    if [ "$TASK_OS" = "windows" ]; then TASK_EXT=zip; else TASK_EXT=tar.gz; fi
+    TASK_ASSET="task_${TASK_OS}_${TASK_ARCH}.${TASK_EXT}"
+    TASK_URL="https://github.com/go-task/task/releases/latest/download/$TASK_ASSET"
+    TASK_TMP="$(mktemp -d)"
+    if curl -fsSL -m 60 -o "$TASK_TMP/$TASK_ASSET" "$TASK_URL" 2>/dev/null; then
+      mkdir -p "$TASK_TOOLS_DIR"
+      if [ "$TASK_EXT" = zip ]; then unzip -o -q "$TASK_TMP/$TASK_ASSET" -d "$TASK_TOOLS_DIR"; else tar -xzf "$TASK_TMP/$TASK_ASSET" -C "$TASK_TOOLS_DIR"; fi
+      TASK_BIN="$TASK_TOOLS_DIR/task"; [ -e "$TASK_BIN" ] || TASK_BIN="$TASK_TOOLS_DIR/task.exe"
+      chmod +x "$TASK_BIN" 2>/dev/null || true
+      line "task (copia locale)" "$("$TASK_BIN" --version 2>/dev/null)"
+    else
+      line "task (copia locale)" "download fallito: non e' bloccante, riprova con la rete"
+    fi
+    rm -rf "$TASK_TMP"
+  else
+    line "task (copia locale)" "sistema non riconosciuto ($UNAME_S_PREP/$UNAME_M_PREP): scaricalo a mano da taskfile.dev"
+  fi
+  echo ""
+
   # 1. Le dipendenze Maven, nella cache di casa (~/.m2).
   echo "==> Dipendenze Maven"
   ( cd "$DEMO_DIR" && ./mvnw -B -q dependency:go-offline && ./mvnw -B -q clean package -Dmaven.test.skip=true )
@@ -141,7 +181,12 @@ echo ""
 if command -v task >/dev/null 2>&1; then
   line "go-task" "$(task --version 2>/dev/null | head -n 1)"
 else
-  line "go-task" "non trovato"; PROBLEMS=$(( PROBLEMS + 1 ))
+  LOCAL_TASK="$REPO_ROOT/.tools/task/task"; [ -x "$LOCAL_TASK" ] || LOCAL_TASK="$REPO_ROOT/.tools/task/task.exe"
+  if [ -e "$LOCAL_TASK" ]; then
+    line "go-task" "non sul PATH, ma c'e' una copia in .tools/task: source scripts/usa-task-locale.sh"
+  else
+    line "go-task" "non trovato"; PROBLEMS=$(( PROBLEMS + 1 ))
+  fi
 fi
 if command -v java >/dev/null 2>&1; then
   line "JDK" "$(command -v java)"
