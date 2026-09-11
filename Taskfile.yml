@@ -1,7 +1,13 @@
 version: "3"
 
 vars:
-  JAVA_HOME_PATH: '{{.JAVA_HOME | default "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot"}}'
+  # Il JDK per Maven: quello di JAVA_HOME se la cartella esiste davvero, se no
+  # quello dove lo installa di solito il template su Windows; se non c'e'
+  # nemmeno quello resta vuoto, e il wrapper Maven usa il java del PATH.
+  # Cosi' il template gira anche su un PC dove il JDK sta altrove, invece di
+  # fermarsi con "JAVA_HOME environment variable is not defined correctly".
+  JAVA_HOME_PATH:
+    sh: 'for d in "$JAVA_HOME" "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot"; do if [ -n "$d" ] && [ -d "$d" ]; then echo "$d"; break; fi; done'
 
 # Ogni comando si usa con variabili NOME=valore, mai con trattini:
 #   task new-service NAME=ordini-service
@@ -54,19 +60,23 @@ tasks:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/wizard.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/wizard.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   consegna:
-    desc: "Prepara la cartella da consegnare: moduli zippati, allegato tecnico, istruzioni (task consegna NOME=ROSSI_MARIO)"
+    desc: "Prepara la cartella da consegnare: progetto pronto da eseguire, allegato tecnico, istruzioni (task consegna NOME=ROSSI_MARIO)"
     summary: |
       Mette in consegna/ tutto quello che va consegnato e niente di quello che
       non serve:
 
-        moduli/<modulo>.zip        i sorgenti di ogni microservizio, senza
+        <modulo>/                  i sorgenti di ogni microservizio, senza
                                    target/ (megabyte di roba ricompilabile)
+        docker-compose.yml         + Dockerfile, pom, wrapper Maven e script
+                                   di init, accanto ai moduli
         ALLEGATO-TECNICO.md        gia' compilato con moduli, porte, endpoint
                                    e schema del database
         SCHEMA-DATABASE.md         lo schema da solo, comodo da copiare
         ISTRUZIONI-ESECUZIONE.md   come far girare il progetto
-        docker-compose.yml         + Dockerfile e script di init
         <NOME>.zip                 tutto quanto sopra in un archivio solo
+
+      Chi corregge scompatta <NOME>.zip e lancia `docker compose up --build`:
+      dentro non ci sono altri archivi da aprire.
 
       Variabili:
         NOME=<COGNOME_NOME>   nome dell'archivio finale
@@ -433,6 +443,8 @@ tasks:
       Docker siano gia' scaricate. Alla fine dice come presentare senza rete.
 
       Per scaricare quello che manca, con la rete: `task offline-prep`.
+    env:
+      JAVA_HOME: '{{.JAVA_HOME_PATH}}'
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/offline.ps1{{else}}bash ./scripts/offline.sh{{end}}'
 

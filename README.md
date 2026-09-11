@@ -20,7 +20,7 @@ posti.
 
 - **[Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. **Parti da qui.**
 - [Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
-- [Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — c'è anche **come funziona il tutto insieme**: il giro di una richiesta da browser a database, chi accende cosa (Lombok, Swagger, Feign, JPA/Hibernate) e come si usa `common-dto`
+- [Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — c'è anche **come funziona il tutto insieme**: il giro di una richiesta da browser a database, chi accende cosa (Lombok, Swagger, Feign, JPA/Hibernate) e come si usa `common-dto`, più il **cheat sheet di Thymeleaf** (§ 6.7: espressioni, attributi, form con validazione, frammenti, errori tipici)
 - [Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
 
 Dal terminale, la guida ai comandi è `task help` (o `task` da solo); il
@@ -37,6 +37,40 @@ dettaglio di un comando singolo, con le sue variabili, è
 
 I due branch svolti servono da riferimento: non serve copiarli, serve
 guardarli quando non ricordi come si fa una cosa.
+
+---
+
+## Scaricarlo senza git
+
+Ogni versione è una [release](https://github.com/daubog44/spring-boot-dockerized/releases/latest)
+con tre zip, pronti da scaricare e da passare a chi ti pare:
+
+| Archivio | Cosa c'è |
+| :--- | :--- |
+| `spring-boot-dockerized.zip` | il template vuoto: è da qui che si parte a ogni traccia |
+| `soluzione-wms.zip` | la traccia WMS svolta (branch `solution/wms`) |
+| `esempio-tourist-events.zip` | l'esempio eventi/turismo (branch `example/tourist-events`) |
+
+Il link al template dell'ultima versione non cambia mai, si può condividere
+così com'è:
+
+```text
+https://github.com/daubog44/spring-boot-dockerized/releases/latest/download/spring-boot-dockerized.zip
+```
+
+Scompatti, apri la cartella nel terminale, `task help`. Servono JDK 25, Docker
+e go-task, come col clone. Se il JDK non sta in `C:\Program Files\Microsoft\`,
+i comandi usano quello di `JAVA_HOME` o, se manca, quello del `PATH`.
+
+**Pubblicare una versione nuova** (dopo il push di `main` e dei due branch):
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+Il resto lo fa la GitHub Action [`release.yml`](./.github/workflows/release.yml):
+prepara i tre zip dai branch e crea la release col tag.
 
 ---
 
@@ -202,9 +236,10 @@ memoria. È quello che chiede l'allegato tecnico.
 task consegna NOME=COGNOME_NOME
 ```
 
-Prepara `consegna/`: i moduli zippati senza `target/`, l'allegato tecnico già
-compilato con moduli, porte, endpoint e schema, le istruzioni di esecuzione, il
-compose per far girare tutto, e un archivio unico da consegnare.
+Prepara `consegna/`: il progetto pronto da eseguire (i moduli senza `target/`,
+accanto a pom e compose), l'allegato tecnico già compilato con moduli, porte,
+endpoint e schema, le istruzioni di esecuzione, e un archivio unico da
+consegnare. Chi lo corregge lo scompatta e lancia `docker compose up --build`.
 
 ### Esame senza rete
 
