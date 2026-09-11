@@ -526,7 +526,7 @@
     return `<div class="copertina">
       <div class="occhiello">Prova finale &middot; Spring Boot &middot; microservizi &middot; Docker</div>
       <h1>Dalla traccia alla consegna</h1>
-      <p class="lede">Come si svolge l'esame con questo template, dalla A alla Z: com'e' fatto il progetto, come si monta, il codice di ogni pezzo e come si consegna. Il filo e' una traccia vera, <strong>la Biblioteca</strong>, svolta per intero nel branch <code>example/biblioteca</code>.</p>
+      <p class="lede">Come si svolge l'esame con questo template, dalla A alla Z: com'e' fatto il progetto, come si monta, il codice di ogni pezzo e come si consegna. Il filo e' una traccia vera, <strong>la Biblioteca</strong>, svolta per intero in un branch a parte (<code>example/biblioteca</code>) &mdash; <strong>non</strong> in questa cartella, che resta il template vuoto: e' un esempio da leggere, non codice gia' tuo.</p>
       <div class="azioni">
         ${prossima ? `<a class="bottone primario" href="#${esc(prossima.rotta)}">${f.size ? 'Riprendi' : 'Comincia'}: ${esc(prossima.titolo)}</a>` : ''}
         <a class="bottone" href="#p">Il tuo progetto</a>

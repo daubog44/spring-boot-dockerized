@@ -30,10 +30,26 @@ posti.
 
 ---
 
+## La prima cosa da fare
+
+```bash
+task learn
+```
+
+Apre il corso: una pagina statica (niente server, niente rete) con diciassette
+lezioni dalla A alla Z — com'è fatto **questo** template (che parti da qui è
+vuoto: nessun modulo oltre a Eureka e `common-dto`), come si parlano i
+servizi, `common-dto`, le entity e i repository JPA con tutti gli esempi, la
+rete dell'esame — e poi una traccia vera svolta per intero, la **Biblioteca**
+(branch a parte, non qualcosa che hai già in questa cartella: la lezione 1 lo
+spiega), per vedere del codice funzionante prima di scrivere il tuo. Dentro ci
+sono anche tutte le guide, con la ricerca, e la mappa dei moduli del **tuo**
+progetto, letta dai file veri.
+
 ## Documentazione
 
-- **[Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. **Parti da qui.**
-- **[Il corso: Dalla traccia alla consegna](./corso/index.html)** — diciassette lezioni dalla A alla Z: com'è fatto il template, come si parlano i servizi, `common-dto`, la rete dell'esame, e poi la traccia **Biblioteca** svolta pezzo per pezzo col suo codice (entity, controller, Feign, algoritmo con i test, Thymeleaf), fino al collaudo, a Docker e alla consegna. Dentro ci sono anche tutte le guide, con la ricerca, e la mappa dei moduli del tuo progetto. Si apre con **`task learn`**: pagina statica, senza server e senza rete.
+- **[Il corso: Dalla traccia alla consegna](./corso/index.html)** — si apre con `task learn`, vedi sopra.
+- **[Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo.
 - [La giornata alla lavagna](./corso/giornata.html) — la stessa giornata in nove fasi, con l'orologio dell'esame e una lavagna che legge le fasi ad alta voce. Il video lo registra la macchina: `powershell -File corso/genera-video.ps1` (voce italiana di Windows, Edge e ffmpeg) scrive `corso/quaderno-esame.mp4`, che resta fuori dal repository.
 - [Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
 - [Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — c'è anche **come funziona il tutto insieme**: il giro di una richiesta da browser a database, chi accende cosa (Lombok, Swagger, Feign, JPA/Hibernate) e come si usa `common-dto`, più il **cheat sheet di Thymeleaf** (§ 6.7: espressioni, attributi, form con validazione, frammenti, errori tipici)
