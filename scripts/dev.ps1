@@ -314,4 +314,4 @@ Write-Host '  task status       chi occupa le porte'
 Write-Host '  task dev-down     ferma tutto'
 Write-Host ''
 Write-Host 'Hot reload attivo: dopo una modifica lancia `task compile` e il servizio si riavvia da solo.'
-Write-Host 'Nota: i client Feign impiegano 10-15 secondi ad aggiornare il registro Eureka.' -ForegroundColor Yellow
+Write-Host 'Nota: le chiamate Feign fra servizi funzionano pochi secondi dopo l''avvio (il registro si rilegge ogni 5).' -ForegroundColor Yellow

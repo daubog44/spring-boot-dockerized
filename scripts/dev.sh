@@ -204,5 +204,5 @@ cat <<EOF
   task dev-down     ferma tutto
 
 Hot reload attivo: dopo una modifica lancia \`task compile\` e il servizio si riavvia da solo.
-Nota: i client Feign impiegano 10-15 secondi ad aggiornare il registro Eureka.
+Nota: le chiamate Feign fra servizi funzionano pochi secondi dopo l'avvio (il registro si rilegge ogni 5).
 EOF

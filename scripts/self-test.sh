@@ -91,7 +91,11 @@ assert_ok "new-service" &&
   # Un nome fisso farebbe scontrare due copie del progetto sulla stessa macchina.
   { grep -qE '^[[:space:]]+container_name:' "$DEMO/docker-compose.yml" && fail "il compose non deve fissare i nomi dei container"; true; } &&
   # Ogni dipendenza sulla sua riga: e' un file che si consegna.
-  assert_not_contains demo/alfa-service/pom.xml "</dependency>        <dependency>" "il pom del modulo"
+  assert_not_contains demo/alfa-service/pom.xml "</dependency>        <dependency>" "il pom del modulo" &&
+  # Senza queste due, le prime chiamate Feign dopo l'avvio falliscono per
+  # 30-60 secondi ("Load balancer does not contain an instance").
+  assert_contains demo/alfa-service/src/main/resources/application.yml "registry-fetch-interval-seconds: 5" "il registro di Eureka" &&
+  assert_contains demo/alfa-service/src/main/resources/application.yml "ttl: 5s" "la cache del load balancer"
 end_case
 
 start_case "il modulo nuovo e' coerente (task check)"

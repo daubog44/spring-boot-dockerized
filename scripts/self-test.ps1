@@ -142,6 +142,11 @@ Test-Case 'new-service crea il modulo e lo collega ovunque' {
     Assert-That ((Get-Text 'demo/docker-compose.yml') -notmatch '(?m)^\s+container_name:') 'il compose non deve fissare i nomi dei container'
     # Ogni dipendenza sulla sua riga: e' un file che si consegna.
     Assert-NotContains (Get-Text 'demo/alfa-service/pom.xml') '</dependency>        <dependency>' 'due dipendenze sulla stessa riga del pom'
+    # Senza queste due, le prime chiamate Feign dopo l'avvio falliscono per
+    # 30-60 secondi ("Load balancer does not contain an instance").
+    $alfaYml = Get-Text 'demo/alfa-service/src/main/resources/application.yml'
+    Assert-Contains $alfaYml 'registry-fetch-interval-seconds: 5' 'il registro di Eureka si rileggerebbe ogni 30 secondi'
+    Assert-Contains $alfaYml 'ttl: 5s' 'la cache del load balancer resterebbe a 35 secondi'
     Assert-Contains (Get-Text 'scripts/dev.ps1') "Module = 'alfa-service'" 'non aggiunto alla lista di dev.ps1'
     Assert-Contains (Get-Text 'scripts/dev.sh') ':alfa-service:' 'non aggiunto alla lista di dev.sh'
 }

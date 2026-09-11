@@ -340,8 +340,8 @@ foreach ($service in $services) {
 }
 if ($hasPostgres) { Add-Run ('| PostgreSQL | `localhost:' + $pgPort + '` |') }
 Add-Run ''
-Add-Run 'I servizi impiegano 10-15 secondi a registrarsi su Eureka: le prime'
-Add-Run 'chiamate fra servizi, subito dopo l''avvio, possono fallire.'
+Add-Run 'Dopo l''avvio servono pochi secondi perche'' i servizi si trovino su Eureka:'
+Add-Run 'se la primissima chiamata fra servizi fallisce, riprova.'
 Add-Run ''
 
 Write-TextFile -Path (Join-Path $OutDir 'ISTRUZIONI-ESECUZIONE.md') -Text ($run -join [Environment]::NewLine)
