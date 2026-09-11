@@ -32,8 +32,15 @@ Write-Host "  copia di prova: $sandbox" -ForegroundColor DarkGray
 Write-Host ''
 
 # robocopy esce con codici 0-7 quando ha funzionato (1 = file copiati).
-$null = robocopy $repoRoot $sandbox /E /XD target .git .dev-logs node_modules .task consegna /NFL /NDL /NJH /NJS /NP
+# /XF .git oltre a /XD .git: in un worktree di git (git worktree add) .git e'
+# un FILE che punta al repository vero. Copiato nella prova, faceva lavorare
+# git mv di rename-project sull'indice del worktree vero: la rinomina di demo
+# finiva nel commit successivo.
+$null = robocopy $repoRoot $sandbox /E /XD target .git .dev-logs node_modules .task consegna /XF .git /NFL /NDL /NJH /NJS /NP
 if ($LASTEXITCODE -ge 8) { throw "Copia del progetto fallita (robocopy $LASTEXITCODE)." }
+if (Test-Path (Join-Path $sandbox '.git')) {
+    throw "La copia di prova ha un .git: le prove toccherebbero il repository vero. Mi fermo."
+}
 
 $sandboxScripts = Join-Path $sandbox 'scripts'
 $demo = Join-Path $sandbox 'demo'
