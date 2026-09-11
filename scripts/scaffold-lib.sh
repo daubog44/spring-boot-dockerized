@@ -4,6 +4,13 @@
 #
 #   . "$SCRIPT_DIR/scaffold-lib.sh"
 
+# Un progetto Docker Compose per copia del template, col nome della cartella
+# del repository (come fanno il Taskfile e dev-lib.sh).
+if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
+  COMPOSE_PROJECT_NAME="$(basename "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9_-]+/-/g; s/^[^a-z0-9]+//')"
+  export COMPOSE_PROJECT_NAME
+fi
+
 # Il pacchetto Java di base (esame, it.rossi...). Non sta in un file di
 # configurazione: e' quello di Eureka meno l'ultimo pezzo (esame.namingserver
 # -> esame). Lo cambia task set-package, e new-service lo segue da solo.

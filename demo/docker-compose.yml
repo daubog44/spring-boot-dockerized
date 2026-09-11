@@ -1,6 +1,8 @@
 # Niente container_name: Docker Compose chiama i container
-# <cartella>-<servizio>-1, cosi' due copie del progetto sulla stessa macchina
-# (quella di prova e quella dell'esame) non si contendono lo stesso nome.
+# <progetto>-<servizio>-1, e il progetto e' la cartella del repository (lo
+# passano il Taskfile e gli script, in COMPOSE_PROJECT_NAME). Cosi' due copie
+# del template sulla stessa macchina (quella di prova e quella dell'esame) hanno
+# container e volume del database loro, anche con credenziali diverse.
 # Per riferirti a un container usa il nome del servizio:
 #   docker compose logs eureka-server
 services:

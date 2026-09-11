@@ -9,6 +9,14 @@ vars:
   JAVA_HOME_PATH:
     sh: 'for d in "$JAVA_HOME" "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot"; do if [ -n "$d" ] && [ -d "$d" ]; then echo "$d"; break; fi; done'
 
+env:
+  # Un progetto Docker Compose per copia del template, col nome della cartella
+  # del repository. Col nome di default (la cartella demo, uguale in tutte le
+  # copie) la copia di prova e quella dell'esame si prendevano i container e il
+  # volume del database a vicenda: con credenziali diverse PostgreSQL rifiutava
+  # la seconda. Gli script lo ricavano allo stesso modo (dev-lib, scaffold-lib).
+  COMPOSE_PROJECT_NAME: '{{regexReplaceAll "^[^a-z0-9]+" (regexReplaceAll "[^a-z0-9_-]+" (.ROOT_DIR | toSlash | base | lower) "-") ""}}'
+
 # Ogni comando si usa con variabili NOME=valore, mai con trattini:
 #   task new-service NAME=ordini-service
 #   task add-dep SERVICE=wms-service DEPS=security,mail
