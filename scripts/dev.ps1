@@ -189,8 +189,12 @@ if ($usesPostgres) {
     } finally {
         Pop-Location
     }
-    if (-not (Wait-ForPort -Port 5432 -TimeoutSeconds 60 -AnyProcess)) {
-        Write-Host 'PostgreSQL non risponde sulla porta 5432.' -ForegroundColor Red
+    # La porta pubblicata sul PC la decide db-config (o il wizard): non e'
+    # detto che sia ancora la 5432.
+    $pgHit = [regex]::Match((Get-Content -Raw (Join-Path $demoDir 'docker-compose.yml')), '(?m)^\s+-\s*"(\d+):5432"')
+    $pgPort = if ($pgHit.Success) { [int]$pgHit.Groups[1].Value } else { 5432 }
+    if (-not (Wait-ForPort -Port $pgPort -TimeoutSeconds 60 -AnyProcess)) {
+        Write-Host "PostgreSQL non risponde sulla porta $pgPort." -ForegroundColor Red
         exit 1
     }
     # Segnaposto per dev-down: fermiamo il container solo se l'abbiamo avviato noi.
@@ -311,4 +315,4 @@ Write-Host '  task status       chi occupa le porte'
 Write-Host '  task dev-down     ferma tutto'
 Write-Host ''
 Write-Host 'Hot reload attivo: dopo una modifica lancia `task compile` e il servizio si riavvia da solo.'
-Write-Host 'Nota: i client Feign impiegano 10-15 secondi ad aggiornare il registro Eureka.' -ForegroundColor Yellow
+Write-Host 'Nota: le chiamate Feign fra servizi funzionano pochi secondi dopo l''avvio (il registro si rilegge ogni 5).' -ForegroundColor Yellow

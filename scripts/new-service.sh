@@ -291,6 +291,12 @@ server:
 spring:
   application:
     name: $APP_NAME
+  # Il load balancer di Feign tiene l'elenco delle istanze in cache per 35
+  # secondi: con 5, un servizio appena acceso diventa chiamabile subito.
+  cloud:
+    loadbalancer:
+      cache:
+        ttl: 5s
 EOF
   if [ "$WITH_DB" = "1" ]; then
     cat <<EOF
@@ -316,8 +322,14 @@ eureka:
   client:
     service-url:
       defaultZone: \${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    # Il registro si rilegge ogni 5 secondi invece che ogni 30.
+    registry-fetch-interval-seconds: 5
   instance:
     prefer-ip-address: true
+    # Un battito ogni 5 secondi: se il servizio si spegne, dopo 15 Eureka lo
+    # toglie e gli altri smettono di chiamarlo.
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
 
 springdoc:
   api-docs:
@@ -338,7 +350,6 @@ echo "  demo/Dockerfile          COPY $MODULE/pom.xml"
 
 COMPOSE="$DEMO_DIR/docker-compose.yml"
 COMPOSE_BLOCK="  $MODULE:
-    container_name: exam-$MODULE
     build:
       context: .
       args:

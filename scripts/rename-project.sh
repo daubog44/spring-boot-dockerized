@@ -95,13 +95,15 @@ FILES="$(ls "$REPO_ROOT"/*.md "$REPO_ROOT"/Taskfile.yml "$REPO_ROOT"/scripts/*.p
 
 # Solo i file che lo nominano davvero: sed riscrive il file per intero, e
 # riscrivere quaranta file per niente cambierebbe loro le fini riga.
-MATCH="([/\\\\'\"\`])$CURRENT|(^|[^\$A-Za-z0-9_{])$CURRENT([/\\\\'\"\`])|^[[:space:]]*dir:[[:space:]]*$CURRENT[[:space:]]*\$|(^|[[:space:]])cd $CURRENT([[:space:]]|\$)"
+# E solo quando il nome finisce li': 'biblioteca-ui' e' un modulo, non la
+# cartella biblioteca seguita da qualcos'altro.
+MATCH="([/\\\\'\"\`])$CURRENT([^A-Za-z0-9_-]|\$)|(^|[^\$A-Za-z0-9_{])$CURRENT([/\\\\'\"\`])|^[[:space:]]*dir:[[:space:]]*$CURRENT[[:space:]]*\$|(^|[[:space:]])cd $CURRENT([[:space:]]|\$)"
 
 TOUCHED=0
 for file in $FILES; do
   grep -qE "$MATCH" "$file" || continue
   sed -i -E \
-    -e "s@([/\\\\'\"\`])$CURRENT@\1$NAME@g" \
+    -e "s@([/\\\\'\"\`])$CURRENT([^A-Za-z0-9_-]|\$)@\1$NAME\2@g" \
     -e "s@(^|[^\$A-Za-z0-9_{])$CURRENT([/\\\\'\"\`])@\1$NAME\2@g" \
     -e "s@^([[:space:]]*dir:[[:space:]]*)$CURRENT[[:space:]]*\$@\1$NAME@" \
     -e "s@(^|[[:space:]])cd $CURRENT([[:space:]]|\$)@\1cd $NAME\2@g" \

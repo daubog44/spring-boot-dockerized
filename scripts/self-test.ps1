@@ -138,6 +138,15 @@ Test-Case 'new-service crea il modulo e lo collega ovunque' {
     Assert-Contains (Get-Text 'demo/pom.xml') '<module>alfa-service</module>' 'non aggiunto ai <modules>'
     Assert-Contains (Get-Text 'demo/Dockerfile') 'COPY alfa-service/pom.xml' 'non aggiunto al Dockerfile'
     Assert-Contains (Get-Text 'demo/docker-compose.yml') 'MODULE: alfa-service' 'non aggiunto al compose'
+    # Un nome fisso farebbe scontrare due copie del progetto sulla stessa macchina.
+    Assert-That ((Get-Text 'demo/docker-compose.yml') -notmatch '(?m)^\s+container_name:') 'il compose non deve fissare i nomi dei container'
+    # Ogni dipendenza sulla sua riga: e' un file che si consegna.
+    Assert-NotContains (Get-Text 'demo/alfa-service/pom.xml') '</dependency>        <dependency>' 'due dipendenze sulla stessa riga del pom'
+    # Senza queste due, le prime chiamate Feign dopo l'avvio falliscono per
+    # 30-60 secondi ("Load balancer does not contain an instance").
+    $alfaYml = Get-Text 'demo/alfa-service/src/main/resources/application.yml'
+    Assert-Contains $alfaYml 'registry-fetch-interval-seconds: 5' 'il registro di Eureka si rileggerebbe ogni 30 secondi'
+    Assert-Contains $alfaYml 'ttl: 5s' 'la cache del load balancer resterebbe a 35 secondi'
     Assert-Contains (Get-Text 'scripts/dev.ps1') "Module = 'alfa-service'" 'non aggiunto alla lista di dev.ps1'
     Assert-Contains (Get-Text 'scripts/dev.sh') ':alfa-service:' 'non aggiunto alla lista di dev.sh'
 }
@@ -321,10 +330,16 @@ Test-Case 'new-service mette il modulo nuovo nel launch.json' {
     Assert-Contains $launch 'com.example.ttfcloud_esame.alfaservice.Main' 'classe Main sbagliata'
     # common-dto e' una libreria: non si avvia.
     Assert-NotContains $launch '"projectName": "common-dto"' 'una libreria non va fra le configurazioni di avvio'
+    # Zed ha il suo file, con l'adattatore della sua estensione Java.
+    $zedDebug = Get-Text '.zed/debug.json'
+    Assert-Contains $zedDebug '"projectName": "alfa-service"' 'il modulo nuovo non e'' nel debug.json di Zed'
+    Assert-Contains $zedDebug '"adapter": "Java"' 'il debug.json di Zed non usa l''adattatore Java'
+    Assert-Contains $zedDebug 'com.example.ttfcloud_esame.alfaservice.Main' 'classe Main sbagliata nel debug.json'
+    Assert-NotContains $zedDebug '"projectName": "common-dto"' 'una libreria non va nel debug.json'
 }
 
-Test-Case 'launch.json e tasks.json sono JSON validi' {
-    foreach ($relative in @('.vscode/launch.json', '.vscode/tasks.json', '.zed/tasks.json')) {
+Test-Case 'i file degli editor sono JSON validi' {
+    foreach ($relative in @('.vscode/launch.json', '.vscode/tasks.json', '.vscode/settings.json', '.zed/tasks.json', '.zed/debug.json', '.zed/settings.json')) {
         # I file di configurazione degli editor ammettono i commenti //: li
         # togliamo prima di darli al parser.
         $text = (Get-Text $relative) -replace '(?m)^\s*//.*$', ''
@@ -337,11 +352,13 @@ Test-Case 'remove-service toglie il modulo anche dal launch.json' {
     Assert-Contains (Get-Text '.vscode/launch.json') '"projectName": "delta-service"' 'non aggiunto al launch.json'
     Assert-Ok (Invoke-Tool 'remove-service.ps1' @('-Module', 'delta-service')) 'remove-service e'' fallito'
     Assert-NotContains (Get-Text '.vscode/launch.json') 'delta-service' 'rimasto nel launch.json'
+    Assert-NotContains (Get-Text '.zed/debug.json') 'delta-service' 'rimasto nel debug.json di Zed'
 }
 
 Test-Case 'set-port aggiorna la porta scritta nel launch.json' {
     Assert-Ok (Invoke-Tool 'set-port.ps1' @('-Module', 'alfa-service', '-Port', '8399')) 'set-port e'' fallito'
     Assert-Contains (Get-Text '.vscode/launch.json') 'alfa-service (:8399)' 'la porta nel launch.json e'' rimasta indietro'
+    Assert-Contains (Get-Text '.zed/debug.json') 'alfa-service (:8399)' 'la porta nel debug.json di Zed e'' rimasta indietro'
 }
 
 Test-Case 'check si accorge se il launch.json e'' rimasto indietro' {
@@ -383,6 +400,60 @@ Test-Case 'db-config cambia le credenziali dappertutto' {
 
 Test-Case 'db-config rifiuta un valore che PostgreSQL non accetterebbe' {
     Assert-Fails (Invoke-Tool 'db-config.ps1' @('-DbName', 'non valido!')) 'ha accettato un nome impossibile'
+}
+
+# --- Il wizard ----------------------------------------------------------------
+# Le risposte gliele diamo da un file (WIZARD_ANSWERS), una per riga: una riga
+# vuota vale come Invio.
+
+Test-Case 'il wizard senza terminale si rifiuta invece di restare appeso' {
+    $path = Join-Path $sandboxScripts 'wizard.ps1'
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        # < NUL: nessuna tastiera. La redirezione la fa cmd, come farebbe una
+        # pipeline o un'esecuzione automatica.
+        $out = cmd /c "powershell -NoProfile -ExecutionPolicy Bypass -File `"$path`" < NUL 2>&1" | Out-String
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    Assert-That ($code -ne 0) "senza terminale doveva fermarsi`n$out"
+    Assert-Contains $out 'terminale vero' 'non dice perche'' si ferma'
+}
+
+Test-Case 'il wizard si ferma se le risposte finiscono prima delle domande' {
+    $answers = Join-Path $sandbox 'risposte-corte.txt'
+    Write-TextFile -Path $answers -Text ''
+    $env:WIZARD_ANSWERS = $answers
+    try { $r = Invoke-Tool 'wizard.ps1' } finally { Remove-Item Env:WIZARD_ANSWERS -ErrorAction SilentlyContinue }
+    Assert-Fails $r 'con le risposte finite doveva fermarsi'
+    Assert-Contains $r.Output 'risposte sono finite' 'non dice perche'' si ferma'
+}
+
+Test-Case 'il wizard monta database e servizi rispondendo alle domande' {
+    $answers = Join-Path $sandbox 'risposte.txt'
+    $lines = @(
+        ''                                          # cartella dei moduli: resta com'e'
+        's', 'wizdb', 'wiz', 'wizpass', '5439'      # PostgreSQL, credenziali, porta
+        'omega-service', '1', '', '2'               # REST con database, porta automatica, database condiviso
+        'sigma-ui', '3', '', 'n'                    # interfaccia web, porta automatica, niente Swagger
+        ''                                          # fine dei microservizi
+    )
+    # L'a capo in fondo serve: senza, l'ultima riga vuota non verrebbe letta.
+    Write-TextFile -Path $answers -Text (($lines -join "`n") + "`n")
+    $env:WIZARD_ANSWERS = $answers
+    try { $r = Invoke-Tool 'wizard.ps1' } finally { Remove-Item Env:WIZARD_ANSWERS -ErrorAction SilentlyContinue }
+    Assert-Ok $r 'il wizard e'' fallito'
+
+    $compose = Get-Text 'demo/docker-compose.yml'
+    Assert-Contains $compose 'POSTGRES_DB: wizdb' 'il database non e'' quello scelto'
+    Assert-Contains $compose '"5439:5432"' 'la porta scelta non e'' pubblicata'
+    Assert-Contains (Get-Text 'demo/omega-service/src/main/resources/application.yml') 'jdbc:postgresql://localhost:5439/wizdb' 'il servizio non punta al database condiviso, sulla porta scelta'
+    Assert-That (Test-Path (Join-Path $demo 'sigma-ui/src/main/resources/templates/index.html')) 'l''interfaccia web non ha la sua pagina'
+    Assert-Contains (Get-Text '.vscode/launch.json') '"projectName": "omega-service"' 'il servizio non e'' nel launch.json'
+    Assert-Contains (Get-Text '.zed/debug.json') '"projectName": "sigma-ui"' 'l''interfaccia non e'' nel debug.json di Zed'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo il wizard il progetto non e'' coerente'
 }
 
 # Da qui in poi serve un dominio con delle @Entity: lo scriviamo noi.
@@ -435,11 +506,34 @@ public class ArticoloEntity {
     private Integer quantita;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     private StatoArticolo stato;
 
     @ManyToOne
     @JoinColumn(name = "deposito_id")
     private DepositoEntity deposito;
+}
+'@
+
+# Nome e cognome, un anno, un id che punta a un altro servizio: i valori
+# devono sembrare veri, non "nome 1", 10, 20.
+Write-TextFile -Path (Join-Path $entityDir 'SocioEntity.java') -Text @'
+package com.example.ttfcloud_esame.alfaservice;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
+@Entity
+public class SocioEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String nome;
+    private String cognome;
+    private Integer annoIscrizione;
+    private Long tesseraId;
 }
 '@
 
@@ -452,6 +546,10 @@ Test-Case 'seed-data ricava le INSERT dalle @Entity' {
     Assert-Contains $sql 'INSERT INTO deposito_entity' 'manca la tabella senza @Table'
     Assert-Contains $sql 'INSERT INTO articoli (nome, quantita, stato, deposito_id)' 'colonne sbagliate (la PK generata non va scritta)'
     Assert-Contains $sql 'DISPONIBILE' 'gli enum non arrivano dal file Java'
+    # Ogni riga scatta solo se la tabella non e' ancora piena: un riavvio su
+    # PostgreSQL non la duplica e una colonna unique non fa fallire l'avvio.
+    Assert-Contains $sql 'WHERE (SELECT COUNT(*) FROM articoli) < 3;' 'le INSERT si ripeterebbero a ogni avvio'
+    Assert-Contains $sql "INSERT INTO socio_entity (nome, cognome, anno_iscrizione, tessera_id) SELECT 'Mario', 'Rossi', 2017, 1 WHERE (SELECT COUNT(*) FROM socio_entity) < 1;" 'nome, cognome, anno o id non sembrano veri'
 
     # La tabella padre va riempita prima, o la chiave esterna punterebbe a niente.
     $primoDeposito = $sql.IndexOf('INSERT INTO deposito_entity')
@@ -474,7 +572,8 @@ Test-Case 'seed-data non ripete i valori quando le righe superano la tabella' {
     Assert-Ok (Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '12')) 'seed-data con 12 righe e'' fallito'
     $righe = @((Get-Text 'demo/alfa-service/src/main/resources/data.sql') -split "`r?`n" | Where-Object { $_ -match '^INSERT INTO articoli' })
     Assert-That ($righe.Count -eq 12) ("righe generate: " + $righe.Count)
-    $unici = @($righe | Select-Object -Unique)
+    # Il conteggio in fondo cambia da riga a riga: confrontiamo solo i valori.
+    $unici = @($righe | ForEach-Object { $_ -replace ' WHERE .*$', '' } | Select-Object -Unique)
     Assert-That ($unici.Count -eq 12) ("righe uguali fra loro: " + (12 - $unici.Count))
 }
 
@@ -487,15 +586,22 @@ Test-Case 'db-schema ricava tabelle e relazioni dalle @Entity' {
     Assert-Contains $r.Output 'Tabella `deposito_entity`' 'manca la tabella senza @Table'
     Assert-Contains $r.Output 'erDiagram' 'manca il diagramma ER'
     Assert-Contains $r.Output 'FK' 'la chiave esterna non e'' segnata'
+    Assert-Contains $r.Output '| `stato` | VARCHAR(20) |' 'la lunghezza di un enum con @Column(length) e'' ignorata'
 }
 
 # Questa cambia il nome della cartella dei moduli: va per ultima.
 Test-Case 'rename-project rinomina la cartella e i file che la nominano' {
+    # Un modulo che comincia con il nome della cartella (biblioteca e
+    # biblioteca-ui) non deve essere rinominato insieme a lei.
+    $omonimo = (Split-Path -Leaf $demo) + '-extra'
+    Assert-Ok (Invoke-Tool 'new-service.ps1' @('-Name', $omonimo, '-NoDb')) 'new-service del modulo omonimo e'' fallito'
     Assert-Ok (Invoke-Tool 'rename-project.ps1' @('-Name', 'collaudo-modules')) 'rename-project e'' fallito'
     Assert-That (Test-Path (Join-Path $sandbox 'collaudo-modules/pom.xml')) 'la cartella nuova non c''e'''
     Assert-That (-not (Test-Path $demo)) 'la cartella vecchia e'' rimasta'
     Assert-Contains (Get-Text 'Taskfile.yml') 'dir: collaudo-modules' 'il Taskfile punta ancora alla cartella vecchia'
     Assert-Contains (Get-Text 'scripts/check.ps1') "'collaudo-modules'" 'gli script puntano ancora alla cartella vecchia'
+    Assert-That (Test-Path (Join-Path $sandbox "collaudo-modules/$omonimo/pom.xml")) "il modulo $omonimo non c'e' piu'"
+    Assert-Contains (Get-Text 'scripts/dev.ps1') "Module = '$omonimo'" "il modulo $omonimo e' stato rinominato insieme alla cartella"
     Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo rename-project il progetto non e'' piu'' coerente'
 }
 

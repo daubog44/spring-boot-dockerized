@@ -48,6 +48,10 @@ $Citta = @('Bolzano', 'Trento', 'Verona', 'Milano', 'Bologna', 'Padova', 'Bresci
 $Persone = @('Mario Rossi', 'Anna Bianchi', 'Luca Verdi', 'Giulia Neri', 'Paolo Gialli', 'Sara Azzurri', 'Marco Ferrari', 'Elena Moretti')
 $Descrizioni = @('Prima consegna del mese', 'Ordine urgente', 'Riassortimento magazzino', 'Reso da cliente', 'Fornitura periodica', 'Campione gratuito', 'Ordine ricorrente', 'Spedizione parziale')
 $Prodotti = @('Vite M6', 'Dado esagonale', 'Cuscinetto 6203', 'Guarnizione 40mm', 'Molla a trazione', 'Rondella piana', 'Perno filettato', 'Boccola in ottone')
+$NomiPropri = @('Mario', 'Anna', 'Luca', 'Giulia', 'Paolo', 'Sara', 'Marco', 'Elena')
+$Cognomi = @('Rossi', 'Bianchi', 'Verdi', 'Neri', 'Gialli', 'Azzurri', 'Ferrari', 'Moretti')
+$Titoli = @('La casa sul lago', 'Il viaggio di Marta', 'Ombre sul fiume', 'Le stagioni del grano', 'Lettere da Trieste', 'Il silenzio del bosco', 'Cronache di provincia', 'L''ultima estate')
+$Nazionalita = @('Italiana', 'Francese', 'Inglese', 'Tedesca', 'Spagnola', 'Americana', 'Austriaca', 'Svizzera')
 
 # Un valore dalla tabella, con il numero di riga appeso quando la tabella
 # finisce: cosi' anche con ROWS=50 non nascono due righe uguali, che su una
@@ -63,13 +67,20 @@ function Get-StringValue {
     param([string]$Column, [int]$Index)
     switch -Regex ($Column) {
         'email'                      { return ('utente' + $Index + '@esempio.it') }
+        '(telefono|cellulare|phone)' { return ('+39 347 ' + (1000000 + $Index * 1357)) }
+        'isbn'                       { return ('978-88-' + (1000 + $Index * 37) + '-' + ($Index % 10)) }
         '(citta|city|comune|luogo)'  { return (Get-FromTable -Table $Citta -Index $Index) }
+        '(nazionalita|nazione|paese)' { return (Get-FromTable -Table $Nazionalita -Index $Index) }
         '(indirizzo|via|address)'    { return ('Via Roma ' + ($Index * 3)) }
         '(codice|sigla|targa|cod)'   { return ('COD-' + $Index.ToString('000')) }
+        '(titolo|title)'             { return (Get-FromTable -Table $Titoli -Index $Index) }
         '(descrizione|note|testo)'   { return (Get-FromTable -Table $Descrizioni -Index $Index) }
         '(prodotto|articolo|item)'   { return (Get-FromTable -Table $Prodotti -Index $Index) }
         '(cliente|fornitore|ragione|azienda|societa)' { return (Get-FromTable -Table $Nomi -Index $Index) }
-        '(nome|cognome|utente|referente|responsabile)' { return (Get-FromTable -Table $Persone -Index $Index) }
+        # Prima il cognome: "cognome" contiene "nome".
+        '(cognome|surname)'          { return (Get-FromTable -Table $Cognomi -Index $Index) }
+        '^nome$'                     { return (Get-FromTable -Table $NomiPropri -Index $Index) }
+        '(nome|utente|referente|responsabile)' { return (Get-FromTable -Table $Persone -Index $Index) }
         '(stato|status|tipo)'        { return ('VALORE_' + $Index) }
         default                      { return ($Column.Replace('_', ' ') + ' ' + $Index) }
     }
@@ -84,11 +95,22 @@ function Get-Value {
         '^(String)$'                { return ("'" + (Get-StringValue -Column $Column.Name -Index $Index).Replace("'", "''") + "'") }
         '^(Long|long|Integer|int|Short|short)$' {
             if ($Column.Name -match '(quantita|pezzi|numero|qta|scorta)') { return (($Index * 7) % 50 + 1) }
+            # Un anno deve sembrare un anno, non 10, 20, 30.
+            if ($Column.Name -match '(^|_)(anno|year)(_|$)') { return (2024 - (($Index * 7) % 60)) }
+            # Un id senza chiave esterna punta di solito a una riga di un altro
+            # servizio (libro_id in prestiti-service): gli id veri partono da 1.
+            if ($Column.Name -match '_id$') { return $Index }
             return ($Index * 10)
         }
         '^(Double|double|Float|float|BigDecimal)$' { return ([string]([math]::Round(($Index * 12.5) + 0.5, 2))) }
         '^(Boolean|boolean)$'       { if ($Index % 2 -eq 0) { return 'true' } else { return 'false' } }
-        '^LocalDate$'               { return ("'" + (Get-Date).AddDays(-$Index).ToString('yyyy-MM-dd') + "'") }
+        '^LocalDate$' {
+            # Le scadenze un po' passate e un po' future: cosi' i ritardi si vedono.
+            if ($Column.Name -match '(scadenza|termine|fine|consegna)') {
+                return ("'" + (Get-Date).AddDays(7 - 3 * $Index).ToString('yyyy-MM-dd') + "'")
+            }
+            return ("'" + (Get-Date).AddDays(-$Index).ToString('yyyy-MM-dd') + "'")
+        }
         '^(LocalDateTime|Instant)$' { return ("'" + (Get-Date).AddHours(-$Index).ToString('yyyy-MM-dd HH:mm:ss') + "'") }
         '^LocalTime$'               { return ("'" + (Get-Date).AddHours(-$Index).ToString('HH:mm:ss') + "'") }
         default                     { return ("'valore" + $Index + "'") }
@@ -214,9 +236,12 @@ foreach ($target in $targets) {
 
     $lines = New-Object System.Collections.Generic.List[string]
     $lines.Add('-- Dati di prova generati da task seed-data.')
-    $lines.Add('-- Spring Boot esegue questo file all''avvio, dopo che Hibernate ha')
-    $lines.Add('-- creato le tabelle. Modificalo pure: non viene sovrascritto se non')
-    $lines.Add('-- rilanci il comando.')
+    $lines.Add('-- Spring Boot esegue questo file a ogni avvio, dopo che Hibernate ha')
+    $lines.Add('-- creato le tabelle. Ogni INSERT scatta solo se la tabella ha meno righe')
+    $lines.Add('-- del suo numero d''ordine: al primo avvio la riempie, poi non la tocca')
+    $lines.Add('-- piu''. Cosi'' un riavvio (o un hot reload) non duplica niente, e una')
+    $lines.Add('-- colonna unique non fa fallire l''avvio.')
+    $lines.Add('-- Modificalo pure: non viene sovrascritto se non rilanci il comando.')
     $lines.Add('')
 
     foreach ($entity in (Get-InsertOrder -Entities $entities)) {
@@ -236,7 +261,10 @@ foreach ($target in $targets) {
                     $values += (Get-Value -Column $column -Index $i)
                 }
             }
-            $lines.Add('INSERT INTO ' + $entity.Table + ' (' + ($names -join ', ') + ') VALUES (' + ($values -join ', ') + ');')
+            # INSERT ... SELECT invece di VALUES: la condizione sul conteggio
+            # funziona uguale su H2 e su PostgreSQL.
+            $lines.Add('INSERT INTO ' + $entity.Table + ' (' + ($names -join ', ') + ') SELECT ' + ($values -join ', ') +
+                ' WHERE (SELECT COUNT(*) FROM ' + $entity.Table + ') < ' + $i + ';')
         }
         $lines.Add('')
     }
@@ -281,7 +309,7 @@ Write-Host ''
 Write-Host '  task dev          riavvia: le tabelle si riempiono da sole'
 Write-Host '  task db-schema    lo schema che questi dati rispettano'
 Write-Host ''
-Write-Host '  Su PostgreSQL le INSERT vengono rieseguite a ogni avvio: se ti trovi' -ForegroundColor DarkGray
-Write-Host '  righe doppie, svuota con task docker-reset. Con H2 in memoria non' -ForegroundColor DarkGray
-Write-Host '  succede, perche'' il database riparte vuoto ogni volta.' -ForegroundColor DarkGray
+Write-Host '  Le INSERT scattano solo su tabelle ancora da riempire: riavvii e hot' -ForegroundColor DarkGray
+Write-Host '  reload non duplicano niente. Per ripartire dai soli dati di prova su' -ForegroundColor DarkGray
+Write-Host '  PostgreSQL: task docker-reset (cancella anche quello che hai inserito).' -ForegroundColor DarkGray
 Write-Host ''

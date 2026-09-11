@@ -12,3 +12,12 @@ eureka:
   client:
     register-with-eureka: false
     fetch-registry: false
+  server:
+    # Le risposte del registro si rinfrescano ogni 5 secondi (il default e'
+    # 30): un servizio appena acceso e' visibile agli altri quasi subito.
+    response-cache-update-interval-ms: 5000
+    # In sviluppo i servizi si spengono e si riaccendono di continuo: niente
+    # "self preservation", e chi e' spento sparisce dal registro in pochi
+    # secondi invece di restarci per minuti.
+    enable-self-preservation: false
+    eviction-interval-timer-in-ms: 5000

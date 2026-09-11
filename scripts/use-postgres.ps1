@@ -94,7 +94,11 @@ if ($missing.Count -gt 0) {
 
 # --- 2. application.yml -------------------------------------------------------
 
-$localUrl = "jdbc:postgresql://localhost:5432/$DbName"
+# Da fuori Docker si passa dalla porta pubblicata, che decide db-config (o il
+# wizard): se la 5432 del PC era occupata, non e' piu' la 5432.
+$portHit = [regex]::Match($composeText, '(?m)^\s+-\s*"(\d+):5432"')
+$hostPort = if ($portHit.Success) { $portHit.Groups[1].Value } else { '5432' }
+$localUrl = "jdbc:postgresql://localhost:$hostPort/$DbName"
 if ($yml -match '(?m)^\s+datasource:') {
     [void](Edit-TextFile -Path $ymlPath -Pattern ('(?m)^(\s+url:\s*\$\{' + $prefix + '_DB_URL:)[^}]*(\})') -Replacement ('${1}' + $localUrl + '${2}'))
     [void](Edit-TextFile -Path $ymlPath -Pattern ('(?m)^(\s+username:\s*\$\{' + $prefix + '_DB_USERNAME:)[^}]*(\})') -Replacement ('${1}' + $dbUser + '${2}'))

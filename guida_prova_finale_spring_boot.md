@@ -306,9 +306,12 @@ risponde. Da qui discendono tre conseguenze pratiche:
 2. **Se sbagli il nome, l'errore arriva a runtime**, non in compilazione: una
    `500` con dentro un messaggio tipo *"Load balancer does not contain an
    instance for the service ORDINI-SERVICE"*. Controlla `task status`.
-3. **Il registro non è immediato.** Dopo l'avvio (o un riavvio da devtools) i
-   client impiegano 10-15 secondi ad accorgersi dell'istanza. Una `500` nei
-   primi secondi spesso non è un bug: riprova.
+3. **Il registro non è immediato.** Ogni client tiene una copia del registro, e
+   il load balancer una copia di quella: con i valori di Spring passano anche
+   30-60 secondi prima che un servizio appena acceso sia chiamabile. I moduli
+   di `task new-service` le rinfrescano ogni 5 secondi
+   (`registry-fetch-interval-seconds`, `spring.cloud.loadbalancer.cache.ttl`),
+   quindi basta poco; una `500` nei primissimi secondi non è un bug: riprova.
 
 ### 5.4 `common-dto`: il contratto condiviso
 
@@ -743,8 +746,9 @@ public class OrdineFacade {
 > parametri non sopravvivono alla compilazione, e senza quella stringa parte un
 > errore poco leggibile all'avvio.
 >
-> E ricorda i 10-15 secondi: un client appena avviato non ha ancora la lista
-> delle istanze, e la prima chiamata può fallire anche se è tutto a posto.
+> E ricorda che il registro non è immediato: un client appena avviato non ha
+> ancora la lista delle istanze, e la primissima chiamata può fallire anche se
+> è tutto a posto (vedi 5.3: nei moduli generati bastano pochi secondi).
 
 ---
 

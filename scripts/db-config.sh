@@ -69,7 +69,7 @@ if [ -z "$DB_NAME" ] && [ -z "$DB_USER" ] && [ -z "$DB_PASSWORD" ] && [ -z "$DB_
   echo "    task db-config DBNAME=magazzino USER=wms PASSWORD=wms123"
   echo "    task db-config PORT=5433"
   echo ""
-  echo "  psql: docker exec -it exam-postgres psql -U $OLD_USER -d $OLD_DB"
+  echo "  psql: docker compose exec postgres psql -U $OLD_USER -d $OLD_DB   (dalla cartella $(basename "$DEMO_DIR"))"
   echo ""
   exit 0
 fi

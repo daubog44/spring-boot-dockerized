@@ -1,6 +1,12 @@
 spring:
   application:
     name: store-service
+  # Il load balancer di Feign tiene l'elenco delle istanze in cache per 35
+  # secondi: con 5, un servizio appena acceso diventa chiamabile subito.
+  cloud:
+    loadbalancer:
+      cache:
+        ttl: 5s
   datasource:
     url: ${STORE_DB_URL:jdbc:postgresql://localhost:5432/event_suggestions}
     username: ${STORE_DB_USERNAME:exam}
@@ -27,7 +33,13 @@ eureka:
       enabled: false
     service-url:
       defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    # Il registro si rilegge ogni 5 secondi invece che ogni 30.
+    registry-fetch-interval-seconds: 5
     webclient:
       enabled: false
   instance:
     prefer-ip-address: true
+    # Un battito ogni 5 secondi: se il servizio si spegne, dopo 15 Eureka lo
+    # toglie e gli altri smettono di chiamarlo.
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15

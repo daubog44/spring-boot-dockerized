@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Event Roulette</title>
+        <link
+            rel="icon"
+            href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23cf5b32'/%3E%3Cstop offset='100%25' stop-color='%23284136'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='18' fill='url(%23g)'/%3E%3Cpath d='M18 20h28v6H35v8h10v6H35v14h-7V20z' fill='white'/%3E%3C/svg%3E"
+        />
+        <link
+            rel="stylesheet"
+            th:href="@{/css/event-roulette.css}"
+            href="/css/event-roulette.css"
+        />
+    </head>
+    <body class="min-h-screen bg-stone-950 font-body text-stone-900">
+        <div class="relative overflow-hidden">
+            <div
+                class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(207,91,50,0.28),_transparent_30%),radial-gradient(circle_at_80%_20%,_rgba(74,106,87,0.22),_transparent_28%),linear-gradient(135deg,_#120d0b_0%,_#241611_45%,_#4b2414_100%)]"
+            ></div>
+            <div
+                class="absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-white/10 to-transparent"
+            ></div>
+
+            <main
+                class="relative mx-auto flex min-h-screen max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-10"
+            >
+                <section class="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+                    <div
+                        class="overflow-hidden rounded-[2rem] border border-white/15 bg-white/10 shadow-haze backdrop-blur"
+                    >
+                        <div
+                            class="flex h-full flex-col justify-between gap-8 p-6 sm:p-8 lg:p-10"
+                        >
+                            <div class="space-y-6">
+                                <div
+                                    class="inline-flex items-center rounded-full border border-ember-100/40 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.32em] text-ember-100"
+                                >
+                                    Spring Cloud | Eureka | PostgreSQL
+                                </div>
+                                <div class="space-y-4">
+                                    <p
+                                        class="text-sm font-semibold uppercase tracking-[0.35em] text-ember-200"
+                                    >
+                                        mondanita geolocalizzata
+                                    </p>
+                                    <h1
+                                        class="max-w-xl font-display text-5xl uppercase leading-none text-white sm:text-6xl lg:text-7xl"
+                                    >
+                                        Event
+                                        <span class="block text-ember-200"
+                                            >Roulette</span
+                                        >
+                                    </h1>
+                                    <p
+                                        class="max-w-2xl text-sm leading-7 text-stone-200 sm:text-base"
+                                    >
+                                        Inserisci le coordinate, il wrapper
+                                        turistico recupera gli eventi vicini, il
+                                        random-service estrae un indice casuale
+                                        e lo store-service salva lo storico dei
+                                        suggerimenti in PostgreSQL.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="grid gap-4 sm:grid-cols-3">
+                                <div
+                                    class="rounded-3xl border border-white/15 bg-white/10 p-4"
+                                >
+                                    <p
+                                        class="text-xs uppercase tracking-[0.25em] text-ember-100"
+                                    >
+                                        Wrapper
+                                    </p>
+                                    <p class="mt-2 text-sm text-stone-200">
+                                        OpenFeign verso OpenDataHub `/v1/Event`
+                                    </p>
+                                </div>
+                                <div
+                                    class="rounded-3xl border border-white/15 bg-white/10 p-4"
+                                >
+                                    <p
+                                        class="text-xs uppercase tracking-[0.25em] text-ember-100"
+                                    >
+                                        Discovery
+                                    </p>
+                                    <p class="mt-2 text-sm text-stone-200">
+                                        Risoluzione servizi via Eureka registry
+                                    </p>
+                                </div>
+                                <div
+                                    class="rounded-3xl border border-white/15 bg-white/10 p-4"
+                                >
+                                    <p
+                                        class="text-xs uppercase tracking-[0.25em] text-ember-100"
+                                    >
+                                        Store
+                                    </p>
+                                    <p class="mt-2 text-sm text-stone-200">
+                                        Persistenza suggerimenti con Hibernate
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="rounded-[2rem] border border-amber-100/60 bg-[#fffaf2] p-6 shadow-haze sm:p-8"
+                    >
+                        <div class="mb-6">
+                            <p
+                                class="text-sm font-semibold uppercase tracking-[0.3em] text-ember-700"
+                            >
+                                scegli l'area
+                            </p>
+                            <h2
+                                class="mt-3 font-display text-3xl uppercase leading-tight text-ember-900 sm:text-4xl"
+                            >
+                                Sorteggia il prossimo evento
+                            </h2>
+                        </div>
+
+                        <form
+                            id="suggestion-form"
+                            class="space-y-5"
+                            th:action="@{/suggest}"
+                            th:attr="data-async-action=@{/partial/suggest}"
+                            th:object="${form}"
+                            method="post"
+                        >
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <label
+                                    class="block text-sm font-medium text-stone-700"
+                                >
+                                    <span class="mb-2 block">Latitudine</span>
+                                    <input
+                                        class="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 outline-none transition focus:border-ember-500 focus:ring-4 focus:ring-ember-100"
+                                        type="number"
+                                        step="0.000001"
+                                        th:field="*{latitude}"
+                                    />
+                                </label>
+                                <label
+                                    class="block text-sm font-medium text-stone-700"
+                                >
+                                    <span class="mb-2 block">Longitudine</span>
+                                    <input
+                                        class="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 outline-none transition focus:border-ember-500 focus:ring-4 focus:ring-ember-100"
+                                        type="number"
+                                        step="0.000001"
+                                        th:field="*{longitude}"
+                                    />
+                                </label>
+                                <label
+                                    class="block text-sm font-medium text-stone-700"
+                                >
+                                    <span class="mb-2 block"
+                                        >Raggio (metri)</span
+                                    >
+                                    <input
+                                        class="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 outline-none transition focus:border-ember-500 focus:ring-4 focus:ring-ember-100"
+                                        type="number"
+                                        th:field="*{radius}"
+                                    />
+                                </label>
+                                <label
+                                    class="block text-sm font-medium text-stone-700"
+                                >
+                                    <span class="mb-2 block">Alternative</span>
+                                    <input
+                                        class="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 outline-none transition focus:border-ember-500 focus:ring-4 focus:ring-ember-100"
+                                        type="number"
+                                        th:field="*{limit}"
+                                    />
+                                </label>
+                            </div>
+
+                            <label
+                                class="block text-sm font-medium text-stone-700"
+                            >
+                                <span class="mb-2 block">Lingua</span>
+                                <input
+                                    class="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base uppercase text-stone-900 outline-none transition focus:border-ember-500 focus:ring-4 focus:ring-ember-100"
+                                    type="text"
+                                    maxlength="2"
+                                    th:field="*{language}"
+                                />
+                            </label>
+
+                            <button
+                                class="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-ember-500 via-ember-700 to-moss-700 px-6 py-4 text-sm font-semibold uppercase tracking-[0.28em] text-white shadow-lg shadow-ember-900/20 transition hover:scale-[1.01] hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-ember-200"
+                                data-label="Sorteggia evento"
+                                type="submit"
+                            >
+                                Sorteggia evento
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                <div th:fragment="suggestionFeedback">
+                    <div id="form-feedback">
+                        <div
+                            class="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                            th:if="${errorMessage}"
+                            th:text="${errorMessage}"
+                        ></div>
+                    </div>
+
+                    <section
+                        id="suggestion-panels"
+                        class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]"
+                    >
+                        <article
+                            class="rounded-[2rem] border border-white/15 bg-white/95 p-6 shadow-haze sm:p-8"
+                        >
+                            <div th:if="${selectedEvent}" class="space-y-6">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <span
+                                        class="inline-flex rounded-full bg-ember-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-ember-700"
+                                        th:text="|Scelta ${selectedIndex} su ${availableCount}|"
+                                    ></span>
+                                    <span
+                                        class="inline-flex rounded-full bg-moss-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-moss-700"
+                                        >evento suggerito</span
+                                    >
+                                </div>
+
+                                <img
+                                    class="max-h-[24rem] w-full rounded-[1.6rem] object-cover"
+                                    th:if="${selectedEvent.imageUrl}"
+                                    th:src="${selectedEvent.imageUrl}"
+                                    th:alt="${selectedEvent.title}"
+                                />
+
+                                <div class="space-y-4">
+                                    <h2
+                                        class="font-display text-3xl uppercase leading-tight text-stone-900 sm:text-4xl"
+                                        th:text="${selectedEvent.title}"
+                                    >
+                                        Evento suggerito
+                                    </h2>
+                                    <p
+                                        class="max-w-3xl text-sm leading-7 text-stone-600 sm:text-base"
+                                        th:if="${selectedEvent.description}"
+                                        th:text="${selectedEvent.description}"
+                                    ></p>
+
+                                    <div class="flex flex-wrap gap-3">
+                                        <span
+                                            class="rounded-full bg-stone-100 px-4 py-2 text-sm text-stone-700"
+                                            th:if="${selectedEvent.locationName}"
+                                            th:text="${selectedEvent.locationName}"
+                                        ></span>
+                                        <span
+                                            class="rounded-full bg-stone-100 px-4 py-2 text-sm text-stone-700"
+                                            th:if="${selectedEvent.municipality}"
+                                            th:text="${selectedEvent.municipality}"
+                                        ></span>
+                                        <span
+                                            class="rounded-full bg-stone-100 px-4 py-2 text-sm text-stone-700"
+                                            th:if="${selectedEvent.startDate}"
+                                            th:text="${#temporals.format(selectedEvent.startDate, 'dd/MM/yyyy HH:mm')}"
+                                        ></span>
+                                    </div>
+
+                                    <p th:if="${selectedEvent.detailUrl}">
+                                        <a
+                                            class="inline-flex items-center rounded-full border border-stone-300 px-5 py-3 text-sm font-semibold uppercase tracking-[0.22em] text-stone-800 transition hover:border-ember-500 hover:text-ember-700"
+                                            th:href="${selectedEvent.detailUrl}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            Apri dettaglio evento
+                                        </a>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                th:unless="${selectedEvent}"
+                                class="flex min-h-[18rem] flex-col justify-center rounded-[1.6rem] border border-dashed border-stone-300 bg-stone-50 px-6 py-10 text-center"
+                            >
+                                <p
+                                    class="text-sm font-semibold uppercase tracking-[0.3em] text-stone-500"
+                                >
+                                    nessuna estrazione
+                                </p>
+                                <h2
+                                    class="mt-4 font-display text-3xl uppercase text-stone-900"
+                                >
+                                    Pronto per il prossimo evento
+                                </h2>
+                                <p
+                                    class="mx-auto mt-4 max-w-xl text-sm leading-7 text-stone-600 sm:text-base"
+                                >
+                                    Compila il form qui sopra per generare un
+                                    suggerimento basato sulla tua posizione e
+                                    salvarlo nello storico solo quando premi il
+                                    pulsante della pagina.
+                                </p>
+                            </div>
+                        </article>
+
+                        <aside
+                            class="rounded-[2rem] border border-white/15 bg-[#f7f1e7] p-6 shadow-haze sm:p-8"
+                        >
+                            <div class="flex items-end justify-between gap-4">
+                                <div>
+                                    <p
+                                        class="text-sm font-semibold uppercase tracking-[0.3em] text-ember-700"
+                                    >
+                                        audit trail
+                                    </p>
+                                    <h3
+                                        class="mt-3 font-display text-3xl uppercase leading-tight text-ember-900"
+                                    >
+                                        Storico suggerimenti
+                                    </h3>
+                                </div>
+                                <span
+                                    class="rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-stone-600"
+                                    th:text="|${#lists.size(history)} record|"
+                                ></span>
+                            </div>
+
+                            <div
+                                class="mt-6 space-y-4"
+                                th:if="${!#lists.isEmpty(history)}"
+                            >
+                                <article
+                                    class="rounded-[1.5rem] border border-white bg-white/90 p-5 shadow-sm"
+                                    th:each="item : ${history}"
+                                >
+                                    <strong
+                                        class="block font-display text-xl uppercase leading-tight text-stone-900"
+                                        th:text="${item.title}"
+                                        >Titolo evento</strong
+                                    >
+                                    <div
+                                        class="mt-2 text-sm text-stone-600"
+                                        th:text="${item.municipality} ?: ${item.locationName}"
+                                    >
+                                        Luogo
+                                    </div>
+                                    <div
+                                        class="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-ember-700"
+                                        th:if="${item.suggestedAt}"
+                                        th:text="${#temporals.format(item.suggestedAt, 'dd/MM/yyyy HH:mm')}"
+                                    ></div>
+                                </article>
+                            </div>
+
+                            <div
+                                class="mt-6 rounded-[1.6rem] border border-dashed border-stone-300 bg-white/70 px-5 py-8 text-center"
+                                th:if="${#lists.isEmpty(history)}"
+                            >
+                                <p class="text-sm leading-7 text-stone-600">
+                                    Nessun suggerimento ancora salvato.
+                                </p>
+                            </div>
+                        </aside>
+                    </section>
+                </div>
+            </main>
+        </div>
+        <script
+            defer
+            th:src="@{/js/event-roulette.js}"
+            src="/js/event-roulette.js"
+        ></script>
+    </body>
+</html>

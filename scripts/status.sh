@@ -55,7 +55,9 @@ echo "CONTAINER"
 if ! command -v docker >/dev/null 2>&1; then
   echo "  Docker non installato."
 else
-  containers="$(docker ps --filter 'name=exam-' --format '  {{.Names}}  {{.Status}}' 2>/dev/null)"
+  # I container non hanno un nome fisso (<cartella>-<servizio>-1): li
+  # chiediamo a docker compose, che sa quali sono di questo progetto.
+  containers="$(docker compose -f "$(dev_repo_root)/demo/docker-compose.yml" ps --format '  {{.Name}}  {{.Status}}' 2>/dev/null)"
   if [ -z "$containers" ]; then
     echo "  Nessun container dell'esame in esecuzione."
   else

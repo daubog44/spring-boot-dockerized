@@ -168,6 +168,37 @@ if ($LASTEXITCODE -ne 0) {
     }
 }
 
+# 4. L'editor. Anche lui scarica: l'estensione Java di Zed prende jdtls,
+#    Lombok e il debugger al primo file .java che apri, e senza rete non puo'.
+#    Il progetto parte lo stesso, quindi e' un avviso e non un problema.
+Write-Host ''
+$editorSeen = $false
+$zedRoot = Join-Path $env:LOCALAPPDATA 'Zed'
+if (Test-Path (Join-Path $zedRoot 'extensions')) {
+    $editorSeen = $true
+    $zedJava = Join-Path $zedRoot 'extensions/work/java'
+    $missing = @()
+    if (-not @(Get-ChildItem (Join-Path $zedJava 'jdtls') -Directory -Filter 'jdt-language-server-*' -ErrorAction SilentlyContinue)) { $missing += 'jdtls' }
+    if (-not @(Get-ChildItem (Join-Path $zedJava 'lombok') -Filter '*.jar' -ErrorAction SilentlyContinue)) { $missing += 'Lombok' }
+    if (-not @(Get-ChildItem (Join-Path $zedJava 'debugger') -Filter '*.jar' -ErrorAction SilentlyContinue)) { $missing += 'debugger' }
+    if (-not (Test-Path (Join-Path $zedRoot 'extensions/installed/java'))) {
+        Write-Line 'Zed (estensione Java)' 'non installata: zed: extensions -> Java, con la rete' 'Yellow'
+    } elseif ($missing.Count -gt 0) {
+        Write-Line 'Zed (estensione Java)' ('manca ' + ($missing -join ', ') + ': apri un file .java in Zed, con la rete') 'Yellow'
+    } else {
+        Write-Line 'Zed (estensione Java)' 'jdtls, Lombok e debugger gia'' scaricati'
+    }
+}
+$vscodeExtensions = Join-Path $env:USERPROFILE '.vscode/extensions'
+if (Test-Path $vscodeExtensions) {
+    $editorSeen = $true
+    $hasJava = @(Get-ChildItem $vscodeExtensions -Directory -Filter 'redhat.java-*' -ErrorAction SilentlyContinue).Count -gt 0
+    $hasDebug = @(Get-ChildItem $vscodeExtensions -Directory -Filter 'vscjava.vscode-java-debug-*' -ErrorAction SilentlyContinue).Count -gt 0
+    if ($hasJava -and $hasDebug) { Write-Line 'VS Code (Java)' 'estensioni Java e debugger installate' }
+    else { Write-Line 'VS Code (Java)' 'manca l''Extension Pack for Java: installalo con la rete' 'Yellow' }
+}
+if (-not $editorSeen) { Write-Line 'editor' 'ne'' VS Code ne'' Zed su questo PC' 'DarkGray' }
+
 # --- Il verdetto --------------------------------------------------------------
 
 Write-Host ''

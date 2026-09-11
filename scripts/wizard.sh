@@ -17,7 +17,14 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ ! -t 0 ]; then
+# Le risposte possono arrivare anche da un file, una per riga (una riga vuota
+# vale come Invio): e' cosi' che `task test` collauda il wizard senza nessuno
+# alla tastiera.
+ANSWERS_FILE="${WIZARD_ANSWERS:-}"
+if [ -n "$ANSWERS_FILE" ]; then
+  [ -f "$ANSWERS_FILE" ] || { echo "WIZARD_ANSWERS: non trovo $ANSWERS_FILE" >&2; exit 1; }
+  exec 3<"$ANSWERS_FILE"
+elif [ ! -t 0 ]; then
   echo ""
   echo "Il wizard fa domande: serve un terminale vero."
   echo ""
@@ -29,6 +36,39 @@ fi
 
 # --- Domande ------------------------------------------------------------------
 
+REPLY_TEXT=""
+read_answer() { # $1 il prompt; la risposta finisce in REPLY_TEXT
+  local prompt="${1:-  >}"
+  if [ -z "$ANSWERS_FILE" ]; then
+    read -r -p "$prompt " REPLY_TEXT
+    return 0
+  fi
+  # Senza questo controllo, una domanda con risposta obbligatoria
+  # continuerebbe a chiedere per sempre.
+  if ! IFS= read -r REPLY_TEXT <&3 && [ -z "$REPLY_TEXT" ]; then
+    echo "WIZARD_ANSWERS: le risposte sono finite prima delle domande." >&2
+    exit 1
+  fi
+  REPLY_TEXT="${REPLY_TEXT%$'\r'}"
+  echo "$prompt $REPLY_TEXT"
+}
+
+# Una 5432 gia' presa (un PostgreSQL installato sul PC del laboratorio, un
+# altro progetto in Docker) e' il guaio piu' comune: meglio accorgersene adesso
+# che al primo avvio.
+port_busy() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn 2>/dev/null | awk 'NR > 1 {print $4}' | grep -qE "[:.]$1\$"
+  else
+    netstat -an 2>/dev/null | grep -iE 'listen' | grep -qE "[:.]$1[[:space:]]"
+  fi
+}
+free_postgres_port() {
+  local port=5432
+  while [ "$port" -lt 5450 ] && port_busy "$port"; do port=$(( port + 1 )); done
+  echo "$port"
+}
+
 ANSWER=""
 
 ask_text() {
@@ -39,7 +79,7 @@ ask_text() {
     echo ""
     echo "  ${question}${suffix}"
     [ -n "$hint" ] && echo "  $hint"
-    read -r -p "  > " ANSWER
+    read_answer "  >"; ANSWER="$REPLY_TEXT"
     ANSWER="$(echo "$ANSWER" | tr -d '[:space:]')"
     [ -z "$ANSWER" ] && ANSWER="$default"
     if [ -z "$ANSWER" ]; then echo "  Serve una risposta."; continue; fi
@@ -58,7 +98,7 @@ ask_yesno() {
   while true; do
     echo ""
     echo "  $question $suffix"
-    read -r -p "  > " answer
+    read_answer "  >"; answer="$REPLY_TEXT"
     answer="$(echo "$answer" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
     [ -z "$answer" ] && answer="$default"
     case "$answer" in
@@ -80,7 +120,7 @@ ask_choice() {
     for i in "${!options[@]}"; do
       echo "    $((i + 1))) ${options[$i]}"
     done
-    read -r -p "  [$default] > " answer
+    read_answer "  [$default] >"; answer="$REPLY_TEXT"
     answer="$(echo "$answer" | tr -d '[:space:]')"
     [ -z "$answer" ] && answer="$default"
     case "$answer" in
@@ -234,7 +274,14 @@ if ask_yesno 'Il progetto usa PostgreSQL? (altrimenti resta H2 in memoria)' s; t
   ask_text 'Nome del database' 'esame' '^[a-z][a-z0-9_]*$';  DB_NAME="$ANSWER"
   ask_text 'Utente del database' 'exam' '^[a-z][a-z0-9_]*$'; DB_USER="$ANSWER"
   ask_text 'Password' 'exam' '^[A-Za-z0-9_]+$';               DB_PASSWORD="$ANSWER"
-  step db-config.sh --db-name "$DB_NAME" --user "$DB_USER" --password "$DB_PASSWORD"
+  FREE_PORT="$(free_postgres_port)"
+  if [ "$FREE_PORT" != "5432" ]; then
+    PORT_HINT="La 5432 su questo PC e' gia' occupata: ti propongo la $FREE_PORT"
+  else
+    PORT_HINT="La porta sul tuo PC: dentro Docker resta sempre 5432"
+  fi
+  ask_text 'Porta di PostgreSQL' "$FREE_PORT" '^[0-9]{2,5}$' "$PORT_HINT"; DB_PORT="$ANSWER"
+  step db-config.sh --db-name "$DB_NAME" --user "$DB_USER" --password "$DB_PASSWORD" --port "$DB_PORT"
   USE_POSTGRES=1
 fi
 
@@ -255,7 +302,7 @@ CREATED=""
 while true; do
   echo ""
   echo "  Nome del microservizio (Invio per finire)"
-  read -r -p "  > " NAME
+  read_answer "  >"; NAME="$REPLY_TEXT"
   NAME="$(echo "$NAME" | tr -d '[:space:]')"
   [ -z "$NAME" ] && break
   printf '%s' "$NAME" | grep -qE '^[a-z][a-z0-9-]*$' || {

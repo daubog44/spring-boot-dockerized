@@ -89,7 +89,10 @@ foreach ($item in $hijacked) {
 
 Write-Host ''
 Write-Host 'CONTAINER' -ForegroundColor Cyan
-$containers = docker ps --filter 'name=exam-' --format '  {{.Names}}  {{.Status}}' 2>$null
+# I container non hanno un nome fisso (<cartella>-<servizio>-1): li chiediamo
+# a docker compose, che sa quali sono di questo progetto.
+$composeFile = Join-Path (Split-Path -Parent $PSScriptRoot) 'demo/docker-compose.yml'
+$containers = docker compose -f $composeFile ps --format '  {{.Name}}  {{.Status}}' 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host '  Docker non raggiungibile.' -ForegroundColor DarkGray
 } elseif (-not $containers) {
