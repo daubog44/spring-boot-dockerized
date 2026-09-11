@@ -548,12 +548,19 @@ end_case
 
 # Questa cambia il nome della cartella dei moduli: va per ultima.
 start_case "rename-project rinomina la cartella e i file che la nominano"
+# Un modulo che comincia con il nome della cartella (biblioteca e
+# biblioteca-ui) non deve essere rinominato insieme a lei.
+OMONIMO="$(basename "$DEMO")-extra"
+run_tool new-service.sh --name "$OMONIMO" --no-db
+assert_ok "new-service del modulo omonimo"
 run_tool rename-project.sh --name collaudo-modules
 assert_ok "rename-project"
 assert_file "collaudo-modules/pom.xml"
 assert_no_file "demo"
 assert_contains "Taskfile.yml" "dir: collaudo-modules" "il Taskfile"
 assert_contains "scripts/check.sh" "/collaudo-modules" "gli script"
+assert_file "collaudo-modules/$OMONIMO/pom.xml"
+assert_contains "scripts/dev.sh" ":$OMONIMO:" "il modulo $OMONIMO rinominato insieme alla cartella"
 run_tool check.sh --project-only
 assert_ok "task check dopo rename-project"
 end_case

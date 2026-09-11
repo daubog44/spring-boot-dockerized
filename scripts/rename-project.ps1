@@ -83,10 +83,12 @@ Write-Step "$current/ -> $Name/"
 # Sostituiamo il nome solo quando e' un pezzo di percorso: cioe' quando ha
 # accanto una barra, un apice o una virgoletta -- ma non quando e' il nome di
 # una variabile ($demo). Cosi' la parola demo in italiano resta dov'e'.
+# E solo quando il nome finisce li': 'biblioteca-ui' e' un modulo, non la
+# cartella biblioteca seguita da qualcos'altro.
 
 $escaped = [regex]::Escape($current)
 $rules = @(
-    @{ Pattern = "(?<=[/\\'`"``])$escaped"; Replacement = $Name },
+    @{ Pattern = "(?<=[/\\'`"``])$escaped(?![\w-])"; Replacement = $Name },
     @{ Pattern = "(?<![$\w{])$escaped(?=[/\\'`"``])"; Replacement = $Name },
     @{ Pattern = "(?m)^(\s*dir:\s*)$escaped\s*$"; Replacement = ('${1}' + $Name) },
     @{ Pattern = "(?m)(^|\s)cd $escaped(?=\s|$)"; Replacement = ('${1}cd ' + $Name) }

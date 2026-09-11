@@ -591,11 +591,17 @@ Test-Case 'db-schema ricava tabelle e relazioni dalle @Entity' {
 
 # Questa cambia il nome della cartella dei moduli: va per ultima.
 Test-Case 'rename-project rinomina la cartella e i file che la nominano' {
+    # Un modulo che comincia con il nome della cartella (biblioteca e
+    # biblioteca-ui) non deve essere rinominato insieme a lei.
+    $omonimo = (Split-Path -Leaf $demo) + '-extra'
+    Assert-Ok (Invoke-Tool 'new-service.ps1' @('-Name', $omonimo, '-NoDb')) 'new-service del modulo omonimo e'' fallito'
     Assert-Ok (Invoke-Tool 'rename-project.ps1' @('-Name', 'collaudo-modules')) 'rename-project e'' fallito'
     Assert-That (Test-Path (Join-Path $sandbox 'collaudo-modules/pom.xml')) 'la cartella nuova non c''e'''
     Assert-That (-not (Test-Path $demo)) 'la cartella vecchia e'' rimasta'
     Assert-Contains (Get-Text 'Taskfile.yml') 'dir: collaudo-modules' 'il Taskfile punta ancora alla cartella vecchia'
     Assert-Contains (Get-Text 'scripts/check.ps1') "'collaudo-modules'" 'gli script puntano ancora alla cartella vecchia'
+    Assert-That (Test-Path (Join-Path $sandbox "collaudo-modules/$omonimo/pom.xml")) "il modulo $omonimo non c'e' piu'"
+    Assert-Contains (Get-Text 'scripts/dev.ps1') "Module = '$omonimo'" "il modulo $omonimo e' stato rinominato insieme alla cartella"
     Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo rename-project il progetto non e'' piu'' coerente'
 }
 
