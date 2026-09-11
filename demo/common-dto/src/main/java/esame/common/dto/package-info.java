@@ -12,4 +12,4 @@
  * <p>Le annotazioni di validazione ({@code @NotBlank}, {@code @Email}, ...) si
  * possono usare: il modulo dipende da jakarta.validation-api.
  */
-package com.example.ttfcloud_esame.common.dto;
+package esame.common.dto;

@@ -7,7 +7,7 @@
             "type": "java",
             "name": "1. naming-server (:8761)",
             "request": "launch",
-            "mainClass": "com.example.ttfcloud_esame.namingserver.Main",
+            "mainClass": "esame.namingserver.Main",
             "projectName": "naming-server"
         }
     ],

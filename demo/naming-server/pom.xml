@@ -31,7 +31,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>com.example.ttfcloud_esame.namingserver.Main</mainClass>
+                    <mainClass>esame.namingserver.Main</mainClass>
                 </configuration>
             </plugin>
         </plugins>
