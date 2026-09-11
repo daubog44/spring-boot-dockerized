@@ -1,0 +1,18 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@MappedSuperclass
+public abstract class BaseEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Version
+    private Long versione;
+    @org.hibernate.annotations.CreationTimestamp
+    private Instant creato;
+}

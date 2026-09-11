@@ -117,8 +117,15 @@ Write-Step 'docker-compose.yml, Dockerfile, pom aggregatore e wrapper Maven'
 # --- Lo schema del database ---------------------------------------------------
 
 $schemaFile = Join-Path $OutDir 'SCHEMA-DATABASE.md'
+# db-schema compila e avvia i moduli con un database per interrogarlo: se uno
+# non parte, lo schema esce con una nota al posto delle sue tabelle, e la
+# consegna va avanti lo stesso.
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'db-schema.ps1') -OutFile $schemaFile | Out-Null
-Write-Step 'SCHEMA-DATABASE.md (ricavato dalle @Entity)'
+if ($LASTEXITCODE -eq 0) {
+    Write-Step 'SCHEMA-DATABASE.md (letto dal database che crea Hibernate)'
+} else {
+    Write-Host '  SCHEMA-DATABASE.md incompleto: task db-schema ti dice perche'', poi rilancia la consegna' -ForegroundColor Yellow
+}
 $schema = Read-TextFile $schemaFile
 
 # --- I servizi, con porte, nomi Eureka ed endpoint ---------------------------

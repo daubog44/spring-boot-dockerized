@@ -1,0 +1,16 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Embeddable
+public class RigaId implements Serializable {
+    private String codiceOrdine;
+    private Integer numeroRiga;
+    public boolean equals(Object o) { return o instanceof RigaId r && java.util.Objects.equals(codiceOrdine, r.codiceOrdine) && java.util.Objects.equals(numeroRiga, r.numeroRiga); }
+    public int hashCode() { return java.util.Objects.hash(codiceOrdine, numeroRiga); }
+}

@@ -1,0 +1,22 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+@Table(name = "articoli")
+public class ArticoloEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Column(nullable = false, length = 80)
+    private String nome;
+    private Integer quantita;
+    @Enumerated(EnumType.STRING) @Column(length = 20)
+    private StatoArticolo stato;
+    @ManyToOne @JoinColumn(name = "deposito_id")
+    private DepositoEntity deposito;
+}

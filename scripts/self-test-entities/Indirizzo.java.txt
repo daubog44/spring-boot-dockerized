@@ -1,0 +1,16 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Embeddable
+public class Indirizzo {
+    private String via;
+    private String citta;
+    @Pattern(regexp = "\\d{5}")
+    private String cap;
+}

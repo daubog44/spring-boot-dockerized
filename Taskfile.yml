@@ -86,7 +86,10 @@ tasks:
         task consegna NOME=ROSSI_MARIO
 
       Prima di consegnare passa da `task check`: se il progetto non e'
-      coerente, si ferma.
+      coerente, si ferma. Per lo schema compila e avvia i moduli con un
+      database (come task db-schema): serve Maven, anche senza rete.
+    env:
+      JAVA_HOME: '{{.JAVA_HOME_PATH}}'
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/consegna.ps1{{if .NOME}} -Nome {{.NOME}}{{end}}{{if .OUT}} -OutDir {{.OUT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/consegna.sh{{if .NOME}} --nome {{.NOME}}{{end}}{{if .OUT}} --out-dir {{.OUT}}{{end}} {{.CLI_ARGS}}{{end}}'
 
@@ -369,56 +372,71 @@ tasks:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/db-config.ps1{{if .DBNAME}} -DbName {{.DBNAME}}{{end}}{{if .USER}} -User {{.USER}}{{end}}{{if .PASSWORD}} -Password {{.PASSWORD}}{{end}}{{if .PORT}} -Port {{.PORT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/db-config.sh{{if .DBNAME}} --db-name {{.DBNAME}}{{end}}{{if .USER}} --user {{.USER}}{{end}}{{if .PASSWORD}} --password {{.PASSWORD}}{{end}}{{if .PORT}} --port {{.PORT}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   db-schema:
-    desc: "Ricava lo schema concettuale e logico del database dalle @Entity (task db-schema)"
+    desc: "Schema concettuale e logico della base dati, letto dal database che crea Hibernate (task db-schema)"
     summary: |
-      Legge le classi annotate con @Entity e ne ricava le tabelle: colonne,
-      tipi SQL, chiavi primarie ed esterne, relazioni, piu' un diagramma ER in
-      mermaid che GitHub e VS Code disegnano da soli. E' lo "schema
-      concettuale e logico della base dati" che chiede l'allegato tecnico,
-      ricavato dal codice invece che ricordato a memoria.
+      Per ogni modulo con delle @Entity compila, avvia l'applicazione su un
+      database H2 usa-e-getta, lascia che Hibernate crei le tabelle e le
+      interroga con JDBC:
 
-      Non si collega a nessun database: legge i sorgenti. Funziona anche a
-      stack spento, e dice la verita' su quello che Hibernate creera'.
+        modello concettuale   entita', attributi, relazioni e cardinalita'
+        modello logico        tabelle, colonne, tipi, chiavi primarie ed
+                              esterne, vincoli, e un diagramma ER in mermaid
+                              che GitHub e VS Code disegnano da soli
+
+      E' lo "schema concettuale e logico della base dati" che chiede
+      l'allegato tecnico. Non indovina niente dai sorgenti: tabelle di
+      collegamento, colonne delle relazioni e vincoli sono quelli veri. Il
+      database del progetto non viene toccato; serve Maven (anche senza rete,
+      dopo task offline-prep).
 
       Variabili (facoltative):
         OUT=<file>   scrive su file invece che a schermo
+        BUILD=0      non ricompila: usa i jar gia' in target/
 
       Esempi:
         task db-schema
         task db-schema OUT=schema.md
 
       Lo genera da solo anche `task consegna`.
+    env:
+      JAVA_HOME: '{{.JAVA_HOME_PATH}}'
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/db-schema.ps1{{if .OUT}} -OutFile {{.OUT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/db-schema.sh{{if .OUT}} --out {{.OUT}}{{end}} {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/db-schema.ps1{{if .OUT}} -OutFile {{.OUT}}{{end}}{{if .BUILD}}{{if eq .BUILD "0"}} -NoBuild{{end}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/db-schema.sh{{if .OUT}} --out {{.OUT}}{{end}}{{if .BUILD}}{{if eq .BUILD "0"}} --no-build{{end}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   seed-data:
-    desc: "Riempie il database di dati di prova ricavati dalle @Entity (task seed-data)"
+    desc: "Dati di prova: a ogni avvio le tabelle vuote si riempiono da sole, passando da Hibernate (task seed-data)"
     summary: |
-      Legge le @Entity e scrive un src/main/resources/data.sql per modulo, con
-      le INSERT. Spring Boot lo esegue all'avvio, dopo che Hibernate ha creato
-      le tabelle.
+      Scrive nell'application.yml dei moduli con delle @Entity
 
-      I valori sono inventati ma plausibili: le stringhe seguono il nome della
-      colonna (un campo "citta" prende nomi di citta', un "email" indirizzi),
-      gli enum vengono presi davvero dai valori dichiarati nel file Java, e le
-      tabelle con chiave esterna vengono riempite dopo quelle a cui puntano.
+        dev-data:
+          rows: 5
 
-      Aggiunge da solo all'application.yml le due proprieta' senza cui il file
-      non verrebbe eseguito (defer-datasource-initialization e sql.init.mode).
+      e da li' in poi, a ogni avvio, il pacchetto devdata di common-dto
+      riempie le tabelle ancora vuote con righe inventate ma plausibili. Le
+      righe passano da Hibernate, quindi rispettano quello che rispetta
+      l'applicazione: id generati, relazioni, enum, lunghezze, @NotNull,
+      @Size, @Min/@Max, @Email, @Pattern. Vale su H2, su PostgreSQL e in
+      Docker; un riavvio non duplica niente.
+
+      Poi compila e prova ogni modulo su un database H2 usa-e-getta, e dice
+      tabella per tabella quante righe sono entrate (o perche' no).
 
       Variabili (tutte facoltative):
         SERVICE=<modulo>   un modulo solo (default: tutti quelli con @Entity)
-        ROWS=<numero>      quante righe per tabella (default 5)
+        ROWS=<numero>      quante righe per tabella (default 5; 0 = spento)
+        CHECK=0            scrive solo la configurazione, senza la prova
 
       Esempi:
         task seed-data
         task seed-data SERVICE=wms-service ROWS=10
+        task seed-data ROWS=0
 
-      Ogni INSERT scatta solo se la tabella non e' ancora piena: un riavvio
-      (o un hot reload) su PostgreSQL non duplica niente. Per ripartire dai
-      soli dati di prova: `task docker-reset`.
+      Un data.sql scritto da te continua a valere: le tabelle che riempie lui
+      non vengono toccate.
+    env:
+      JAVA_HOME: '{{.JAVA_HOME_PATH}}'
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/seed-data.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .ROWS}} -Rows {{.ROWS}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/seed-data.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .ROWS}} --rows {{.ROWS}}{{end}} {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/seed-data.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .ROWS}} -Rows {{.ROWS}}{{end}}{{if .CHECK}}{{if eq .CHECK "0"}} -NoCheck{{end}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/seed-data.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .ROWS}} --rows {{.ROWS}}{{end}}{{if .CHECK}}{{if eq .CHECK "0"}} --no-check{{end}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   ide-sync:
     desc: "Riallinea VS Code e Zed ai moduli veri del progetto (task ide-sync)"
@@ -484,8 +502,10 @@ tasks:
       disco, a rete staccata non parte niente.
 
       Questo comando controlla gli attrezzi (go-task, JDK), la cache di Maven,
-      prova davvero una build offline (mvnw -o) e verifica che le immagini
-      Docker siano gia' scaricate. Alla fine dice come presentare senza rete.
+      prova davvero una build offline (mvnw -o) del progetto e di un modulo
+      nuovo, come quelli che creerai con new-service, e verifica che le
+      immagini Docker siano gia' scaricate. Alla fine dice come presentare
+      senza rete.
 
       Per scaricare quello che manca, con la rete: `task offline-prep`.
     env:
@@ -501,9 +521,20 @@ tasks:
       prima `docker compose build`, che riempie la cache dei livelli (compreso
       quello con curl, che a rete staccata non si potrebbe piu' installare).
 
+      Scarica anche quello che serve ai moduli che creerai all'esame: in un
+      progetto di prova crea con new-service un servizio con database e
+      un'interfaccia e li compila (JPA, H2, PostgreSQL, Feign, Swagger,
+      Thymeleaf), anche dentro Docker. Cosi' new-service, seed-data e
+      db-schema funzionano a rete staccata.
+
+      Variabili (facoltative):
+        ALL=1   anche tutto il catalogo di add-dep (security, kafka, mongodb...)
+
       Poi verifica con `task offline`.
+    env:
+      JAVA_HOME: '{{.JAVA_HOME_PATH}}'
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/offline.ps1 -Prep{{else}}bash ./scripts/offline.sh --prep{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/offline.ps1 -Prep{{if .ALL}} -All{{end}}{{else}}bash ./scripts/offline.sh --prep{{if .ALL}} --all{{end}}{{end}}'
 
   # --- Stack in container -----------------------------------------------------
 

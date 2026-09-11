@@ -25,10 +25,10 @@ Write-Host '  Dettaglio di uno solo: task --summary <comando>' -ForegroundColor 
 Write-Section 'Dall''inizio alla consegna'
 Write-Cmd 'task wizard' 'fa le domande e monta il progetto'
 Write-Cmd 'task wizard SERVICE=<modulo>' 'le domande di un microservizio solo'
-Write-Cmd 'task seed-data' 'dati di prova dalle @Entity (data.sql)'
-Write-Cmd 'task db-schema' 'schema concettuale e logico, dalle @Entity'
+Write-Cmd 'task seed-data' 'dati di prova a ogni avvio, passando da Hibernate'
+Write-Cmd 'task db-schema' 'schema concettuale e logico, letto dal database'
 Write-Cmd 'task consegna NOME=COGNOME_NOME' 'la cartella da consegnare'
-Write-Note 'Il wizard e'' anche task init. seed-data: SERVICE=<modulo>, ROWS=<n>.'
+Write-Note 'Il wizard e'' anche task init. seed-data: SERVICE=<modulo>, ROWS=<n> (0 = spenti).'
 Write-Note 'db-schema: OUT=<file>. consegna genera l''allegato tecnico gia'' compilato.'
 
 Write-Section 'La giornata, in ordine'

@@ -172,23 +172,27 @@ Per un microservizio solo: `task wizard SERVICE=<nome>`. Non fa niente di
 magico: chiama `set-java`, `rename-project`, `set-package`, `db-config`,
 `new-service` e `use-postgres` nell'ordine giusto, e finisce con `task check`.
 
-Scritte le entity, due comandi le leggono e ne ricavano il resto:
+Scritte le entity, due comandi le mettono al lavoro. Tutti e due passano dal
+database vero, non dalla lettura dei sorgenti: avviano l'applicazione, lasciano
+che Hibernate crei le tabelle e lavorano su quelle.
 
 ```bash
 task seed-data
 ```
 
-Scrive un `data.sql` per modulo con dati di prova plausibili, che Spring Boot
-esegue all'avvio dopo che Hibernate ha creato le tabelle. Una demo su tabelle
-vuote non si vede.
+Accende i dati di prova: a ogni avvio le tabelle vuote si riempiono da sole
+con righe plausibili, salvate passando da Hibernate, quindi con id, relazioni,
+enum e vincoli di validazione rispettati. Prima prova su un H2 usa-e-getta e
+ti dice tabella per tabella com'e' andata. Una demo su tabelle vuote non si
+vede.
 
 ```bash
 task db-schema
 ```
 
-Lo schema concettuale e logico della base dati - tabelle, colonne, tipi SQL,
-chiavi, relazioni e un diagramma ER - ricavato dalle `@Entity`. E' quello che
-chiede l'allegato tecnico.
+Lo schema concettuale e logico della base dati - entita' e relazioni, tabelle,
+colonne, tipi SQL, chiavi, vincoli e un diagramma ER - letto dal database dopo
+che Hibernate l'ha creato. E' quello che chiede l'allegato tecnico.
 
 E a fine giornata:
 

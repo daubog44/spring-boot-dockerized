@@ -1,0 +1,14 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+public class PagamentoCartaEntity extends PagamentoEntity {
+    @Size(min = 4, max = 4) @Pattern(regexp = "\\d{4}")
+    private String ultimeCifre;
+}

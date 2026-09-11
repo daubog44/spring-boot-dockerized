@@ -99,8 +99,14 @@ echo "  docker-compose.yml, Dockerfile, pom aggregatore e wrapper Maven"
 
 # --- Lo schema del database ---------------------------------------------------
 
-bash "$SCRIPT_DIR/db-schema.sh" --out "$OUT_DIR/SCHEMA-DATABASE.md" >/dev/null
-echo "  SCHEMA-DATABASE.md (ricavato dalle @Entity)"
+# db-schema compila e avvia i moduli con un database per interrogarlo: se uno
+# non parte, lo schema esce con una nota al posto delle sue tabelle, e la
+# consegna va avanti lo stesso.
+if bash "$SCRIPT_DIR/db-schema.sh" --out "$OUT_DIR/SCHEMA-DATABASE.md" >/dev/null; then
+  echo "  SCHEMA-DATABASE.md (letto dal database che crea Hibernate)"
+else
+  echo "  SCHEMA-DATABASE.md incompleto: task db-schema ti dice perche', poi rilancia la consegna"
+fi
 
 # --- I servizi, con porte, nomi Eureka ed endpoint ---------------------------
 

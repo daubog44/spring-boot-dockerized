@@ -1,0 +1,27 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+public class OrdineEntity {
+    @Id @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+    @ManyToOne(optional = false)
+    private ClienteEntity cliente;
+    private LocalDateTime dataOrdine;
+    @Column(precision = 7, scale = 2) @DecimalMin("0.01") @Digits(integer = 5, fraction = 2)
+    private BigDecimal totale;
+    private Priorita priorita;
+    @Lob
+    private String note;
+    @ElementCollection
+    private List<String> etichette = new ArrayList<>();
+    private boolean urgente;
+    @OneToMany(mappedBy = "ordine")
+    private List<RigaOrdineEntity> righe = new ArrayList<>();
+}

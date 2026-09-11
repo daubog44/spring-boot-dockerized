@@ -1,0 +1,26 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+public class ClienteEntity {
+    @Id
+    private Long id;
+    @Email @NotBlank @Column(unique = true)
+    private String email;
+    @Pattern(regexp = "[A-Z]{6}\\d{2}[A-Z]\\d{2}[A-Z]\\d{3}[A-Z]")
+    private String codiceFiscale;
+    @Pattern(regexp = "\\+39 \\d{9,10}")
+    private String telefono;
+    @Past
+    private LocalDate dataNascita;
+    @Embedded
+    private Indirizzo indirizzo;
+    private char iniziale;
+    private Boolean attivo;
+}

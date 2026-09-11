@@ -1,0 +1,17 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+@Inheritance
+public abstract class VeicoloEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Pattern(regexp = "[A-Z]{2}[0-9]{3}[A-Z]{2}")
+    private String targa;
+}

@@ -157,8 +157,9 @@ E per non presentare tabelle vuote:
 task seed-data
 ```
 
-Legge le `@Entity` e scrive un `data.sql` per modulo, che Spring Boot esegue
-all'avvio dopo che Hibernate ha creato le tabelle.
+Accende i dati di prova: a ogni avvio le tabelle vuote si riempiono da sole,
+con righe salvate passando da Hibernate (id, relazioni, enum e vincoli
+rispettati). Prima prova su un H2 usa-e-getta e ti dice com'è andata.
 
 ---
 

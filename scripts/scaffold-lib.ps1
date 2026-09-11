@@ -213,3 +213,165 @@ function Get-AggregatorName {
     }
     throw "Non trovo la cartella dell'aggregatore (pom.xml + docker-compose.yml) sotto $RepoRoot."
 }
+
+# --- I moduli con un database, avviati per interrogarlo -----------------------
+# Li usano task seed-data e task db-schema. Il lavoro vero lo fa il pacchetto
+# devdata di common-dto, dentro l'applicazione: qui si compila, si avvia il jar
+# con le proprieta' giuste e si leggono le sue righe [dev-data].
+
+function Get-JpaModules {
+    # I moduli con spring-boot-starter-data-jpa nel pom. Per ognuno: se ha gia'
+    # delle @Entity e se ha H2 (il database usa-e-getta delle prove).
+    param([string]$RepoRoot = (Get-ScaffoldRepoRoot))
+    $aggr = Join-Path $RepoRoot (Get-AggregatorName -RepoRoot $RepoRoot)
+    $out = @()
+    foreach ($dir in (Get-ChildItem -Path $aggr -Directory | Sort-Object Name)) {
+        $pom = Join-Path $dir.FullName 'pom.xml'
+        if (-not (Test-Path $pom)) { continue }
+        $pomText = Read-TextFile $pom
+        if ($pomText -notmatch '<artifactId>spring-boot-starter-data-jpa</artifactId>') { continue }
+        $src = Join-Path $dir.FullName 'src/main/java'
+        $hasEntities = $false
+        if (Test-Path $src) {
+            $hit = Get-ChildItem -Path $src -Recurse -Filter '*.java' |
+                Where-Object { (Read-TextFile $_.FullName) -match '(?m)^\s*@(jakarta\.persistence\.)?Entity\b' } |
+                Select-Object -First 1
+            $hasEntities = [bool]$hit
+        }
+        $out += [pscustomobject]@{
+            Name = $dir.Name
+            Dir = $dir.FullName
+            HasEntities = $hasEntities
+            HasH2 = ($pomText -match '<artifactId>h2</artifactId>')
+        }
+    }
+    return $out
+}
+
+function Get-JavaExe {
+    if ($env:JAVA_HOME) {
+        $java = Join-Path $env:JAVA_HOME 'bin\java.exe'
+        if (Test-Path $java) { return $java }
+    }
+    $onPath = Get-Command java -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($onPath) { return $onPath.Source }
+    return $null
+}
+
+function Invoke-ModuleBuild {
+    # Compila i moduli, e common-dto da cui dipendono, con il wrapper Maven.
+    param([Parameter(Mandatory = $true)][string[]]$Modules, [string]$RepoRoot = (Get-ScaffoldRepoRoot))
+    $aggr = Join-Path $RepoRoot (Get-AggregatorName -RepoRoot $RepoRoot)
+    $log = Join-Path ([System.IO.Path]::GetTempPath()) ('devdata-build-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.log')
+    $javaHome = if ($env:JAVA_HOME -and (Test-Path $env:JAVA_HOME)) { $env:JAVA_HOME } else { '' }
+    Push-Location $aggr
+    try {
+        # La redirezione la fa cmd: PowerShell 5.1 trasformerebbe gli avvisi di
+        # Maven su stderr in errori.
+        cmd /c "set JAVA_HOME=$javaHome&& .\mvnw.cmd -B -q -pl $($Modules -join ',') -am package -Dmaven.test.skip=true > `"$log`" 2>&1"
+        $code = $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
+    $tail = @(Get-Content $log -ErrorAction SilentlyContinue | Where-Object { $_ -match 'ERROR' } | Select-Object -First 15)
+    return [pscustomobject]@{ ExitCode = $code; Log = $log; Errors = $tail }
+}
+
+function Invoke-DevDataRun {
+    # Avvia il jar di un modulo senza server web ne' Eureka, su un database H2
+    # in memoria (o sul suo, con -OwnDatabase), e aspetta che devdata finisca.
+    # Restituisce l'exit code, le righe [dev-data] e, se non e' partito, le
+    # righe del log che spiegano perche'.
+    param(
+        [Parameter(Mandatory = $true)]$Module,
+        [string[]]$Arguments = @(),
+        [switch]$OwnDatabase,
+        [int]$TimeoutSeconds = 180
+    )
+    $result = [pscustomobject]@{ ExitCode = -1; Lines = @(); Problem = ''; LogTail = @() }
+    $jar = Get-ChildItem -Path (Join-Path $Module.Dir 'target') -Filter '*.jar' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notmatch '(sources|javadoc|plain)\.jar$' } |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $jar) { $result.Problem = "manca il jar in $($Module.Name)/target: compila prima (task build)"; return $result }
+    $java = Get-JavaExe
+    if (-not $java) { $result.Problem = 'java non trovato: installa un JDK (task check)'; return $result }
+
+    $all = @(
+        '--spring.main.web-application-type=none', '--spring.main.banner-mode=off', '--logging.level.root=WARN',
+        '--eureka.client.enabled=false', '--spring.cloud.discovery.enabled=false',
+        '--spring.cloud.service-registry.auto-registration.enabled=false', '--spring.sql.init.mode=never',
+        '--dev-data.exit=true'
+    )
+    if (-not $OwnDatabase) {
+        # Un database vuoto tutto suo: Hibernate ci crea le tabelle da zero, e
+        # quello del progetto (PostgreSQL compreso) non viene toccato.
+        $all += @(
+            '--spring.datasource.url=jdbc:h2:mem:devdata;DB_CLOSE_DELAY=-1', '--spring.datasource.driver-class-name=org.h2.Driver',
+            '--spring.datasource.username=sa', '--spring.datasource.password=', '--spring.jpa.hibernate.ddl-auto=create',
+            '--spring.jpa.database-platform=org.hibernate.dialect.H2Dialect',
+            '--spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect',
+            '--spring.flyway.enabled=false', '--spring.liquibase.enabled=false'
+        )
+    }
+    $all += $Arguments
+    $log = Join-Path ([System.IO.Path]::GetTempPath()) ('devdata-run-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.log')
+    $line = '"' + $java + '" -jar "' + $jar.FullName + '" ' + (($all | ForEach-Object { '"' + $_ + '"' }) -join ' ') + ' > "' + $log + '" 2>&1'
+    $process = Start-Process -FilePath $env:ComSpec -ArgumentList @('/d', '/c', ('"' + $line + '"')) -NoNewWindow -PassThru
+    $null = $process.Handle   # senza, ExitCode resta vuoto (difetto noto di PowerShell)
+    if ($process.WaitForExit($TimeoutSeconds * 1000)) {
+        $result.ExitCode = $process.ExitCode
+    } else {
+        # Solo questo processo e i suoi figli: mai tutti i java della macchina.
+        & taskkill /PID $process.Id /T /F 2>&1 | Out-Null
+        $result.ExitCode = -2
+        $result.Problem = "non ha finito in $TimeoutSeconds secondi (aspetta un database o un altro servizio?)"
+    }
+    $text = @(Get-Content $log -Encoding UTF8 -ErrorAction SilentlyContinue)
+    $result.Lines = @($text | Where-Object { $_.StartsWith('[dev-data] ') } | ForEach-Object { $_.Substring(11) })
+    $result.LogTail = @($text | Where-Object { $_ -match 'ERROR|Caused by|Description:|Action:|APPLICATION FAILED|Exception' -and $_ -notmatch '^\s+at ' } | Select-Object -Last 12)
+    if (-not $result.Problem -and $result.Lines.Count -eq 0) {
+        $result.Problem = if ($result.ExitCode -eq 0) {
+            "non usa common-dto, che porta devdata: task add-dep SERVICE=$($Module.Name) DEP=common-dto"
+        } else {
+            "non si e' avviato (log completo: $log)"
+        }
+    }
+    return $result
+}
+
+function Write-DevDataResult {
+    # Mostra le righe [dev-data] di un modulo; $true se e' andato tutto bene.
+    param([Parameter(Mandatory = $true)]$Result)
+    foreach ($line in $Result.Lines) {
+        $color = if ($line.StartsWith('ERRORE')) { 'Red' } else { 'Gray' }
+        Write-Host "    $line" -ForegroundColor $color
+    }
+    if ($Result.Problem) {
+        Write-Host "    $($Result.Problem)" -ForegroundColor Red
+        foreach ($l in $Result.LogTail) { Write-Host "      $l" -ForegroundColor DarkGray }
+    }
+    return ($Result.ExitCode -eq 0 -and $Result.Lines.Count -gt 0)
+}
+
+function Set-DevDataRows {
+    # dev-data.rows nell'application.yml: lo aggiorna se c'e', se no lo aggiunge in fondo.
+    param([Parameter(Mandatory = $true)][string]$YmlPath, [Parameter(Mandatory = $true)][int]$Rows)
+    $text = Read-TextFile $YmlPath
+    $eol = Get-TextEol $text
+    $block = '(?m)(^dev-data:[ \t]*\r?\n(?:[ \t]+.*\r?\n)*?[ \t]+rows:[ \t]*)\d+'
+    if ($text -match $block) {
+        $text = [regex]::Replace($text, $block, ('${1}' + $Rows))
+    } elseif ($text -match '(?m)^dev-data:[ \t]*\r?$') {
+        $text = [regex]::Replace($text, '(?m)^(dev-data:[ \t]*)(\r?)$', ('${1}${2}' + "`n" + '  rows: ' + $Rows + '${2}'))
+    } else {
+        $lines = @(
+            ''
+            '# Dati di prova (task seed-data): all''avvio le tabelle ancora vuote si'
+            '# riempiono da sole con righe inventate, passando da Hibernate. 0 = spento.'
+            'dev-data:'
+            "  rows: $Rows"
+        )
+        $text = $text.TrimEnd("`r", "`n") + $eol + ($lines -join $eol) + $eol
+    }
+    Write-TextFile -Path $YmlPath -Text $text
+}
