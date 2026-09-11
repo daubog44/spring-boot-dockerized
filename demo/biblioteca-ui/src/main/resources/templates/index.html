@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${titolo}">Biblioteca</title>
+    <style>
+        :root { --ink: #1d2733; --muted: #5d6b7a; --line: #d6dde4; --paper: #f6f8fa; --accent: #1e3fa8; --bad: #b3261e; --good: #2f7d4f; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink); background: var(--paper); }
+        main { max-width: 68rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; display: grid; gap: 1.75rem; }
+        h1 { margin: 0; font-size: 1.9rem; }
+        h2 { margin: 0 0 .75rem; font-size: 1.15rem; }
+        section { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 1.25rem; }
+        .avviso { padding: .75rem 1rem; border-radius: 6px; border: 1px solid; }
+        .avviso.ok { color: var(--good); border-color: var(--good); background: #eef7f1; }
+        .avviso.ko { color: var(--bad); border-color: var(--bad); background: #fbeeed; }
+        .scroll { overflow-x: auto; }
+        table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+        th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+        th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+        .no { color: var(--muted); }
+        .ritardo { color: var(--bad); font-weight: 600; }
+        form.nuovo { display: grid; grid-template-columns: 2fr 2fr 1fr auto; gap: .75rem; align-items: end; }
+        label { display: grid; gap: .3rem; font-size: .85rem; color: var(--muted); }
+        input, select, button { font: inherit; padding: .45rem .55rem; border: 1px solid var(--line); border-radius: 4px; }
+        button { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+        button.piccolo { padding: .2rem .6rem; font-size: .85rem; }
+        .errore-campo { color: var(--bad); font-size: .8rem; }
+        @media (max-width: 720px) { form.nuovo { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<main>
+    <h1 th:text="${titolo}">Biblioteca</h1>
+
+    <p class="avviso ok" th:if="${messaggio}" th:text="${messaggio}"></p>
+    <p class="avviso ko" th:if="${errore}" th:text="${errore}"></p>
+
+    <section>
+        <h2>Nuovo prestito</h2>
+        <!-- th:object lega il form all'oggetto "form" del modello; *{campo}
+             legge e scrive un suo campo; th:errors mostra il messaggio di
+             validazione di quel campo, se c'e'. -->
+        <form class="nuovo" th:action="@{/prestiti}" th:object="${form}" method="post">
+            <label>Libro
+                <select th:field="*{libroId}">
+                    <option value="">scegli un libro disponibile</option>
+                    <option th:each="l : ${disponibili}" th:value="${l.id}" th:text="${l.titolo} + ' - ' + ${l.autore}"></option>
+                </select>
+                <span class="errore-campo" th:if="${#fields.hasErrors('libroId')}" th:errors="*{libroId}"></span>
+            </label>
+            <label>Email di chi lo prende
+                <input type="text" th:field="*{utenteEmail}" placeholder="nome@esempio.it">
+                <span class="errore-campo" th:if="${#fields.hasErrors('utenteEmail')}" th:errors="*{utenteEmail}"></span>
+            </label>
+            <label>Giorni
+                <input type="number" th:field="*{giorni}" min="1" max="60">
+                <span class="errore-campo" th:if="${#fields.hasErrors('giorni')}" th:errors="*{giorni}"></span>
+            </label>
+            <button type="submit">Presta</button>
+        </form>
+    </section>
+
+    <section>
+        <h2>Prestiti</h2>
+        <div class="scroll">
+            <table>
+                <tr><th>Libro</th><th>Utente</th><th>Scadenza</th><th>Stato</th><th>Ritardo</th><th>Penale</th><th></th></tr>
+                <tr th:each="p : ${prestiti}">
+                    <td th:text="${p.titoloLibro}"></td>
+                    <td th:text="${p.utenteEmail}"></td>
+                    <td th:text="${#temporals.format(p.dataScadenza, 'dd/MM/yyyy')}"></td>
+                    <td th:text="${p.stato == 'IN_CORSO'} ? 'in corso' : 'restituito'"></td>
+                    <td th:classappend="${p.giorniRitardo > 0} ? 'ritardo'" th:text="${p.giorniRitardo} + ' gg'"></td>
+                    <td th:text="${#numbers.formatDecimal(p.penale, 1, 2, 'COMMA')} + ' EUR'"></td>
+                    <td>
+                        <form th:if="${p.stato == 'IN_CORSO'}" th:action="@{/prestiti/{id}/restituzione(id=${p.id})}" method="post">
+                            <button class="piccolo" type="submit">Restituisci</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(prestiti)}"><td colspan="7" class="no">Nessun prestito.</td></tr>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <h2>Catalogo</h2>
+        <div class="scroll">
+            <table>
+                <tr><th>Titolo</th><th>Autore</th><th>Genere</th><th>Anno</th><th>ISBN</th><th>Disponibile</th></tr>
+                <tr th:each="l : ${libri}">
+                    <td th:text="${l.titolo}"></td>
+                    <td th:text="${l.autore}"></td>
+                    <td th:text="${l.genere}"></td>
+                    <td th:text="${l.annoPubblicazione}"></td>
+                    <td th:text="${l.isbn}"></td>
+                    <td th:text="${l.disponibile} ? 'si' : 'no'" th:classappend="${!l.disponibile} ? 'no'"></td>
+                </tr>
+            </table>
+        </div>
+    </section>
+</main>
+</body>
+</html>

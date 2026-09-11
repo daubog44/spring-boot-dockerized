@@ -9,13 +9,37 @@
             "request": "launch",
             "mainClass": "esame.namingserver.Main",
             "projectName": "naming-server"
+        },
+        {
+            "type": "java",
+            "name": "2. biblioteca-ui (:8090)",
+            "request": "launch",
+            "mainClass": "esame.bibliotecaui.Main",
+            "projectName": "biblioteca-ui"
+        },
+        {
+            "type": "java",
+            "name": "3. catalogo-service (:8081)",
+            "request": "launch",
+            "mainClass": "esame.catalogoservice.Main",
+            "projectName": "catalogo-service"
+        },
+        {
+            "type": "java",
+            "name": "4. prestiti-service (:8082)",
+            "request": "launch",
+            "mainClass": "esame.prestitiservice.Main",
+            "projectName": "prestiti-service"
         }
     ],
     "compounds": [
         {
             "name": "Stack completo",
             "configurations": [
-                "1. naming-server (:8761)"
+                "1. naming-server (:8761)",
+                "2. biblioteca-ui (:8090)",
+                "3. catalogo-service (:8081)",
+                "4. prestiti-service (:8082)"
             ],
             "stopAll": true
         }

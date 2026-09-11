@@ -21,6 +21,9 @@
     <modules>
         <module>common-dto</module>
         <module>naming-server</module>
+        <module>catalogo-service</module>
+        <module>prestiti-service</module>
+        <module>biblioteca-ui</module>
     </modules>
 
     <properties>

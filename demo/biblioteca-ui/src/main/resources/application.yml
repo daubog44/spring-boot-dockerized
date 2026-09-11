@@ -1,0 +1,34 @@
+# La porta si legge da SERVER_PORT (in Docker la passa docker-compose.yml) e
+# ricade sul valore qui sotto quando lo avvii in locale. Per cambiarla:
+#   task set-port SERVICE=biblioteca-ui PORT=<porta>
+server:
+  port: ${SERVER_PORT:8090}
+
+spring:
+  application:
+    name: BIBLIOTECA-UI
+  # Il load balancer di Feign tiene l'elenco delle istanze in cache per 35
+  # secondi: con 5, un servizio appena acceso diventa chiamabile subito.
+  cloud:
+    loadbalancer:
+      cache:
+        ttl: 5s
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    # Il registro si rilegge ogni 5 secondi invece che ogni 30.
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    # Un battito ogni 5 secondi: se il servizio si spegne, dopo 15 Eureka lo
+    # toglie e gli altri smettono di chiamarlo.
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

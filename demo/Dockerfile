@@ -11,6 +11,9 @@ COPY .mvn .mvn
 COPY pom.xml .
 COPY common-dto/pom.xml common-dto/pom.xml
 COPY naming-server/pom.xml naming-server/pom.xml
+COPY catalogo-service/pom.xml catalogo-service/pom.xml
+COPY prestiti-service/pom.xml prestiti-service/pom.xml
+COPY biblioteca-ui/pom.xml biblioteca-ui/pom.xml
 
 ARG MODULE="naming-server"
 
