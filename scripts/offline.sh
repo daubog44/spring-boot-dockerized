@@ -128,8 +128,11 @@ fi
 
 # --- Controllo ----------------------------------------------------------------
 
-echo ""
-echo "PRONTI PER UN ESAME SENZA RETE?"
+# 0. La rete di adesso: all'esame e' filtrata, e quello che passa oggi decide
+#    che cosa deve essere gia' sul disco.
+bash "$SCRIPT_DIR/rete.sh"
+
+echo "E SE UN DOMINIO NON PASSA, C'E' GIA' TUTTO?"
 echo ""
 
 # 1. Gli attrezzi.

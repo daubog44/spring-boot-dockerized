@@ -28,6 +28,28 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/help.ps1{{else}}bash ./scripts/help.sh{{end}}'
 
+  learn:
+    desc: "IL CORSO: apre nel browser il corso dalla A alla Z, con dentro le guide e la mappa del progetto"
+    aliases: [corso]
+    summary: |
+      Il corso d'esame: diciassette lezioni dalla traccia alla consegna, col
+      codice della traccia Biblioteca (branch example/biblioteca), piu' le
+      guide del progetto e la mappa dei moduli di adesso. E' una pagina
+      statica, corso/index.html: si apre senza server e senza rete.
+
+      Il comando raccoglie le lezioni (corso/lezioni/*.md), le guide (*.md)
+      e i moduli del progetto in corso/contenuti.js, poi apre la pagina.
+      Rilancialo quando cambi una guida o aggiungi un modulo.
+
+      Variabili (facoltative):
+        OPEN=0   prepara il corso senza aprire il browser
+
+      Esempi:
+        task learn
+        task learn OPEN=0
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/learn.ps1{{if .OPEN}}{{if eq .OPEN "0"}} -NoOpen{{end}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/learn.sh{{if .OPEN}}{{if eq .OPEN "0"}} --no-open{{end}}{{end}} {{.CLI_ARGS}}{{end}}'
+
   # --- Inizio e fine del progetto ---------------------------------------------
   # Il wizard monta il progetto facendo domande; la consegna prepara la
   # cartella da consegnare. In mezzo c'e' tutto il resto.
@@ -77,6 +99,12 @@ tasks:
 
       Chi corregge scompatta <NOME>.zip e lancia `docker compose up --build`:
       dentro non ci sono altri archivi da aprire.
+
+      Le parti da scrivere a mano (analisi, algoritmo, che cosa fa ogni
+      modulo, risposte teoriche) stanno in allegato.md, nella cartella del
+      progetto: la prima consegna lo crea con i titoli pronti, le altre ne
+      prendono il testo e lo mettono nell'allegato prima di fare l'archivio.
+      Rilanciala quante volte vuoi: il testo non si perde.
 
       Variabili:
         NOME=<COGNOME_NOME>   nome dell'archivio finale
@@ -494,14 +522,37 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/self-test.ps1{{if .FULL}} -Full{{end}}{{else}}bash ./scripts/self-test.sh{{if .FULL}} --full{{end}}{{end}}'
 
-  offline:
-    desc: "Dice se il progetto partirebbe senza rete (cache Maven, immagini Docker)"
+  rete:
+    desc: "Quali domini di internet passano da qui (Maven Central, Docker Hub, GitHub...): all'esame la rete e' filtrata"
     summary: |
-      Il giorno dell'esame potresti non avere internet. Maven scarica le
-      dipendenze in ~/.m2, Docker le immagini di base: se non sono gia' sul
-      disco, a rete staccata non parte niente.
+      All'esame la rete c'e', ma passa da una whitelist di domini: Maven
+      Central si', il resto non si sa. Questo comando bussa ai domini che
+      servono al template e dice, per ognuno, se risponde e che cosa fare se
+      non risponde. Non cambia niente e ci mette pochi secondi.
 
-      Questo comando controlla gli attrezzi (go-task, JDK), la cache di Maven,
+        Maven Central        dipendenze Maven (moduli nuovi, add-dep)
+        Docker Hub           immagini di base (eclipse-temurin, postgres)
+        Ubuntu               curl dentro l'immagine, se la cache non ce l'ha
+        GitHub               git clone del template
+        VS Code Marketplace  estensioni dell'editor
+
+      Lo lancia anche task offline, all'inizio.
+
+      Esempio:
+        task rete
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/rete.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/rete.sh {{.CLI_ARGS}}{{end}}'
+
+  offline:
+    desc: "Dice se il progetto partirebbe anche senza rete (cache Maven, immagini Docker)"
+    summary: |
+      All'esame la rete e' filtrata: Maven Central passa, il resto forse no
+      (task rete lo dice). Maven scarica le dipendenze in ~/.m2, Docker le
+      immagini di base: quello che non e' gia' sul disco, se il suo dominio
+      non passa, non si recupera.
+
+      Questo comando prima prova la rete (task rete), poi controlla gli
+      attrezzi (go-task, JDK), la cache di Maven,
       prova davvero una build offline (mvnw -o) del progetto e di un modulo
       nuovo, come quelli che creerai con new-service, e verifica che le
       immagini Docker siano gia' scaricate. Alla fine dice come presentare

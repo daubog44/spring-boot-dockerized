@@ -9,7 +9,8 @@ Flusso applicativo: la UI riceve coordinate, raggio e numero di alternative, int
 ## 📚 Documentazione & Guide per l'Esame
 
 - **[🚨 Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. Parti da qui.
-- **[📓 Il corso: Quaderno d'esame](./corso/index.html)** — la stessa giornata in nove fasi, con i comandi da provare, quello che devi vedere, un esercizio per fase e una lavagna che legge le lezioni ad alta voce. Aprilo nel browser (doppio clic sul file). Il video, voce sintetica compresa, lo registra la macchina: `powershell -File corso/genera-video.ps1` (servono la voce italiana di Windows, Edge e ffmpeg) scrive `corso/quaderno-esame.mp4`, che resta fuori dal repository: è il file da allegare a una release.
+- **[📓 Il corso: Dalla traccia alla consegna](./corso/index.html)** — diciassette lezioni dalla A alla Z: com'è fatto il template, come si parlano i servizi, `common-dto`, la rete dell'esame, e poi la traccia **Biblioteca** svolta pezzo per pezzo col suo codice, fino al collaudo, a Docker e alla consegna. Dentro ci sono anche tutte le guide, con la ricerca, e la mappa dei moduli di questo progetto. Si apre con **`task learn`**: pagina statica, senza server e senza rete.
+- [La giornata alla lavagna](./corso/giornata.html) — la stessa giornata in nove fasi, con una lavagna che le legge ad alta voce; il video lo registra `powershell -File corso/genera-video.ps1`.
 - [📖 Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
 - [📘 Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — con il **cheat sheet di Thymeleaf** (§ 6.7)
 - [🛠️ Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
@@ -123,7 +124,9 @@ Sviluppo:
 - `task db-config`: Stampa o cambia le credenziali del database.
 - `task rename-project NAME=<nome>`: Rinomina la cartella dei moduli Maven.
 - `task ide-sync`: Riallinea VS Code e Zed ai moduli veri.
-- `task offline-prep` / `task offline`: Preparazione e verifica per un esame senza rete.
+- `task learn`: Il corso nel browser, dalla traccia alla consegna.
+- `task rete`: Quali domini passano dalla rete dell'aula (all'esame e' filtrata: Maven Central passa).
+- `task offline-prep` / `task offline`: Scarica la sera prima, e verifica, quello che la rete potrebbe non far passare.
 - `task dev`: Pulisce, compila e avvia l'intero stack in locale con hot reload.
 - `task dev-down`: Ferma i servizi locali e libera le porte.
 - `task logs`: Segue i log di tutti i servizi in un terminale solo (`task logs SERVICE=store` per uno).
@@ -214,18 +217,20 @@ accanto a pom e compose), l'allegato tecnico già compilato con moduli, porte,
 endpoint e schema, le istruzioni di esecuzione, e un archivio unico da
 consegnare. Chi lo corregge lo scompatta e lancia `docker compose up --build`.
 
-### Esame senza rete
+### La rete all'esame
 
-La sera prima, con la connessione:
+All'esame la rete passa da una whitelist di domini: Maven Central si', il
+resto non si sa.
 
 ```bash
-task offline-prep
+task rete
 ```
 
-Scarica le dipendenze Maven in `~/.m2`, le immagini Docker di base e fa una
-prima build dei container. Poi `task offline` dice se il progetto partirebbe a
-rete staccata. Portati la cartella del progetto e la `~/.m2` su una chiavetta:
-il template *e'* la cartella, non serve altro.
+Dice, dominio per dominio (Maven Central, Docker Hub, Ubuntu, GitHub, le
+estensioni di VS Code), se risponde e che cosa fare se no. La sera prima, con
+la connessione di casa, `task offline-prep` scarica quello che potrebbe non
+passare, e `task offline` verifica. Portati la cartella del progetto e la
+`~/.m2` su una chiavetta: il template *e'* la cartella, non serve altro.
 
 ---
 
