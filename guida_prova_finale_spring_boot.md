@@ -210,7 +210,7 @@ spring:
 logging:
   level:
     root: INFO
-    com.example.ttfcloud_esame: DEBUG # Abilita il log dettagliato per i package del progetto
+    esame: DEBUG # Abilita il log dettagliato per i package del progetto (la base: task set-package)
     org.hibernate.SQL: DEBUG # Stampa i parametri delle query SQL
 ```
 
@@ -327,7 +327,7 @@ Non è un servizio: non ha `Main`, non ha una porta, non si registra su Eureka.
 **Aggiungere un DTO**: crei la classe dentro `demo/common-dto/src/main/java/...`
 
 ```java
-package com.example.ttfcloud_esame.commondto;
+package esame.common.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -409,9 +409,9 @@ Il primo va in un **servizio** (`ordini-service`), il secondo in una **UI**
 
 ```java
 // demo/ordini-service/src/main/java/.../OrdineController.java
-package com.example.ttfcloud_esame.ordiniservice;
+package esame.ordiniservice;
 
-import com.example.ttfcloud_esame.commondto.OrdineDTO;
+import esame.common.dto.OrdineDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -464,9 +464,9 @@ public class OrdineController {
 
 ```java
 // demo/ordini-ui/src/main/java/.../OrdineWebController.java
-package com.example.ttfcloud_esame.ordiniui;
+package esame.ordiniui;
 
-import com.example.ttfcloud_esame.commondto.OrdineDTO;
+import esame.common.dto.OrdineDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -545,7 +545,7 @@ commissione, ed è il punto della traccia che chiede il "descrittore".
 
 ```java
 // demo/ordini-service/src/main/java/.../OrdineController.java
-package com.example.ttfcloud_esame.ordiniservice;
+package esame.ordiniservice;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -647,7 +647,7 @@ tocchi quasi mai:
 
 ```java
 // demo/naming-server/src/main/java/.../Main.java
-package com.example.ttfcloud_esame.namingserver;
+package esame.namingserver;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -690,9 +690,9 @@ public class Main {
 
 ```java
 // demo/ordini-ui/src/main/java/.../OrdiniClient.java
-package com.example.ttfcloud_esame.ordiniui;
+package esame.ordiniui;
 
-import com.example.ttfcloud_esame.commondto.OrdineDTO;
+import esame.common.dto.OrdineDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
@@ -773,7 +773,7 @@ condividono e non vanno in `common-dto`.
 
 ```java
 // demo/ordini-service/src/main/java/.../persistence/OrdineEntity.java
-package com.example.ttfcloud_esame.ordiniservice.persistence;
+package esame.ordiniservice.persistence;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -818,7 +818,7 @@ public class OrdineEntity {
 
 ```java
 // demo/ordini-service/src/main/java/.../persistence/OrdineRepository.java
-package com.example.ttfcloud_esame.ordiniservice.persistence;
+package esame.ordiniservice.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -842,9 +842,9 @@ public interface OrdineRepository extends JpaRepository<OrdineEntity, Long> {
 
 ```java
 // demo/ordini-service/src/main/java/.../OrdineService.java
-package com.example.ttfcloud_esame.ordiniservice;
+package esame.ordiniservice;
 
-import com.example.ttfcloud_esame.commondto.OrdineDTO;
+import esame.common.dto.OrdineDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -930,7 +930,7 @@ Il DTO sta in **common-dto**, il service nel **modulo che lo usa**.
 
 ```java
 // demo/common-dto/src/main/java/.../OrdineDTO.java
-package com.example.ttfcloud_esame.commondto;
+package esame.common.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -953,7 +953,7 @@ sei fra getter e setter, `equals`, `hashCode` e `toString`.
 
 ```java
 // demo/ordini-service/src/main/java/.../OrdineService.java
-package com.example.ttfcloud_esame.ordiniservice;
+package esame.ordiniservice;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -1013,7 +1013,7 @@ I vincoli stanno sul DTO (**common-dto**), il `@Valid` nel controller del
 
 ```java
 // demo/common-dto/src/main/java/.../OrdineDTO.java
-package com.example.ttfcloud_esame.commondto;
+package esame.common.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -1050,7 +1050,7 @@ figura in Swagger:
 
 ```java
 // demo/ordini-service/src/main/java/.../GestioneErrori.java
-package com.example.ttfcloud_esame.ordiniservice;
+package esame.ordiniservice;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -1195,7 +1195,7 @@ browser     riceve HTML normale: di Thymeleaf non resta traccia
 | Confronti | `gt` `lt` `ge` `le` `eq` `ne` (oppure `>` `<` `>=` `<=` `==` `!=`) | dentro un attributo HTML il `<` può rompere il tag: usa `lt` |
 | Logici | `and` `or` `not` | |
 | Metodi | `${o.stato.name()}`, `${ordini.size()}` | SpEL chiama qualsiasi metodo pubblico |
-| Classi ed enum | `${T(com.example.ttfcloud_esame.commondto.Stato).values()}` | funziona, ma un `@ModelAttribute` nel controller è più leggibile |
+| Classi ed enum | `${T(esame.common.dto.Stato).values()}` | funziona, ma un `@ModelAttribute` nel controller è più leggibile |
 | Bean di Spring | `${@environment.getProperty('spring.application.name')}` | `@nomeDelBean` |
 | Proiezione | `${ordini.![quantita]}` | la lista dei soli `quantita`: si passa a `#aggregates` e `#lists` |
 | Parametri della richiesta | `${param.q}` per scriverlo, `${param.q[0]}` per confrontarlo | `param.q` è l'elenco dei valori di `?q=`; meglio ancora: rimettilo nel `Model` |
@@ -1256,9 +1256,9 @@ fra controller e pagine.
 ```java
 // demo/ordini-ui/src/main/java/.../OrdineForm.java
 // L'oggetto del form: un campo per ogni <input>, coi vincoli di validazione.
-package com.example.ttfcloud_esame.ordiniui;
+package esame.ordiniui;
 
-import com.example.ttfcloud_esame.commondto.Stato;
+import esame.common.dto.Stato;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -1293,9 +1293,9 @@ public class OrdineForm {
 
 ```java
 // demo/ordini-ui/src/main/java/.../OrdiniWebController.java
-package com.example.ttfcloud_esame.ordiniui;
+package esame.ordiniui;
 
-import com.example.ttfcloud_esame.commondto.Stato;
+import esame.common.dto.Stato;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;

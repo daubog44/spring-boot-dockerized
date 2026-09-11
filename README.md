@@ -58,9 +58,10 @@ così com'è:
 https://github.com/daubog44/spring-boot-dockerized/releases/latest/download/spring-boot-dockerized.zip
 ```
 
-Scompatti, apri la cartella nel terminale, `task help`. Servono JDK 25, Docker
-e go-task, come col clone. Se il JDK non sta in `C:\Program Files\Microsoft\`,
-i comandi usano quello di `JAVA_HOME` o, se manca, quello del `PATH`.
+Scompatti, apri la cartella nel terminale, `task help`. Servono un JDK (dal 17
+in su), Docker e go-task, come col clone. Il template nasce su Java 25: se il
+tuo è un altro, `task wizard` (o `task set-java`) allinea il progetto al JDK
+che trova in `JAVA_HOME` o, se manca, nel `PATH`.
 
 **Pubblicare una versione nuova** (dopo il push di `main` e dei due branch):
 
@@ -91,22 +92,25 @@ E, già pronto e configurato per i moduli che creerai:
 - **PostgreSQL** in `docker-compose.yml` (database `esame`, utente e password `exam`): c'è un container, **non collegato a niente** finché non lo chiedi. I moduli generati partono con H2 in memoria; `task use-postgres SERVICE=<modulo>` sposta un modulo sul database vero, e con `DBNAME=` gliene dà uno tutto suo dentro lo stesso container.
 - **Dockerfile unico** parametrico sul modulo: un'immagine per servizio, senza un Dockerfile per cartella.
 - **Configurazione degli editor** gia' pronta e **mantenuta dai comandi**: `.vscode/launch.json` (un profilo di debug per servizio, piu' il compound *Stack completo*), `.vscode/tasks.json` e `.zed/tasks.json` (i comandi `task` dalla palette), piu' `settings.json`, `extensions.json` e `.editorconfig`. Li riscrivono `new-service`, `remove-service` e `set-port`; se restano indietro lo dice `task check`.
+- **Pacchetto Java corto**: i sorgenti di un modulo stanno in `src/main/java/esame/<modulo>/`, non in `com/example/...`. La base si cambia per tutti i moduli con `task set-package PACKAGE=it.cognome` (lo chiede anche il wizard), e `new-service` la segue.
+- **La versione di Java della macchina**: `task set-java` allinea pom, immagini Docker e VS Code al JDK installato (dal 17 in su); il wizard lo fa da solo all'inizio, e `task check` avvisa se il JDK è più vecchio del progetto.
 
 ---
 
 ## Come si lavora
 
 Il giorno dell'esame, letta la traccia, il modo più rapido per montare il
-progetto è il wizard: chiede come si chiama la cartella dei moduli, se serve
-PostgreSQL e con quali credenziali, e poi i microservizi uno per uno.
+progetto è il wizard: allinea Java al JDK della macchina, poi chiede come si
+chiama la cartella dei moduli, il pacchetto Java di base, se serve PostgreSQL
+e con quali credenziali, e i microservizi uno per uno.
 
 ```bash
 task wizard
 ```
 
 Per un microservizio solo: `task wizard SERVICE=<nome>`. Non fa niente di
-magico: chiama `rename-project`, `db-config`, `new-service` e `use-postgres`
-nell'ordine giusto, e finisce con `task check`.
+magico: chiama `set-java`, `rename-project`, `set-package`, `db-config`,
+`new-service` e `use-postgres` nell'ordine giusto, e finisce con `task check`.
 
 Poi, una volta sola:
 

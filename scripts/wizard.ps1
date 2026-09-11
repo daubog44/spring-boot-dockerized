@@ -231,11 +231,35 @@ Write-Host ''
 Write-Host '  Eureka (naming-server) c''e'' gia'': e'' il registro dei servizi, e' -ForegroundColor DarkGray
 Write-Host '  senza di lui i nomi delle chiamate Feign non si risolvono.' -ForegroundColor DarkGray
 
+# 0. Java: il progetto si allinea al JDK di questa macchina, senza domande.
+$jdk = Get-MachineJdk
+$projectJava = Get-ProjectJavaVersion -RepoRoot $repoRoot
+Write-Host ''
+if (-not $jdk) {
+    Write-Host "  Non trovo un JDK (JAVA_HOME o PATH): il progetto resta su Java $projectJava." -ForegroundColor Yellow
+    Write-Host '  Installane uno da 17 in su, poi task set-java.' -ForegroundColor Yellow
+} elseif ($jdk.Version -lt 17) {
+    Write-Host "  Il JDK di questa macchina e' Java $($jdk.Version): Spring Boot 4 vuole almeno Java 17." -ForegroundColor Yellow
+    Write-Host "  Il progetto resta su Java ${projectJava}: installa un JDK piu' recente, poi task set-java." -ForegroundColor Yellow
+} elseif ($jdk.Version -ne $projectJava) {
+    Write-Host "  Il progetto e' su Java $projectJava, il JDK di questa macchina e' Java $($jdk.Version): li allineo." -ForegroundColor Cyan
+    Invoke-Step -Script 'set-java.ps1'
+} else {
+    Write-Host "  Java ${projectJava}: lo stesso del JDK di questa macchina." -ForegroundColor DarkGray
+}
+
 # 1. Il nome del progetto
 $demoName = (Split-Path -Leaf (Get-DemoDir))
 $projectName = Ask-Text -Question 'Come si chiama la cartella con i moduli Maven?' -Default $demoName -Pattern '^[a-z][a-z0-9-]*$' -Hint 'La cartella che oggi contiene pom.xml e docker-compose.yml'
 if ($projectName -ne $demoName) {
     Invoke-Step -Script 'rename-project.ps1' -Arguments @{ Name = $projectName }
+}
+
+# 1-bis. Il pacchetto Java
+$basePackage = Get-BasePackage -RepoRoot $repoRoot
+$newPackage = Ask-Text -Question 'Pacchetto Java di base' -Default $basePackage -Pattern '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$' -Hint ('Ogni modulo stara'' in src/main/java/<pacchetto>/<modulo>/; oggi: src/main/java/' + ($basePackage -replace '\.', '/') + '/')
+if ($newPackage -ne $basePackage) {
+    Invoke-Step -Script 'set-package.ps1' -Arguments @{ Package = $newPackage }
 }
 
 # 2. Il database

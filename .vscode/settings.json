@@ -1,9 +1,7 @@
 {
     "java.configuration.updateBuildConfiguration": "automatic",
     "java.compile.nullAnalysis.mode": "automatic",
-    // Lo stesso JDK che usa il Taskfile. Se sulla macchina d'esame sta
-    // altrove, correggi qui il percorso (o togli il blocco: VS Code cerca da
-    // solo, ma puo' pescare un Java piu' vecchio).
+    // Lo stesso JDK che usa il Taskfile: lo aggiorna task set-java.
     "java.configuration.runtimes": [
         {
             "name": "JavaSE-25",

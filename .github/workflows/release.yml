@@ -65,7 +65,8 @@ jobs:
           | `esempio-tourist-events.zip` | l'esempio eventi/turismo (branch `example/tourist-events`) |
 
           Scompatta, apri la cartella nel terminale e lancia `task help`.
-          Servono JDK 25, Docker e go-task: vedi il README.
+          Servono un JDK da 17 in su, Docker e go-task: vedi il README.
+          Il wizard (`task wizard`) allinea il progetto al tuo JDK da solo.
 
           Link che punta sempre all'ultima versione del template:
           https://github.com/daubog44/spring-boot-dockerized/releases/latest/download/spring-boot-dockerized.zip
