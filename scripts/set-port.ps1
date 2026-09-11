@@ -159,6 +159,12 @@ if ($isEureka) {
     }
 }
 
+# --- Gli editor ---------------------------------------------------------------
+# Nel launch.json la porta compare nel nome della configurazione.
+
+& (Join-Path $PSScriptRoot 'ide-sync.ps1') | Out-Null
+Write-Step 'configurazione di VS Code e Zed riallineata'
+
 # --- 5. Cosa resta da guardare a mano ----------------------------------------
 
 # Collaudo e documentazione hanno indirizzi scritti per esteso: non li tocchiamo

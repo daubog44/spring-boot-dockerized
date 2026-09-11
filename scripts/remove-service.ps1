@@ -96,6 +96,12 @@ if ($moduleLine -ge 0) {
     Write-Step 'demo/docker-compose.yml'
 }
 
+# --- Gli editor ---------------------------------------------------------------
+# Un launch.json che elenca servizi che non esistono e' peggio di non averlo.
+
+& (Join-Path $PSScriptRoot 'ide-sync.ps1') | Out-Null
+Write-Step 'configurazione di VS Code e Zed riallineata'
+
 # --- Fatto --------------------------------------------------------------------
 
 Write-Host ''

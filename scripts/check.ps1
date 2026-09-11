@@ -213,6 +213,32 @@ foreach ($svc in $devServices) {
 Write-Check -Label 'docker-compose' -Errors $errors
 $problems += $errors
 
+# --- La configurazione degli editor -------------------------------------------
+# Un launch.json che elenca servizi spariti manda in errore il tasto Debug, e
+# uno che non li elenca non lo fa partire affatto.
+
+$errors = @()
+$launchPath = Join-Path $repoRoot '.vscode/launch.json'
+if (Test-Path $launchPath) {
+    $launchText = Read-TextFile $launchPath
+    $launched = @([regex]::Matches($launchText, '"projectName"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+    foreach ($svc in $devServices) {
+        if ($launched -notcontains $svc.Module) {
+            $errors += "$($svc.Module): manca in .vscode/launch.json"
+        }
+    }
+    foreach ($name in $launched) {
+        if (-not (Test-Path (Join-Path $demoDir "$name/pom.xml"))) {
+            $errors += "${name}: e' in .vscode/launch.json ma il modulo non esiste"
+        }
+    }
+    if ($errors.Count -gt 0) { $errors += 'riallinea con: task ide-sync' }
+    Write-Check -Label 'editor (launch.json)' -Errors $errors
+} else {
+    Write-Host ('  {0,-26}{1}' -f 'editor (launch.json)', 'assente: task ide-sync') -ForegroundColor Yellow
+}
+$problems += $errors
+
 # --- Porte riservate da Windows ----------------------------------------------
 
 # Windows si riserva interi intervalli di porte (Hyper-V, WSL, l'avvio di

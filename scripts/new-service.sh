@@ -379,6 +379,12 @@ SH_END="$(awk -v s="$SH_START" 'NR > s && /^\)/ { print NR; exit }' "$DEV_SH")"
 insert_at_line "$DEV_SH" "$((SH_END - 1))" "  \"$SHORT:$MODULE:$PORT\""
 echo "  scripts/dev.sh           $SHORT -> $MODULE:$PORT"
 
+# --- Gli editor ---------------------------------------------------------------
+# Un launch.json che elenca servizi che non esistono e' peggio di non averlo.
+
+bash "$SCRIPT_DIR/ide-sync.sh" >/dev/null 2>&1
+echo "  configurazione di VS Code e Zed riallineata"
+
 # --- Fatto --------------------------------------------------------------------
 
 echo ""

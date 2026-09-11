@@ -1,0 +1,16 @@
+// Zed legge il Java dall'estensione "Java" (jdtls): installala da
+// "zed: extensions". Il progetto e' Maven multi-modulo, quindi apri la
+// cartella del repository, non quella di un singolo servizio.
+{
+    "format_on_save": "on",
+    "languages": {
+        "Java": { "tab_size": 4 },
+        "YAML": { "tab_size": 2 }
+    },
+    "file_scan_exclusions": [
+        "**/target",
+        "**/.dev-logs",
+        "**/consegna",
+        "**/.git"
+    ]
+}

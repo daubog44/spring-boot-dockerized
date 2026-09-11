@@ -136,6 +136,66 @@ da decidere: Eureka, OpenFeign, Swagger, Lombok, validation, actuator e
 
 ---
 
+## L'editor: VS Code, Zed, IntelliJ
+
+Il progetto si apre **dalla cartella del repository**, non da quella di un
+singolo servizio: è un progetto Maven multi-modulo, e l'editor deve vedere il
+pom aggregatore per capirlo.
+
+### VS Code
+
+Nel repository ci sono già:
+
+| File | Cosa fa |
+| :--- | :--- |
+| `.vscode/launch.json` | una configurazione di debug per servizio, più il compound **Stack completo** che li avvia tutti in ordine (Eureka per primo) |
+| `.vscode/tasks.json` | i comandi `task` dalla palette: `Ctrl+Shift+P` → *Tasks: Run Task* |
+| `.vscode/settings.json` | salvataggio automatico (senza, l'hot reload di `task compile` non si accorge di niente), `target/` nascosto dalla ricerca |
+| `.vscode/extensions.json` | le estensioni consigliate: `Ctrl+Shift+P` → *Extensions: Show Recommended Extensions* |
+
+L'unica indispensabile è **Extension Pack for Java**: senza, il tasto Debug non
+esiste. Le altre (Spring Boot Extension Pack, Docker, YAML, Task) fanno comodo
+ma non sono obbligatorie.
+
+Premi `F5`, scegli **Stack completo** e hai tutti i servizi in debug, con i
+breakpoint che funzionano. Se invece ti basta vederli girare, `task dev` resta
+più leggero.
+
+> `launch.json` e `tasks.json` sono **generati**: li riscrivono `new-service`,
+> `remove-service` e `set-port`. Se li modifichi a mano, le modifiche si
+> perdono al comando successivo. `settings.json` ed `extensions.json` no: quelli
+> sono tuoi.
+
+### Zed
+
+| File | Cosa fa |
+| :--- | :--- |
+| `.zed/tasks.json` | i comandi `task` dalla palette: *task: Spawn* |
+| `.zed/settings.json` | formattazione, indentazione, e `target/` fuori dall'indice |
+
+Per l'autocompletamento Java serve l'estensione **Java** (usa `jdtls`):
+palette → *zed: extensions*. Zed non ha un debugger Java come quello di VS
+Code: per il debug passa da VS Code o da IntelliJ.
+
+### IntelliJ IDEA
+
+Non c'è niente da configurare: *File → Open* sulla cartella del repository,
+IntelliJ riconosce il pom aggregatore e importa i moduli da solo. Le
+configurazioni di avvio se le crea lui quando apri una classe `Main`.
+
+### Se l'elenco dei servizi non torna
+
+```bash
+task ide-sync
+```
+
+Riscrive `launch.json` e i due `tasks.json` leggendo i moduli veri: trova la
+classe `Main` nei sorgenti (quindi funziona anche per un modulo scritto a mano)
+e la porta nell'`application.yml`. Serve solo se hai toccato i moduli senza
+passare dai comandi; se il `launch.json` resta indietro, te lo dice `task check`.
+
+---
+
 ## Fase 1 — Sviluppo: il ciclo che ripeterai tutto il giorno
 
 Questo branch è l'esempio svolto della traccia turismo: `tourist-service`,
@@ -553,6 +613,7 @@ la verità su quello che Hibernate creerà.
 | `task use-postgres` | Collega un modulo a PostgreSQL (`DBNAME=` per un database suo) |
 | `task enable-swagger` | Rimette Swagger su un modulo che non ce l'ha |
 | `task db-config` | Stampa o cambia database, utente, password e porta di PostgreSQL |
+| `task ide-sync` | Riallinea VS Code e Zed ai moduli veri (lo chiamano da soli new-service, remove-service, set-port) |
 | `task rename-project` | Rinomina la cartella dei moduli Maven, ovunque sia nominata |
 | `task seed-data` | Dati di prova ricavati dalle `@Entity` (`data.sql`) |
 | `task db-schema` | Schema concettuale e logico ricavato dalle `@Entity` |
