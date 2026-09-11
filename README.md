@@ -1,10 +1,24 @@
-# Spring Boot Dockerized — Template d'esame ITS
+# Spring Boot Dockerized — Traccia svolta: Biblioteca di quartiere
 
-Template **vuoto** per una prova finale a microservizi: c'è l'impalcatura già
-configurata e collaudata (Eureka, OpenFeign, OpenAPI/Swagger, PostgreSQL, Docker
-Compose, hot reload), **non** c'è nessun servizio d'esempio da smontare.
+Questo branch contiene la traccia **Biblioteca di quartiere** svolta per
+intero sul template del branch
+[`main`](https://github.com/daubog44/spring-boot-dockerized/tree/main): un
+catalogo di libri e autori, un servizio dei prestiti con la penale per i
+ritardi, un'interfaccia web, due database PostgreSQL, Eureka e Docker Compose.
+È il filo del corso (`task learn`): ogni pezzo di codice che il corso mostra
+sta qui, compilato e collaudato. Traccia, architettura, endpoint e collaudo
+sono in **[README-ESAME-TTFCLOUD.md](./README-ESAME-TTFCLOUD.md)**.
 
-I servizi della traccia li generi con un comando:
+```bash
+task dev
+```
+
+```bash
+powershell -ExecutionPolicy Bypass -File test_e2e_biblioteca.ps1
+```
+
+Il resto di questa pagina è il README del template. Nel template i servizi
+della traccia si generano con un comando:
 
 ```bash
 task new-service NAME=ordini-service
@@ -33,10 +47,10 @@ dettaglio di un comando singolo, con le sue variabili, è
 
 ## Branch
 
-- **`main`** (questo): il template vuoto. È da qui che si parte a ogni traccia.
+- **`main`**: il template vuoto. È da qui che si parte a ogni traccia.
 - **[`solution/wms`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: soluzione completa della traccia **WMS magazzino** (product, crm, wms, wms-ui, calcolo distanza Manhattan, DTO condivisi, collaudo end-to-end).
 - **[`example/tourist-events`](https://github.com/daubog44/spring-boot-dockerized/tree/example/tourist-events)**: esempio svolto della traccia **eventi/turismo** (wrapper OpenFeign di OpenDataHub, estrazione casuale, storico su PostgreSQL).
-- **[`example/biblioteca`](https://github.com/daubog44/spring-boot-dockerized/tree/example/biblioteca)**: la traccia **Biblioteca di quartiere** svolta per intero, ed è il filo del corso (catalogo e prestiti con due database, Feign nei due sensi, penale per ritardo con i suoi test, interfaccia con form e restituzioni, collaudo end-to-end).
+- **`example/biblioteca`** (questo): la traccia **Biblioteca di quartiere** svolta per intero, ed è il filo del corso (catalogo e prestiti con due database, Feign nei due sensi, penale per ritardo con i suoi test, interfaccia con form e restituzioni, collaudo end-to-end).
 
 I branch svolti servono da riferimento: non serve copiarli, serve guardarli
 quando non ricordi come si fa una cosa.

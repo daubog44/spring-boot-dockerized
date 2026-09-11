@@ -235,9 +235,10 @@ passare dai comandi; se il `launch.json` resta indietro, te lo dice `task check`
 
 ## Fase 1 — Sviluppo: il ciclo che ripeterai tutto il giorno
 
-Questo branch è il template vuoto: c'è Eureka, il modulo `common-dto` per le
-classi condivise, e nient'altro. I servizi della traccia li crei tu, un
-comando per uno:
+Questo branch ha la traccia Biblioteca già svolta: `catalogo-service`,
+`prestiti-service` e `biblioteca-ui`, oltre a Eureka e `common-dto`. Nel
+template vuoto (`main`) i servizi della traccia li crei tu, un comando per
+uno:
 
 ```bash
 task new-service NAME=ordini-service
