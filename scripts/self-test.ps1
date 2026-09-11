@@ -606,6 +606,30 @@ Test-Case 'rete dice quali domini non passano, senza fallire' {
     Assert-Contains $r.Output 'NON risponde' 'non ha visto che l''indirizzo non risponde'
 }
 
+Test-Case 'offline-prep scarica anche una copia di scorta di task' {
+    # Il download vero servirebbe la rete: qui verifichiamo solo che lo
+    # script sappia dove metterla, e che il collaudo (senza -Prep) e
+    # usa-task-locale sappiano trovarla dopo.
+    Assert-Contains (Get-Text 'scripts/offline.ps1') '.tools/task' 'offline-prep non prepara una copia di scorta di task'
+    Assert-Contains (Get-Text 'scripts/offline.ps1') 'usa-task-locale.ps1' 'offline non dice come usare la copia locale'
+}
+
+Test-Case 'usa-task-locale trova ed espone la copia locale di task' {
+    $usaScript = Join-Path $sandboxScripts 'usa-task-locale.ps1'
+
+    # Senza una copia locale: lo dice chiaramente, senza esplodere.
+    $senzaCopia = ("" + (& powershell -NoProfile -ExecutionPolicy Bypass -Command ". '$usaScript'" 2>&1))
+    Assert-Contains $senzaCopia 'offline-prep' 'senza una copia locale non spiega come procurarsela'
+
+    # Con una copia (anche finta) di task.exe: la trova e la mette sul PATH
+    # di questa sessione. Dev'essere lanciato col punto (dot-sourcing).
+    $taskDir = Join-Path $sandbox '.tools/task'
+    New-Item -ItemType Directory -Force -Path $taskDir | Out-Null
+    Set-Content -Path (Join-Path $taskDir 'task.exe') -Value 'finto' -Encoding ascii
+    $sulPath = ("" + (& powershell -NoProfile -ExecutionPolicy Bypass -Command ". '$usaScript'; `$env:Path -split ';' -contains '$taskDir'")).Trim()
+    Assert-That ($sulPath -match 'True') 'non aggiunge la copia locale al PATH di questa sessione'
+}
+
 Test-Case 'learn raccoglie lezioni, guide e moduli in contenuti.js' {
     Assert-Ok (Invoke-Tool 'learn.ps1' @('-NoOpen')) 'task learn e'' fallito'
     $js = Get-Text 'corso/contenuti.js'

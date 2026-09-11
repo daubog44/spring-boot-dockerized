@@ -77,6 +77,7 @@ Write-Cmd 'task rete' 'quali domini passano da qui, e cosa fare se no'
 Write-Cmd 'task offline-prep' 'LA SERA PRIMA, A CASA: scarica tutto'
 Write-Cmd 'task offline' 'dice se partirebbe anche senza rete'
 Write-Note 'Se Docker Hub non passa: task dev + task run-db, che non ricompila dentro Docker.'
+Write-Note 'Se task non risponde: . .\scripts\usa-task-locale.ps1 (c''e'' gia'' una copia in .tools/task).'
 
 Write-Section 'Docker, per la demo'
 Write-Cmd 'task docker-up' 'costruisce le immagini e avvia i container'
