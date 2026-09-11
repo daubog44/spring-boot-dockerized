@@ -13,16 +13,18 @@ COMPOSE="$DEMO_DIR/docker-compose.yml"
 
 MODULE=""
 DB_NAME=""
+REMOVE_H2=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -Module|--module) MODULE="$2"; shift 2 ;;
     -DbName|--db-name) DB_NAME="$2"; shift 2 ;;
+    -RemoveH2|--remove-h2) REMOVE_H2=1; shift ;;
     *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
   esac
 done
 
 if [ -z "$MODULE" ]; then
-  echo "Uso: task use-postgres SERVICE=<modulo> [DBNAME=<database>]" >&2
+  echo "Uso: task use-postgres SERVICE=<modulo> [DBNAME=<database>] [REMOVE_H2=1]" >&2
   exit 1
 fi
 if [ ! -f "$DEMO_DIR/$MODULE/pom.xml" ]; then
@@ -72,6 +74,18 @@ if [ -n "$MISSING" ]; then
   echo "  pom.xml: aggiunte ${MISSING//,/, }"
 else
   echo "  pom.xml: data-jpa e driver PostgreSQL gia' presenti"
+fi
+
+if [ "$REMOVE_H2" -eq 1 ]; then
+  python3 -c '
+import sys, re
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    text = f.read()
+text = re.sub(r"(?s)\s*<dependency>\s*<groupId>com\.h2database</groupId>\s*<artifactId>h2</artifactId>.*?</dependency>", "", text)
+with open(sys.argv[1], "w", encoding="utf-8") as f:
+    f.write(text)
+' "$POM" 2>/dev/null || true
+  echo "  pom.xml: rimossa dipendenza h2"
 fi
 
 # --- 2. application.yml -------------------------------------------------------

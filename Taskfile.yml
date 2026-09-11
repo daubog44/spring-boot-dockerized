@@ -281,13 +281,15 @@ tasks:
         FROM=<modulo>      OBBLIGATORIA: modulo chiamante (es. prestiti-service)
         TO=<modulo>        OBBLIGATORIA: modulo da chiamare (es. catalogo-service)
         DTO=<NomeDto>      facoltativa: nome del DTO di common-dto (es. LibroDto)
+        FIELDS=<campi>     facoltativa: se il DTO non esiste o sono specificati,
+                           crea automaticamente il DTO in common-dto!
         NAME=<Nome>        facoltativa: nome client (default: derivato da TO)
         PATH=<rotta>       facoltativa: prefisso rotta (default: /api/<risorsa>)
 
       Esempio:
-        task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto
+        task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto FIELDS=id:long,titolo:string:required
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-client.ps1{{if .FROM}} -From {{.FROM}}{{end}}{{if .TO}} -To {{.TO}}{{end}}{{if .DTO}} -Dto {{.DTO}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .PATH}} -Path {{.PATH}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-client.sh{{if .FROM}} --from {{.FROM}}{{end}}{{if .TO}} --to {{.TO}}{{end}}{{if .DTO}} --dto {{.DTO}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .PATH}} --path {{.PATH}}{{end}} {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-client.ps1{{if .FROM}} -From {{.FROM}}{{end}}{{if .TO}} -To {{.TO}}{{end}}{{if .DTO}} -Dto {{.DTO}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .PATH}} -Path {{.PATH}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-client.sh{{if .FROM}} --from {{.FROM}}{{end}}{{if .TO}} --to {{.TO}}{{end}}{{if .DTO}} --dto {{.DTO}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .PATH}} --path {{.PATH}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   new-view:
     desc: "Genera controller Thymeleaf e vista HTML con tabella e form (task new-view SERVICE=event-ui NAME=Libri)"
@@ -306,6 +308,40 @@ tasks:
         task new-view SERVICE=event-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-view.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .ROUTE}} -Route {{.ROUTE}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-view.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .ROUTE}} --route {{.ROUTE}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}} {{.CLI_ARGS}}{{end}}'
+
+  new-auth:
+    desc: "Configura autenticazione Spring Security (task new-auth SERVICE=<modulo> [TYPE=inmemory|db|form])"
+    summary: |
+      Configura Spring Security con utenti e ruoli per un modulo in tre modalita':
+        - TYPE=inmemory (default per REST): HTTP Basic, utenti admin/user, Swagger aperto
+        - TYPE=db: UtenteEntity, UtenteRepository, CustomUserDetailsService, BCrypt e seed
+        - TYPE=form: Form login (/login), LoginController e login.html stilizzato
+
+      Variabili:
+        SERVICE=<modulo>   OBBLIGATORIA: modulo da proteggere
+        TYPE=<tipo>        facoltativa: inmemory, db, form (default auto: form se UI, inmemory se REST)
+
+      Esempi:
+        task new-auth SERVICE=ordini-service
+        task new-auth SERVICE=ordini-service TYPE=db
+        task new-auth SERVICE=store-ui TYPE=form
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-auth.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .TYPE}} -Type {{.TYPE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-auth.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .TYPE}} --type {{.TYPE}}{{end}} {{.CLI_ARGS}}{{end}}'
+
+  new-handler:
+    desc: "Genera GlobalExceptionHandler (@RestControllerAdvice) per un modulo (task new-handler SERVICE=<modulo>)"
+    summary: |
+      Genera GlobalExceptionHandler.java con annotazione @RestControllerAdvice:
+      cattura errori di validazione (@Valid), 404 Not Found ed errori imprevisti
+      formattando risposte JSON ordinate e leggibili.
+
+      Variabili:
+        SERVICE=<modulo>   OBBLIGATORIA: modulo in cui creare l'handler
+
+      Esempio:
+        task new-handler SERVICE=ordini-service
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-handler.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-handler.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   add-dep:
     desc: "Aggiunge dipendenze al pom di un modulo (task add-dep SERVICE=wms-service DEPS=security,mail)"
@@ -422,16 +458,18 @@ tasks:
         SERVICE=<modulo>   OBBLIGATORIA, la cartella sotto demo/
         DBNAME=<database>  facoltativa: un database dedicato a questo modulo,
                            invece di quello condiviso del compose
+        REMOVE_H2=1        facoltativa: rimuove anche h2 dal pom.xml
 
       Esempi:
         task use-postgres SERVICE=ordini-service
         task use-postgres SERVICE=ordini-service DBNAME=ordini
+        task use-postgres SERVICE=ordini-service REMOVE_H2=1
 
       Con DBNAME crea anche lo script di init del database: PostgreSQL li
       esegue solo a volume vuoto, quindi la prima volta serve
       `task docker-reset`.
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/use-postgres.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .DBNAME}} -DbName {{.DBNAME}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/use-postgres.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .DBNAME}} --db-name {{.DBNAME}}{{end}} {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/use-postgres.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .DBNAME}} -DbName {{.DBNAME}}{{end}}{{if .REMOVE_H2}} -RemoveH2{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/use-postgres.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .DBNAME}} --db-name {{.DBNAME}}{{end}}{{if .REMOVE_H2}} --remove-h2{{end}} {{.CLI_ARGS}}{{end}}'
 
   enable-swagger:
     desc: "Accende Swagger UI su un modulo che non ce l'ha (task enable-swagger SERVICE=<modulo>)"

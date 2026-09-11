@@ -230,6 +230,38 @@ assert_ok "new-view" &&
   assert_contains "demo/beta-ui/src/main/resources/templates/libri.html" 'xmlns:th="http://www.thymeleaf.org"'
 end_case
 
+start_case "new-client crea automaticamente il DTO in common-dto se sono passati FIELDS"
+run_tool new-client.sh --from alfa-service --to beta-ui --name BetaClient --dto AutoreDto --fields "nome:string:required"
+assert_ok "new-client con FIELDS" &&
+  assert_file "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/AutoreDto.java" &&
+  assert_file "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/BetaClient.java"
+end_case
+
+start_case "new-auth configura la sicurezza su database (UtenteEntity, Repo, UserDetailsService, BCrypt)"
+run_tool new-auth.sh --service epsilon-service --type db
+assert_ok "new-auth db" &&
+  assert_file "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/entity/UtenteEntity.java" &&
+  assert_file "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/repository/UtenteRepository.java" &&
+  assert_file "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/service/CustomUserDetailsService.java" &&
+  assert_file "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/config/SecurityConfig.java"
+end_case
+
+start_case "new-auth configura form login su modulo UI (LoginController, login.html)"
+run_tool new-auth.sh --service beta-ui --type form
+assert_ok "new-auth form" &&
+  assert_file "demo/beta-ui/src/main/java/$(sb_package_path beta-ui)/controller/LoginController.java" &&
+  assert_file "demo/beta-ui/src/main/resources/templates/login.html" &&
+  assert_contains "demo/beta-ui/src/main/resources/templates/login.html" 'th:action="@{/login}"'
+end_case
+
+start_case "new-handler genera GlobalExceptionHandler (@RestControllerAdvice)"
+run_tool new-handler.sh --service alfa-service
+assert_ok "new-handler" &&
+  assert_file "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/controller/GlobalExceptionHandler.java" &&
+  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/controller/GlobalExceptionHandler.java" "@RestControllerAdvice" &&
+  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/controller/GlobalExceptionHandler.java" "MethodArgumentNotValidException"
+end_case
+
 start_case "add-dep aggiunge dal catalogo e crea SecurityConfig se security"
 run_tool add-dep.sh --module alfa-service --deps security,mail
 assert_ok "add-dep" &&

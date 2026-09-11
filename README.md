@@ -109,7 +109,13 @@ Il comando `task` da solo stampa questo elenco.
 Sviluppo:
 
 - `task wizard`: Fa le domande e monta il progetto (`SERVICE=<modulo>` per uno solo).
+- `task new-service NAME=<nome>`: Genera un nuovo microservizio Spring Boot collegato.
 - `task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=...`: Genera entity, repository, service e controller.
+- `task new-dto NAME=<Nome> FIELDS=...`: Genera un DTO con validazione in common-dto.
+- `task new-client FROM=<da> TO=<a> DTO=<NomeDto> [FIELDS=...]`: Genera FeignClient (e DTO correlato se specificato).
+- `task new-view SERVICE=<modulo> NAME=<Nome> FIELDS=...`: Genera Controller e template Thymeleaf per UI.
+- `task new-auth SERVICE=<modulo> TYPE=db|inmemory|form`: Configura Spring Security con zero boilerplate.
+- `task new-handler SERVICE=<modulo>`: Genera GlobalExceptionHandler (@RestControllerAdvice).
 - `task consegna NOME=COGNOME_NOME`: Prepara la cartella da consegnare.
 - `task seed-data`: Dati di prova ricavati dalle `@Entity`.
 - `task db-schema`: Schema concettuale e logico ricavato dalle `@Entity`.
@@ -176,7 +182,6 @@ task wizard
 Per un microservizio solo: `task wizard SERVICE=<nome>`. Non fa niente di
 magico: chiama `set-java`, `rename-project`, `set-package`, `db-config`,
 `new-service` e `use-postgres` nell'ordine giusto, e finisce con `task check`.
-
 
 Scritte le entity, due comandi le mettono al lavoro. Tutti e due passano dal
 database vero, non dalla lettura dei sorgenti: avviano l'applicazione, lasciano
