@@ -210,6 +210,37 @@ function Test-ProtectedProcess {
     return ($protected -contains $Listener.Name.ToLower())
 }
 
+function Stop-ForeignContainers {
+    <#
+        Ferma i container di altri progetti Compose che tengono una porta dello
+        stack: un'altra copia del template, o questa stessa di prima che ogni
+        copia avesse il suo progetto. Fermati, non cancellati: i loro dati
+        restano. Quelli di questo progetto non si toccano.
+    #>
+    param([int]$Port, [switch]$KeepForeign, [switch]$Quiet)
+    $stopped = 0
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        foreach ($row in @(docker ps --filter "publish=$Port" --format '{{.ID}} {{.Names}}' 2>$null)) {
+            if ($row -notmatch '^(\S+)\s+(\S+)') { continue }
+            $id = $Matches[1]
+            $name = $Matches[2]
+            if ($env:COMPOSE_PROJECT_NAME -and $name.StartsWith($env:COMPOSE_PROJECT_NAME + '-')) { continue }
+            if ($KeepForeign) {
+                if (-not $Quiet) { Write-Host "  porta $Port tenuta dal container $name, di un altro progetto: lasciato acceso." -ForegroundColor Yellow }
+                continue
+            }
+            Write-Host "  fermo il container $name, di un altro progetto, che teneva la porta $Port" -ForegroundColor Yellow
+            docker stop $id 2>&1 | Out-Null
+            $stopped++
+        }
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    return $stopped
+}
+
 function Stop-DevStack {
     <#
     .SYNOPSIS
@@ -310,19 +341,9 @@ function Stop-DevStack {
                 Write-Host '  (docker compose non raggiungibile: container ancora accesi)' -ForegroundColor Yellow
             }
             # Un container di un'altra copia del template, o di prima che ogni
-            # copia avesse il suo progetto Compose, puo' tenere ancora le porte:
-            # si ferma come un'applicazione estranea (fermato, non cancellato).
+            # copia avesse il suo progetto Compose, puo' tenere ancora le porte.
             foreach ($port in $portsToFree) {
-                foreach ($row in @(docker ps --filter "publish=$port" --format '{{.ID}} {{.Names}}' 2>$null)) {
-                    if ($row -notmatch '^(\S+)\s+(\S+)') { continue }
-                    if ($KeepForeign) {
-                        Write-Host "  porta $port tenuta dal container $($Matches[2]): lasciato acceso." -ForegroundColor Yellow
-                        continue
-                    }
-                    Write-Host "  fermo il container $($Matches[2]), che teneva la porta $port" -ForegroundColor Yellow
-                    docker stop $Matches[1] 2>&1 | Out-Null
-                    $stopped++
-                }
+                $stopped += Stop-ForeignContainers -Port $port -KeepForeign:$KeepForeign -Quiet:$Quiet
             }
         } finally {
             $ErrorActionPreference = $previousPreference

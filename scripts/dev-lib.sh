@@ -73,6 +73,28 @@ wait_for_port() {
   return 1
 }
 
+# Ferma i container di altri progetti Compose che tengono una porta dello stack:
+# un'altra copia del template, o questa stessa di prima che ogni copia avesse il
+# suo progetto. Fermati, non cancellati: i loro dati restano. Quelli di questo
+# progetto non si toccano.
+# Uso: stop_foreign_containers <porta> [keep_foreign]
+stop_foreign_containers() {
+  local port="$1" keep="${2:-}" cid cname
+  command -v docker >/dev/null 2>&1 || return 0
+  while read -r cid cname; do
+    [ -z "${cid:-}" ] && continue
+    if [ -n "${COMPOSE_PROJECT_NAME:-}" ]; then
+      case "$cname" in "$COMPOSE_PROJECT_NAME"-*) continue ;; esac
+    fi
+    if [ -n "$keep" ]; then
+      echo "  porta $port tenuta dal container $cname, di un altro progetto: lasciato acceso." >&2
+    else
+      echo "  fermo il container $cname, di un altro progetto, che teneva la porta $port" >&2
+      docker stop "$cid" >/dev/null 2>&1 || true
+    fi
+  done < <(docker ps --filter "publish=$port" --format '{{.ID}} {{.Names}}' 2>/dev/null)
+}
+
 # Libera davvero le porte dello stack: termina i nostri processi java, spegne i
 # container dell'esame e chiude le applicazioni estranee rimaste in ascolto.
 # Restano intoccati i processi di sistema e l'infrastruttura di Docker.
@@ -137,19 +159,9 @@ stop_dev_stack() {
       echo "  (docker compose non raggiungibile)" >&2
     stopped=$((stopped + 1))
     # Un container di un'altra copia del template, o di prima che ogni copia
-    # avesse il suo progetto Compose, puo' tenere ancora le porte: si ferma come
-    # un'applicazione estranea (fermato, non cancellato).
-    local cid cname
+    # avesse il suo progetto Compose, puo' tenere ancora le porte.
     for port in $all_ports; do
-      while read -r cid cname; do
-        [ -z "${cid:-}" ] && continue
-        if [ -n "$keep_foreign" ]; then
-          echo "  porta $port tenuta dal container $cname: lasciato acceso." >&2
-        else
-          echo "  fermo il container $cname, che teneva la porta $port" >&2
-          docker stop "$cid" >/dev/null 2>&1 || true
-        fi
-      done < <(docker ps --filter "publish=$port" --format '{{.ID}} {{.Names}}' 2>/dev/null)
+      stop_foreign_containers "$port" "$keep_foreign"
     done
   fi
 

@@ -95,11 +95,14 @@ fi
 
 if [ "$USES_POSTGRES" -eq 1 ]; then
   echo "==> Avvio PostgreSQL su Docker..."
-  (cd "$DEMO_DIR" && docker compose up -d postgres)
   # La porta pubblicata sul PC la decide db-config (o il wizard): non e' detto
   # che sia ancora la 5432.
   PG_PORT="$(grep -oE '^[[:space:]]+-[[:space:]]*"[0-9]+:5432"' "$DEMO_DIR/docker-compose.yml" | head -n 1 | grep -oE '[0-9]+:5432' | cut -d: -f1 || true)"
   [ -n "$PG_PORT" ] || PG_PORT=5432
+  # Il PostgreSQL di un'altra copia del template (o di questa, col nome di
+  # progetto di prima) terrebbe la porta: "port is already allocated".
+  stop_foreign_containers "$PG_PORT" "$KEEP_FOREIGN"
+  (cd "$DEMO_DIR" && docker compose up -d postgres)
   if ! wait_for_port "$PG_PORT" 60; then
     echo "PostgreSQL non risponde sulla porta $PG_PORT." >&2
     exit 1
