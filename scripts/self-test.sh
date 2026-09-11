@@ -497,7 +497,9 @@ assert_out_contains "veicolo_entity 24"
 end_case
 
 start_case "db-schema legge tabelle, chiavi e vincoli dal database"
-run_tool db-schema.sh --no-build
+# Senza --no-build: sui branch svolti ci sono altri moduli con delle entity,
+# che seed-data (limitato ad alfa-service) non ha compilato.
+run_tool db-schema.sh
 assert_ok "db-schema"
 for needle in '## Modulo `alfa-service`' 'Modello concettuale' 'Modello logico' 'erDiagram' \
   'Tabella `articoli`' 'Tabella `deposito_entity`' '| `stato` | VARCHAR(20) |' 'valori ammessi: DISPONIBILE' \
