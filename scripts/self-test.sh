@@ -542,6 +542,28 @@ run_tool set-package.sh --package it.class
 assert_fails "set-package con una parola riservata"
 end_case
 
+start_case "rete dice quali domini non passano, senza fallire"
+run_tool rete.sh --url http://127.0.0.1:9/ --timeout 3
+assert_ok "task rete" && assert_out_contains "NON risponde"
+end_case
+
+start_case "learn raccoglie lezioni, guide e moduli in contenuti.js"
+run_tool learn.sh --no-open
+JS="$SANDBOX/corso/contenuti.js"
+N_LESSONS="$(ls "$SANDBOX/corso/lezioni"/*.md 2>/dev/null | wc -l | tr -d ' ')"
+# I testi stanno fra apici inversi: dentro, apici inversi e ${ vanno protetti,
+# altrimenti il JavaScript si rompe e la pagina resta vuota.
+N_TICKS="$(sed -e 's/\\\\//g' -e 's/\\`//g' "$JS" 2>/dev/null | tr -cd '`' | wc -c | tr -d ' ')"
+N_ENTRIES="$(grep -c 'testo: `' "$JS" 2>/dev/null)"
+assert_ok "task learn" &&
+  { [ "$N_LESSONS" -gt 0 ] || fail "nessuna lezione in corso/lezioni"; } &&
+  { [ "$(grep -c "file: 'corso/lezioni/" "$JS")" -eq "$N_LESSONS" ] || fail "non ci sono tutte le lezioni"; } &&
+  assert_contains corso/contenuti.js "file: 'GIORNO-ESAME.md'" &&
+  assert_contains corso/contenuti.js "nome: 'alfa-service'" &&
+  assert_contains corso/contenuti.js '\${SERVER_PORT' &&
+  { [ "$N_TICKS" -eq $(( 2 * N_ENTRIES )) ] || fail "un apice inverso non protetto rompe il JavaScript"; }
+end_case
+
 start_case "consegna prepara un archivio che parte appena scompattato"
 run_tool consegna.sh --nome ROSSI_MARIO
 assert_ok "consegna"
@@ -571,6 +593,33 @@ else
   [ -z "$(find "$DEST" -type d -name target)" ] || fail "nella consegna ci sono cartelle target/"
   [ -z "$(find "$DEST" -type f -name '*.zip')" ] || fail "archivi dentro l'archivio"
   grep -q 'Scompatta ogni archivio' "$DEST/ISTRUZIONI-ESECUZIONE.md" && fail "le istruzioni chiedono ancora di ricomporre il progetto"
+  rm -rf "$DEST"
+fi
+end_case
+
+# Prima la consegna faceva l'archivio e poi diceva di riempire l'allegato:
+# l'archivio restava coi segnaposto, e una consegna rifatta cancellava il testo.
+start_case "consegna mette nell'archivio il testo scritto in allegato.md"
+if [ ! -f "$SANDBOX/allegato.md" ]; then
+  fail "la prima consegna non ha creato allegato.md"
+else
+  assert_contains allegato.md "## alfa-service" "allegato.md"
+  printf '# Le mie parti\n\n## Analisi\n\nLa biblioteca di prova presta libri.\n\n## Algoritmo\n\nLa penale di prova.\n' >"$SANDBOX/allegato.md"
+  run_tool consegna.sh --nome ROSSI_MARIO
+  DEST="$SANDBOX/consegna-allegato"
+  mkdir -p "$DEST"
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -q "$SANDBOX/consegna/ROSSI_MARIO.zip" ALLEGATO-TECNICO.md -d "$DEST"
+  else
+    (cd "$DEST" && jar xf "$SANDBOX/consegna/ROSSI_MARIO.zip" ALLEGATO-TECNICO.md)
+  fi
+  assert_ok "la seconda consegna" &&
+    assert_out_contains "mancano ancora" &&
+    assert_contains consegna-allegato/ALLEGATO-TECNICO.md "La biblioteca di prova presta libri." "l'allegato nell'archivio" &&
+    assert_contains consegna-allegato/ALLEGATO-TECNICO.md "La penale di prova." "l'allegato nell'archivio" &&
+    assert_not_contains consegna-allegato/ALLEGATO-TECNICO.md "[Due o tre paragrafi" "l'allegato nell'archivio" &&
+    assert_contains allegato.md "## alfa-service" "allegato.md dopo la consegna" &&
+    assert_contains allegato.md "La biblioteca di prova presta libri." "allegato.md dopo la consegna"
   rm -rf "$DEST"
 fi
 end_case

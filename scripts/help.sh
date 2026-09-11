@@ -12,15 +12,19 @@ COMANDI DEL PROGETTO
   Si usano con variabili NOME=valore, mai con trattini.
   Dettaglio di uno solo: task --summary <comando>
 
-Dall'inizio alla consegna
+Per imparare
 EOF
+cmd "task learn" "il corso nel browser, dalla traccia alla consegna"
+
+echo ""
+echo "Dall'inizio alla consegna"
 cmd "task wizard" "fa le domande e monta il progetto"
 cmd "task wizard SERVICE=<modulo>" "le domande di un microservizio solo"
 cmd "task seed-data" "dati di prova a ogni avvio, passando da Hibernate"
 cmd "task db-schema" "schema concettuale e logico, letto dal database"
 cmd "task consegna NOME=COGNOME_NOME" "la cartella da consegnare"
 note "Il wizard e' anche task init. seed-data: SERVICE=<modulo>, ROWS=<n> (0 = spenti)."
-note "db-schema: OUT=<file>. consegna genera l'allegato tecnico gia' compilato."
+note "db-schema: OUT=<file>. consegna: le parti scritte a mano stanno in allegato.md."
 
 echo ""
 echo "La giornata, in ordine"
@@ -67,10 +71,11 @@ cmd "task ide-sync" "riallinea VS Code e Zed ai moduli veri"
 note "ide-sync lo chiamano da soli new-service, remove-service e set-port."
 
 echo ""
-echo "Esame senza rete"
-cmd "task offline-prep" "DA FARE CON LA RETE: scarica tutto"
-cmd "task offline" "dice se partirebbe a rete staccata"
-note "Senza rete presenta con task dev + task run-db: non ricompila dentro Docker."
+echo "La rete all'esame (filtrata: Maven Central passa, il resto forse no)"
+cmd "task rete" "quali domini passano da qui, e cosa fare se no"
+cmd "task offline-prep" "LA SERA PRIMA, A CASA: scarica tutto"
+cmd "task offline" "dice se partirebbe anche senza rete"
+note "Se Docker Hub non passa: task dev + task run-db, che non ricompila dentro Docker."
 
 echo ""
 echo "Docker, per la demo"

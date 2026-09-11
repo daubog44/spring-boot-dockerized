@@ -1,16 +1,16 @@
 <#
 .SYNOPSIS
-    Registra il video del corso: la lavagna di corso/index.html, scena per
+    Registra il video del corso: la lavagna di corso/giornata.html, scena per
     scena, letta dalla voce italiana di Windows. Niente servizi esterni.
 
 .DESCRIPTION
-    Il testo sta tutto in index.html: le lezioni (il blocco "lezioni") e la
+    Il testo sta tutto in giornata.html: le fasi (il blocco "lezioni") e la
     pronuncia delle parole inglesi (PRONUNCIA). Cambi la pagina, rilanci
     questo script, e il video la segue.
 
     Per ogni scena:
       1. Edge (o Chrome) senza finestra fotografa la lavagna a 1280x720
-         (index.html?video=<scena>);
+         (giornata.html?video=<scena>);
       2. la voce italiana di Windows (Microsoft Elsa) legge la didascalia in
          un file WAV;
       3. ffmpeg unisce immagine e voce.
@@ -28,7 +28,7 @@
 param([string]$Out = (Join-Path $PSScriptRoot 'quaderno-esame.mp4'))
 
 $ErrorActionPreference = 'Stop'
-$html = Join-Path $PSScriptRoot 'index.html'
+$html = Join-Path $PSScriptRoot 'giornata.html'
 $page = [System.IO.File]::ReadAllText($html)
 
 # --- Il testo, dalla pagina ----------------------------------------------------

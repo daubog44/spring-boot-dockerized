@@ -22,6 +22,9 @@ Write-Host 'COMANDI DEL PROGETTO' -ForegroundColor Green
 Write-Host '  Si usano con variabili NOME=valore, mai con trattini.' -ForegroundColor DarkGray
 Write-Host '  Dettaglio di uno solo: task --summary <comando>' -ForegroundColor DarkGray
 
+Write-Section 'Per imparare'
+Write-Cmd 'task learn' 'il corso nel browser, dalla traccia alla consegna'
+
 Write-Section 'Dall''inizio alla consegna'
 Write-Cmd 'task wizard' 'fa le domande e monta il progetto'
 Write-Cmd 'task wizard SERVICE=<modulo>' 'le domande di un microservizio solo'
@@ -29,7 +32,7 @@ Write-Cmd 'task seed-data' 'dati di prova a ogni avvio, passando da Hibernate'
 Write-Cmd 'task db-schema' 'schema concettuale e logico, letto dal database'
 Write-Cmd 'task consegna NOME=COGNOME_NOME' 'la cartella da consegnare'
 Write-Note 'Il wizard e'' anche task init. seed-data: SERVICE=<modulo>, ROWS=<n> (0 = spenti).'
-Write-Note 'db-schema: OUT=<file>. consegna genera l''allegato tecnico gia'' compilato.'
+Write-Note 'db-schema: OUT=<file>. consegna: le parti scritte a mano stanno in allegato.md.'
 
 Write-Section 'La giornata, in ordine'
 Write-Cmd 'task dev' 'compila e avvia tutto in background'
@@ -69,10 +72,11 @@ Write-Cmd 'task test' 'collauda gli strumenti in una copia usa-e-getta'
 Write-Cmd 'task ide-sync' 'riallinea VS Code e Zed ai moduli veri'
 Write-Note 'ide-sync lo chiamano da soli new-service, remove-service e set-port.'
 
-Write-Section 'Esame senza rete'
-Write-Cmd 'task offline-prep' 'DA FARE CON LA RETE: scarica tutto'
-Write-Cmd 'task offline' 'dice se partirebbe a rete staccata'
-Write-Note 'Senza rete presenta con task dev + task run-db: non ricompila dentro Docker.'
+Write-Section 'La rete all''esame (filtrata: Maven Central passa, il resto forse no)'
+Write-Cmd 'task rete' 'quali domini passano da qui, e cosa fare se no'
+Write-Cmd 'task offline-prep' 'LA SERA PRIMA, A CASA: scarica tutto'
+Write-Cmd 'task offline' 'dice se partirebbe anche senza rete'
+Write-Note 'Se Docker Hub non passa: task dev + task run-db, che non ricompila dentro Docker.'
 
 Write-Section 'Docker, per la demo'
 Write-Cmd 'task docker-up' 'costruisce le immagini e avvia i container'
