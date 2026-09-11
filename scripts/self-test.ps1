@@ -537,7 +537,9 @@ Test-Case 'seed-data riempie ogni tabella passando da Hibernate (Maven + H2)' {
 }
 
 Test-Case 'db-schema legge tabelle, chiavi e vincoli dal database' {
-    $r = Invoke-Tool 'db-schema.ps1' @('-NoBuild')
+    # Senza -NoBuild: sui branch svolti ci sono altri moduli con delle entity,
+    # che seed-data (limitato ad alfa-service) non ha compilato.
+    $r = Invoke-Tool 'db-schema.ps1'
     Assert-Ok $r 'db-schema e'' fallito'
     foreach ($needle in @('## Modulo `alfa-service`', 'Modello concettuale', 'Modello logico', 'erDiagram',
             'Tabella `articoli`', 'Tabella `deposito_entity`', '| `stato` | VARCHAR(20) |', 'valori ammessi: DISPONIBILE',
