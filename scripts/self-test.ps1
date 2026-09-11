@@ -321,10 +321,16 @@ Test-Case 'new-service mette il modulo nuovo nel launch.json' {
     Assert-Contains $launch 'com.example.ttfcloud_esame.alfaservice.Main' 'classe Main sbagliata'
     # common-dto e' una libreria: non si avvia.
     Assert-NotContains $launch '"projectName": "common-dto"' 'una libreria non va fra le configurazioni di avvio'
+    # Zed ha il suo file, con l'adattatore della sua estensione Java.
+    $zedDebug = Get-Text '.zed/debug.json'
+    Assert-Contains $zedDebug '"projectName": "alfa-service"' 'il modulo nuovo non e'' nel debug.json di Zed'
+    Assert-Contains $zedDebug '"adapter": "Java"' 'il debug.json di Zed non usa l''adattatore Java'
+    Assert-Contains $zedDebug 'com.example.ttfcloud_esame.alfaservice.Main' 'classe Main sbagliata nel debug.json'
+    Assert-NotContains $zedDebug '"projectName": "common-dto"' 'una libreria non va nel debug.json'
 }
 
-Test-Case 'launch.json e tasks.json sono JSON validi' {
-    foreach ($relative in @('.vscode/launch.json', '.vscode/tasks.json', '.zed/tasks.json')) {
+Test-Case 'i file degli editor sono JSON validi' {
+    foreach ($relative in @('.vscode/launch.json', '.vscode/tasks.json', '.vscode/settings.json', '.zed/tasks.json', '.zed/debug.json', '.zed/settings.json')) {
         # I file di configurazione degli editor ammettono i commenti //: li
         # togliamo prima di darli al parser.
         $text = (Get-Text $relative) -replace '(?m)^\s*//.*$', ''
@@ -337,11 +343,13 @@ Test-Case 'remove-service toglie il modulo anche dal launch.json' {
     Assert-Contains (Get-Text '.vscode/launch.json') '"projectName": "delta-service"' 'non aggiunto al launch.json'
     Assert-Ok (Invoke-Tool 'remove-service.ps1' @('-Module', 'delta-service')) 'remove-service e'' fallito'
     Assert-NotContains (Get-Text '.vscode/launch.json') 'delta-service' 'rimasto nel launch.json'
+    Assert-NotContains (Get-Text '.zed/debug.json') 'delta-service' 'rimasto nel debug.json di Zed'
 }
 
 Test-Case 'set-port aggiorna la porta scritta nel launch.json' {
     Assert-Ok (Invoke-Tool 'set-port.ps1' @('-Module', 'alfa-service', '-Port', '8399')) 'set-port e'' fallito'
     Assert-Contains (Get-Text '.vscode/launch.json') 'alfa-service (:8399)' 'la porta nel launch.json e'' rimasta indietro'
+    Assert-Contains (Get-Text '.zed/debug.json') 'alfa-service (:8399)' 'la porta nel debug.json di Zed e'' rimasta indietro'
 }
 
 Test-Case 'check si accorge se il launch.json e'' rimasto indietro' {
@@ -383,6 +391,60 @@ Test-Case 'db-config cambia le credenziali dappertutto' {
 
 Test-Case 'db-config rifiuta un valore che PostgreSQL non accetterebbe' {
     Assert-Fails (Invoke-Tool 'db-config.ps1' @('-DbName', 'non valido!')) 'ha accettato un nome impossibile'
+}
+
+# --- Il wizard ----------------------------------------------------------------
+# Le risposte gliele diamo da un file (WIZARD_ANSWERS), una per riga: una riga
+# vuota vale come Invio.
+
+Test-Case 'il wizard senza terminale si rifiuta invece di restare appeso' {
+    $path = Join-Path $sandboxScripts 'wizard.ps1'
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        # < NUL: nessuna tastiera. La redirezione la fa cmd, come farebbe una
+        # pipeline o un'esecuzione automatica.
+        $out = cmd /c "powershell -NoProfile -ExecutionPolicy Bypass -File `"$path`" < NUL 2>&1" | Out-String
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+    Assert-That ($code -ne 0) "senza terminale doveva fermarsi`n$out"
+    Assert-Contains $out 'terminale vero' 'non dice perche'' si ferma'
+}
+
+Test-Case 'il wizard si ferma se le risposte finiscono prima delle domande' {
+    $answers = Join-Path $sandbox 'risposte-corte.txt'
+    Write-TextFile -Path $answers -Text ''
+    $env:WIZARD_ANSWERS = $answers
+    try { $r = Invoke-Tool 'wizard.ps1' } finally { Remove-Item Env:WIZARD_ANSWERS -ErrorAction SilentlyContinue }
+    Assert-Fails $r 'con le risposte finite doveva fermarsi'
+    Assert-Contains $r.Output 'risposte sono finite' 'non dice perche'' si ferma'
+}
+
+Test-Case 'il wizard monta database e servizi rispondendo alle domande' {
+    $answers = Join-Path $sandbox 'risposte.txt'
+    $lines = @(
+        ''                                          # cartella dei moduli: resta com'e'
+        's', 'wizdb', 'wiz', 'wizpass', '5439'      # PostgreSQL, credenziali, porta
+        'omega-service', '1', '', '2'               # REST con database, porta automatica, database condiviso
+        'sigma-ui', '3', '', 'n'                    # interfaccia web, porta automatica, niente Swagger
+        ''                                          # fine dei microservizi
+    )
+    # L'a capo in fondo serve: senza, l'ultima riga vuota non verrebbe letta.
+    Write-TextFile -Path $answers -Text (($lines -join "`n") + "`n")
+    $env:WIZARD_ANSWERS = $answers
+    try { $r = Invoke-Tool 'wizard.ps1' } finally { Remove-Item Env:WIZARD_ANSWERS -ErrorAction SilentlyContinue }
+    Assert-Ok $r 'il wizard e'' fallito'
+
+    $compose = Get-Text 'demo/docker-compose.yml'
+    Assert-Contains $compose 'POSTGRES_DB: wizdb' 'il database non e'' quello scelto'
+    Assert-Contains $compose '"5439:5432"' 'la porta scelta non e'' pubblicata'
+    Assert-Contains (Get-Text 'demo/omega-service/src/main/resources/application.yml') 'jdbc:postgresql://localhost:5439/wizdb' 'il servizio non punta al database condiviso, sulla porta scelta'
+    Assert-That (Test-Path (Join-Path $demo 'sigma-ui/src/main/resources/templates/index.html')) 'l''interfaccia web non ha la sua pagina'
+    Assert-Contains (Get-Text '.vscode/launch.json') '"projectName": "omega-service"' 'il servizio non e'' nel launch.json'
+    Assert-Contains (Get-Text '.zed/debug.json') '"projectName": "sigma-ui"' 'l''interfaccia non e'' nel debug.json di Zed'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo il wizard il progetto non e'' coerente'
 }
 
 # Da qui in poi serve un dominio con delle @Entity: lo scriviamo noi.

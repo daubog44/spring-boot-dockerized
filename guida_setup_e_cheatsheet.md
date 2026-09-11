@@ -315,14 +315,15 @@ ordine), `.vscode/tasks.json` (i comandi `task` dalla palette),
 **Extension Pack for Java**: senza, il tasto Debug non esiste. `F5` ->
 *Stack completo* e hai tutti i servizi con i breakpoint attivi.
 
-**Zed** ha `.zed/tasks.json` (palette -> *task: Spawn*) e `.zed/settings.json`.
-Per il Java serve l'estensione *Java* (jdtls); per il debug passa da VS Code o
-IntelliJ.
+**Zed** ha `.zed/debug.json` (`F4` -> un servizio in debug, con i breakpoint),
+`.zed/tasks.json` (palette -> *task: Spawn*) e `.zed/settings.json`. Serve
+l'estensione *Java*: al primo file `.java` scarica jdtls, Lombok e il debugger,
+quindi aprilo una volta con la rete (`task offline` controlla che ci siano).
 
 **IntelliJ IDEA** non ha bisogno di niente: *File -> Open* sulla cartella del
 repository.
 
-`launch.json` e i due `tasks.json` sono **generati**: li riscrivono
+`launch.json`, `debug.json` e i due `tasks.json` sono **generati**: li riscrivono
 `new-service`, `remove-service` e `set-port`. Se li hai scavalcati modificando
 i moduli a mano:
 

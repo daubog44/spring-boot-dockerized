@@ -288,13 +288,18 @@ assert_contains "$LAUNCH" 'Stack completo' "il compound che li avvia tutti"
 assert_contains "$LAUNCH" 'com.example.ttfcloud_esame.alfaservice.Main' "la classe Main"
 # common-dto e' una libreria: non si avvia.
 assert_not_contains "$LAUNCH" '"projectName": "common-dto"' "una libreria non va fra le configurazioni di avvio"
+# Zed ha il suo file, con l'adattatore della sua estensione Java.
+assert_contains ".zed/debug.json" '"projectName": "alfa-service"' "il debug.json di Zed"
+assert_contains ".zed/debug.json" '"adapter": "Java"' "il debug.json di Zed"
+assert_contains ".zed/debug.json" 'com.example.ttfcloud_esame.alfaservice.Main' "la classe Main nel debug.json"
+assert_not_contains ".zed/debug.json" '"projectName": "common-dto"' "una libreria non va nel debug.json"
 end_case
 
-start_case "launch.json e tasks.json sono JSON validi"
+start_case "i file degli editor sono JSON validi"
 # I file di configurazione degli editor ammettono i commenti //: li togliamo
 # prima di darli al parser.
 if command -v python3 >/dev/null 2>&1; then
-  for f in .vscode/launch.json .vscode/tasks.json .zed/tasks.json; do
+  for f in .vscode/launch.json .vscode/tasks.json .vscode/settings.json .zed/tasks.json .zed/debug.json .zed/settings.json; do
     python3 -c "
 import io, json, re, sys
 t = io.open(sys.argv[1], encoding='utf-8').read()
@@ -313,12 +318,14 @@ assert_contains ".vscode/launch.json" '"projectName": "delta-service"' "il launc
 run_tool remove-service.sh --module delta-service
 assert_ok "remove-service"
 assert_not_contains ".vscode/launch.json" 'delta-service' "il launch.json"
+assert_not_contains ".zed/debug.json" 'delta-service' "il debug.json di Zed"
 end_case
 
 start_case "set-port aggiorna la porta scritta nel launch.json"
 run_tool set-port.sh --module alfa-service --port 8399
 assert_ok "set-port"
 assert_contains ".vscode/launch.json" 'alfa-service (:8399)' "il launch.json"
+assert_contains ".zed/debug.json" 'alfa-service (:8399)' "il debug.json di Zed"
 end_case
 
 start_case "check si accorge se il launch.json e' rimasto indietro"
@@ -361,6 +368,44 @@ end_case
 start_case "db-config rifiuta un valore che PostgreSQL non accetterebbe"
 run_tool db-config.sh --db-name "non valido!"
 assert_fails "db-config con un nome impossibile"
+end_case
+
+# --- Il wizard ----------------------------------------------------------------
+# Le risposte gliele diamo da un file (WIZARD_ANSWERS), una per riga: una riga
+# vuota vale come Invio.
+
+start_case "il wizard senza terminale si rifiuta invece di restare appeso"
+TOOL_OUT="$(bash "$SB_SCRIPTS/wizard.sh" </dev/null 2>&1)"; TOOL_CODE=$?
+assert_fails "il wizard senza terminale"
+assert_out_contains "terminale vero"
+end_case
+
+start_case "il wizard si ferma se le risposte finiscono prima delle domande"
+: >"$SANDBOX/risposte-corte.txt"
+TOOL_OUT="$(WIZARD_ANSWERS="$SANDBOX/risposte-corte.txt" bash "$SB_SCRIPTS/wizard.sh" </dev/null 2>&1)"; TOOL_CODE=$?
+assert_fails "il wizard con le risposte finite"
+assert_out_contains "risposte sono finite"
+end_case
+
+start_case "il wizard monta database e servizi rispondendo alle domande"
+# cartella invariata; PostgreSQL con credenziali e porta; un servizio REST con
+# il database condiviso; un'interfaccia web senza Swagger; Invio per finire.
+printf '%s\n' \
+  '' \
+  s wizdb wiz wizpass 5439 \
+  omega-service 1 '' 2 \
+  sigma-ui 3 '' n \
+  '' >"$SANDBOX/risposte.txt"
+TOOL_OUT="$(WIZARD_ANSWERS="$SANDBOX/risposte.txt" bash "$SB_SCRIPTS/wizard.sh" </dev/null 2>&1)"; TOOL_CODE=$?
+assert_ok "il wizard"
+assert_contains "demo/docker-compose.yml" "POSTGRES_DB: wizdb" "il database scelto"
+assert_contains "demo/docker-compose.yml" '"5439:5432"' "la porta scelta"
+assert_contains "demo/omega-service/src/main/resources/application.yml" "jdbc:postgresql://localhost:5439/wizdb" "il servizio sul database condiviso, sulla porta scelta"
+assert_file "demo/sigma-ui/src/main/resources/templates/index.html"
+assert_contains ".vscode/launch.json" '"projectName": "omega-service"' "il launch.json"
+assert_contains ".zed/debug.json" '"projectName": "sigma-ui"' "il debug.json di Zed"
+run_tool check.sh --project-only
+assert_ok "task check dopo il wizard"
 end_case
 
 # Da qui in poi serve un dominio con delle @Entity: lo scriviamo noi.

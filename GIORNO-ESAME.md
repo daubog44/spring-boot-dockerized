@@ -28,7 +28,9 @@ task offline
 ```
 
 Deve dire **Tutto pronto**. Se dice che manca qualcosa, hai ancora la rete per
-rimediare.
+rimediare. Guarda anche le righe dell'editor: l'estensione Java di Zed scarica
+jdtls, Lombok e il debugger al primo file `.java` che apri, quindi aprine uno
+**adesso**.
 
 **Portati il progetto su una chiavetta.** Non serve un `.exe` né un
 generatore: il template *è* la cartella, e i comandi stanno tutti dentro. Copia
@@ -123,7 +125,9 @@ Ti chiede, nell'ordine:
 1. **come si chiama la cartella con i moduli Maven** — di default `demo`,
    perché così nasce da Spring Initializr; dagli il nome del progetto e la
    rinomina ovunque sia scritta (Taskfile, script, guide);
-2. **se il progetto usa PostgreSQL**, e con quale database, utente e password;
+2. **se il progetto usa PostgreSQL**, e con quale database, utente, password e
+   porta — se sul PC la 5432 è già occupata (nei laboratori capita, con un
+   PostgreSQL installato) te ne propone un'altra;
 3. **i microservizi, uno per uno**: nome, che cos'è (servizio REST con
    database, servizio REST senza, interfaccia Thymeleaf), su quale porta, e se
    usa H2 in memoria o PostgreSQL — condiviso o tutto suo.
@@ -170,7 +174,7 @@ Premi `F5`, scegli **Stack completo** e hai tutti i servizi in debug, con i
 breakpoint che funzionano. Se invece ti basta vederli girare, `task dev` resta
 più leggero.
 
-> `launch.json` e `tasks.json` sono **generati**: li riscrivono `new-service`,
+> `launch.json` e `tasks.json` (e i loro gemelli di Zed) sono **generati**: li riscrivono `new-service`,
 > `remove-service` e `set-port`. Se li modifichi a mano, le modifiche si
 > perdono al comando successivo. `settings.json` ed `extensions.json` no: quelli
 > sono tuoi.
@@ -179,12 +183,19 @@ più leggero.
 
 | File | Cosa fa |
 | :--- | :--- |
+| `.zed/debug.json` | una configurazione di debug per servizio: `F4` e scegli quale avviare |
 | `.zed/tasks.json` | i comandi `task` dalla palette: *task: Spawn* |
-| `.zed/settings.json` | formattazione, indentazione, e `target/` fuori dall'indice |
+| `.zed/settings.json` | Java formattato al salvataggio, `target/` fuori dall'indice, jdtls che non va a cercare aggiornamenti |
 
-Per l'autocompletamento Java serve l'estensione **Java** (usa `jdtls`):
-palette → *zed: extensions*. Zed non ha un debugger Java come quello di VS
-Code: per il debug passa da VS Code o da IntelliJ.
+Serve l'estensione **Java** (palette → *zed: extensions*). Al primo file
+`.java` che apri scarica tre cose: `jdtls` (autocompletamento, errori,
+navigazione fra i moduli), Lombok e il debugger. **Fallo la sera prima, con la
+rete**: poi le impostazioni del progetto (`"check_updates": "once"`) dicono a
+Zed di usare quello che ha già, e `task offline` ti conferma che c'è.
+
+Il debug è quello vero, con i breakpoint, ma un servizio per volta: Zed non ha
+il compound *Stack completo*. Se ti serve tutto lo stack in debug insieme, VS
+Code (`F5` → *Stack completo*) resta la strada più corta.
 
 ### IntelliJ IDEA
 
@@ -198,7 +209,7 @@ configurazioni di avvio se le crea lui quando apri una classe `Main`.
 task ide-sync
 ```
 
-Riscrive `launch.json` e i due `tasks.json` leggendo i moduli veri: trova la
+Riscrive `launch.json`, `debug.json` e i due `tasks.json` leggendo i moduli veri: trova la
 classe `Main` nei sorgenti (quindi funziona anche per un modulo scritto a mano)
 e la porta nell'`application.yml`. Serve solo se hai toccato i moduli senza
 passare dai comandi; se il `launch.json` resta indietro, te lo dice `task check`.

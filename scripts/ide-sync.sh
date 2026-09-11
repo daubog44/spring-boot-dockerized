@@ -2,8 +2,8 @@
 # Riallinea la configurazione degli editor (VS Code, Zed) ai moduli veri.
 # Equivalente POSIX di scripts/ide-sync.ps1.
 #
-# Riscrive .vscode/launch.json, .vscode/tasks.json e .zed/tasks.json; crea, solo
-# se mancano, i file che non dipendono dai moduli.
+# Riscrive .vscode/launch.json, .vscode/tasks.json, .zed/tasks.json e
+# .zed/debug.json; crea, solo se mancano, i file che non dipendono dai moduli.
 #
 #   task ide-sync
 set -uo pipefail
@@ -180,6 +180,36 @@ echo "  .vscode/tasks.json"
 } >"$ZED_DIR/tasks.json"
 echo "  .zed/tasks.json"
 
+# --- .zed/debug.json ----------------------------------------------------------
+# Il debugger di Zed usa l'adattatore "Java" dell'estensione: stesse voci del
+# launch.json, un servizio per voce (Zed non ha i compound). Niente commenti in
+# questo file: e' l'unico di Zed per cui la documentazione non li promette.
+
+{
+  if [ "$COUNT" -eq 0 ]; then
+    echo '[]'
+  else
+    echo '['
+    i=0
+    while IFS='|' read -r rank module main_class port; do
+      [ -z "$module" ] && continue
+      i=$(( i + 1 ))
+      [ "$i" -gt 1 ] && echo '    },'
+      if [ -n "$port" ]; then label="$i. $module (:$port)"; else label="$i. $module"; fi
+      echo '    {'
+      echo "        \"label\": \"$label\","
+      echo '        "adapter": "Java",'
+      echo '        "request": "launch",'
+      echo "        \"mainClass\": \"$main_class\","
+      echo "        \"projectName\": \"$module\","
+      echo '        "cwd": "$ZED_WORKTREE_ROOT"'
+    done <"$TARGETS"
+    echo '    }'
+    echo ']'
+  fi
+} >"$ZED_DIR/debug.json"
+echo "  .zed/debug.json"
+
 # --- I file che non dipendono dai moduli: solo se mancano --------------------
 # Questi puoi modificarli a piacere: ide-sync non ci torna sopra.
 
@@ -235,14 +265,29 @@ fi
 
 if [ ! -f "$ZED_DIR/settings.json" ]; then
   cat >"$ZED_DIR/settings.json" <<'EOF'
-// Zed legge il Java dall'estensione "Java" (jdtls): installala da
-// "zed: extensions". Il progetto e' Maven multi-modulo, quindi apri la
-// cartella del repository, non quella di un singolo servizio.
+// Zed legge il Java dall'estensione "Java" (jdtls, Lombok e debugger):
+// se manca, palette -> "zed: extensions" -> Java. Il progetto e' Maven
+// multi-modulo, quindi apri la cartella del repository, non quella di un
+// singolo servizio.
 {
-    "format_on_save": "on",
+    // Il Java lo formatta jdtls, che gira in locale. Gli altri file Zed li
+    // darebbe a prettier, che la prima volta si scarica da npm: a rete
+    // staccata sarebbero solo errori.
+    "format_on_save": "off",
     "languages": {
-        "Java": { "tab_size": 4 },
+        "Java": { "tab_size": 4, "format_on_save": "on" },
         "YAML": { "tab_size": 2 }
+    },
+    "lsp": {
+        "jdtls": {
+            "settings": {
+                // "once": jdtls, Lombok e il debugger si scaricano solo se
+                // non ci sono ancora. Il default ("always") li ricontrolla
+                // ogni 24 ore, e il giorno dell'esame la rete non c'e'.
+                "check_updates": "once",
+                "lombok_support": true
+            }
+        }
     },
     "file_scan_exclusions": [
         "**/target",
@@ -289,11 +334,11 @@ echo "Editor riallineati."
 echo ""
 if [ "$COUNT" -gt 0 ]; then
   echo '  VS Code: F5 -> "Stack completo" avvia tutti i servizi in debug.'
-  echo '  Zed:     palette "task: Spawn" per i comandi task.'
+  echo '  Zed:     F4 -> un servizio in debug; palette "task: Spawn" per i comandi.'
 else
   echo "  Nessun servizio avviabile: crea un modulo con task new-service."
 fi
 echo ""
-echo "  Per il debug in VS Code serve l'estensione Extension Pack for Java;"
+echo "  VS Code vuole l'Extension Pack for Java, Zed l'estensione Java;"
 echo "  IntelliJ non ha bisogno di niente: apri il pom aggregatore."
 echo ""

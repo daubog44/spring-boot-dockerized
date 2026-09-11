@@ -128,6 +128,9 @@ role() { # modulo
 
 HAS_POSTGRES=0
 grep -qE 'image:[[:space:]]*postgres' "$DEMO_DIR/docker-compose.yml" && HAS_POSTGRES=1
+# La porta pubblicata sul PC, che db-config puo' aver spostato dalla 5432.
+PG_PORT="$(grep -oE '^[[:space:]]+-[[:space:]]*"[0-9]+:5432"' "$DEMO_DIR/docker-compose.yml" | head -n 1 | grep -oE '[0-9]+:5432' | cut -d: -f1 || true)"
+[ -n "$PG_PORT" ] || PG_PORT=5432
 
 # --- L'allegato tecnico -------------------------------------------------------
 
@@ -160,7 +163,7 @@ grep -qE 'image:[[:space:]]*postgres' "$DEMO_DIR/docker-compose.yml" && HAS_POST
     [ -z "$module" ] && continue
     echo "| \`$module\` | $port | \`$(app_name "$module")\` | $(role "$module") |"
   done <<<"$SERVICES"
-  [ "$HAS_POSTGRES" -eq 1 ] && echo "| \`postgres\` | 5432 | - | Database relazionale (container) |"
+  [ "$HAS_POSTGRES" -eq 1 ] && echo "| \`postgres\` | $PG_PORT | - | Database relazionale (container) |"
   echo ""
   echo "Il modulo \`common-dto\` non e' un servizio: contiene le classi DTO"
   echo "condivise, cosi' chi chiama e chi risponde usano lo stesso contratto."
@@ -280,7 +283,7 @@ echo "  ALLEGATO-TECNICO.md (moduli, porte, endpoint e schema gia' dentro)"
       *) echo "| Swagger \`$module\` | \`http://localhost:$port/swagger-ui.html\` |" ;;
     esac
   done <<<"$SERVICES"
-  [ "$HAS_POSTGRES" -eq 1 ] && echo "| PostgreSQL | \`localhost:5432\` |"
+  [ "$HAS_POSTGRES" -eq 1 ] && echo "| PostgreSQL | \`localhost:$PG_PORT\` |"
   echo ""
   echo "I servizi impiegano 10-15 secondi a registrarsi su Eureka: le prime"
   echo "chiamate fra servizi, subito dopo l'avvio, possono fallire."

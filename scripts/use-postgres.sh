@@ -76,7 +76,11 @@ fi
 
 # --- 2. application.yml -------------------------------------------------------
 
-LOCAL_URL="jdbc:postgresql://localhost:5432/$DB_NAME"
+# Da fuori Docker si passa dalla porta pubblicata, che decide db-config (o il
+# wizard): se la 5432 del PC era occupata, non e' piu' la 5432.
+HOST_PORT="$(grep -oE '^[[:space:]]+-[[:space:]]*"[0-9]+:5432"' "$COMPOSE" | head -n 1 | grep -oE '[0-9]+:5432' | cut -d: -f1)"
+[ -n "$HOST_PORT" ] || HOST_PORT=5432
+LOCAL_URL="jdbc:postgresql://localhost:$HOST_PORT/$DB_NAME"
 if grep -qE '^[[:space:]]+datasource:' "$YML"; then
   sed -i.bak -E "s#^([[:space:]]+url:[[:space:]]*\\\$\{${PREFIX}_DB_URL:)[^}]*(\})#\1${LOCAL_URL}\2#" "$YML"
   sed -i.bak -E "s#^([[:space:]]+username:[[:space:]]*\\\$\{${PREFIX}_DB_USERNAME:)[^}]*(\})#\1${DB_USER}\2#" "$YML"

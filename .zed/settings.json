@@ -1,11 +1,26 @@
-// Zed legge il Java dall'estensione "Java" (jdtls): installala da
-// "zed: extensions". Il progetto e' Maven multi-modulo, quindi apri la
-// cartella del repository, non quella di un singolo servizio.
+// Zed legge il Java dall'estensione "Java" (jdtls, Lombok e debugger):
+// se manca, palette -> "zed: extensions" -> Java. Il progetto e' Maven
+// multi-modulo, quindi apri la cartella del repository, non quella di un
+// singolo servizio.
 {
-    "format_on_save": "on",
+    // Il Java lo formatta jdtls, che gira in locale. Gli altri file Zed li
+    // darebbe a prettier, che la prima volta si scarica da npm: a rete
+    // staccata sarebbero solo errori.
+    "format_on_save": "off",
     "languages": {
-        "Java": { "tab_size": 4 },
+        "Java": { "tab_size": 4, "format_on_save": "on" },
         "YAML": { "tab_size": 2 }
+    },
+    "lsp": {
+        "jdtls": {
+            "settings": {
+                // "once": jdtls, Lombok e il debugger si scaricano solo se
+                // non ci sono ancora. Il default ("always") li ricontrolla
+                // ogni 24 ore, e il giorno dell'esame la rete non c'e'.
+                "check_updates": "once",
+                "lombok_support": true
+            }
+        }
     },
     "file_scan_exclusions": [
         "**/target",

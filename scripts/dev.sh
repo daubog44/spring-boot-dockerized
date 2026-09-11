@@ -94,8 +94,12 @@ fi
 if [ "$USES_POSTGRES" -eq 1 ]; then
   echo "==> Avvio PostgreSQL su Docker..."
   (cd "$DEMO_DIR" && docker compose up -d postgres)
-  if ! wait_for_port 5432 60; then
-    echo "PostgreSQL non risponde sulla porta 5432." >&2
+  # La porta pubblicata sul PC la decide db-config (o il wizard): non e' detto
+  # che sia ancora la 5432.
+  PG_PORT="$(grep -oE '^[[:space:]]+-[[:space:]]*"[0-9]+:5432"' "$DEMO_DIR/docker-compose.yml" | head -n 1 | grep -oE '[0-9]+:5432' | cut -d: -f1 || true)"
+  [ -n "$PG_PORT" ] || PG_PORT=5432
+  if ! wait_for_port "$PG_PORT" 60; then
+    echo "PostgreSQL non risponde sulla porta $PG_PORT." >&2
     exit 1
   fi
   # Segnaposto per dev-down: fermiamo il container solo se l'abbiamo avviato noi.

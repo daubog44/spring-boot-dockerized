@@ -167,8 +167,9 @@ progetto Maven multi-modulo.
 - **VS Code**: `F5` → **Stack completo** avvia tutti i servizi in debug, Eureka
   per primo. Serve l'*Extension Pack for Java*; le altre estensioni consigliate
   te le propone VS Code stesso (`.vscode/extensions.json`).
-- **Zed**: palette → *task: Spawn* per i comandi `task`. Per il Java serve
-  l'estensione *Java*; per il debug passa da VS Code o IntelliJ.
+- **Zed**: `F4` → il servizio da avviare in debug (`.zed/debug.json`); palette
+  → *task: Spawn* per i comandi `task`. Serve l'estensione *Java*, che al primo
+  file `.java` scarica jdtls, Lombok e il debugger: la prima volta, con la rete.
 - **IntelliJ IDEA**: niente da configurare, apri il pom aggregatore.
 
 Se l'elenco dei servizi non torna (hai toccato i moduli a mano):

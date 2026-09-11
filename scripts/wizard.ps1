@@ -33,7 +33,17 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Get-ScaffoldRepoRoot
 
-if ([Console]::IsInputRedirected) {
+# Le risposte possono arrivare anche da un file, una per riga (una riga vuota
+# vale come Invio): e' cosi' che `task test` collauda il wizard senza nessuno
+# alla tastiera.
+$script:answers = $null
+if ($env:WIZARD_ANSWERS) {
+    if (-not (Test-Path $env:WIZARD_ANSWERS)) { throw "WIZARD_ANSWERS: non trovo $env:WIZARD_ANSWERS" }
+    $script:answers = New-Object 'System.Collections.Generic.Queue[string]'
+    foreach ($line in [System.IO.File]::ReadAllLines($env:WIZARD_ANSWERS)) { $script:answers.Enqueue($line) }
+}
+
+if ($null -eq $script:answers -and [Console]::IsInputRedirected) {
     Write-Host ''
     Write-Host 'Il wizard fa domande: serve un terminale vero.' -ForegroundColor Yellow
     Write-Host ''
@@ -45,6 +55,28 @@ if ([Console]::IsInputRedirected) {
 
 # --- Domande ------------------------------------------------------------------
 
+function Read-Answer {
+    param([string]$Prompt = '  >')
+    if ($null -eq $script:answers) { return (Read-Host $Prompt) }
+    # Senza questo controllo, una domanda con risposta obbligatoria
+    # continuerebbe a chiedere per sempre.
+    if ($script:answers.Count -eq 0) { throw 'WIZARD_ANSWERS: le risposte sono finite prima delle domande.' }
+    $answer = $script:answers.Dequeue()
+    Write-Host "$Prompt $answer"
+    return $answer
+}
+
+function Get-FreePostgresPort {
+    # Una 5432 gia' presa (un PostgreSQL installato sul PC del laboratorio, un
+    # altro progetto in Docker) e' il guaio piu' comune: meglio accorgersene
+    # adesso che al primo avvio.
+    $port = 5432
+    while ($port -lt 5450 -and @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue).Count -gt 0) {
+        $port++
+    }
+    return $port
+}
+
 function Ask-Text {
     param([string]$Question, [string]$Default = '', [string]$Pattern = '', [string]$Hint = '')
     while ($true) {
@@ -52,7 +84,7 @@ function Ask-Text {
         Write-Host ''
         Write-Host ("  " + $Question + $suffix) -ForegroundColor Cyan
         if ($Hint) { Write-Host ("  " + $Hint) -ForegroundColor DarkGray }
-        $answer = (Read-Host '  >').Trim()
+        $answer = (Read-Answer).Trim()
         if (-not $answer) { $answer = $Default }
         if (-not $answer) { Write-Host '  Serve una risposta.' -ForegroundColor Yellow; continue }
         if ($Pattern -and ($answer -notmatch $Pattern)) {
@@ -69,7 +101,7 @@ function Ask-YesNo {
     while ($true) {
         Write-Host ''
         Write-Host ("  " + $Question + " " + $suffix) -ForegroundColor Cyan
-        $answer = (Read-Host '  >').Trim().ToLower()
+        $answer = (Read-Answer).Trim().ToLower()
         if (-not $answer) { return $Default }
         if ($answer -in @('s', 'si', 'y', 'yes')) { return $true }
         if ($answer -in @('n', 'no')) { return $false }
@@ -85,7 +117,7 @@ function Ask-Choice {
         for ($i = 0; $i -lt $Options.Count; $i++) {
             Write-Host ("    " + ($i + 1) + ") " + $Options[$i])
         }
-        $answer = (Read-Host ("  [" + $Default + "] >")).Trim()
+        $answer = (Read-Answer ("  [" + $Default + "] >")).Trim()
         if (-not $answer) { return $Default }
         if ($answer -match '^\d+$' -and [int]$answer -ge 1 -and [int]$answer -le $Options.Count) { return [int]$answer }
         Write-Host '  Scegli un numero dell''elenco.' -ForegroundColor Yellow
@@ -209,7 +241,10 @@ if (Ask-YesNo -Question 'Il progetto usa PostgreSQL? (altrimenti resta H2 in mem
     $dbName = Ask-Text -Question 'Nome del database' -Default 'esame' -Pattern '^[a-z][a-z0-9_]*$'
     $dbUser = Ask-Text -Question 'Utente del database' -Default 'exam' -Pattern '^[a-z][a-z0-9_]*$'
     $dbPassword = Ask-Text -Question 'Password' -Default 'exam' -Pattern '^[A-Za-z0-9_]+$'
-    Invoke-Step -Script 'db-config.ps1' -Arguments @{ DbName = $dbName; User = $dbUser; Password = $dbPassword }
+    $freePort = Get-FreePostgresPort
+    $portHint = if ($freePort -ne 5432) { "La 5432 su questo PC e' gia' occupata: ti propongo la $freePort" } else { 'La porta sul tuo PC: dentro Docker resta sempre 5432' }
+    $dbPort = Ask-Text -Question 'Porta di PostgreSQL' -Default ([string]$freePort) -Pattern '^\d{2,5}$' -Hint $portHint
+    Invoke-Step -Script 'db-config.ps1' -Arguments @{ DbName = $dbName; User = $dbUser; Password = $dbPassword; Port = $dbPort }
     $usePostgres = $true
 } else {
     $usePostgres = $false
@@ -232,7 +267,7 @@ $created = @()
 while ($true) {
     Write-Host ''
     Write-Host '  Nome del microservizio (Invio per finire)' -ForegroundColor Cyan
-    $name = (Read-Host '  >').Trim()
+    $name = (Read-Answer).Trim()
     if (-not $name) { break }
     if ($name -notmatch '^[a-z][a-z0-9-]*$') {
         Write-Host '  Minuscole, numeri e trattini. Riprova.' -ForegroundColor Yellow

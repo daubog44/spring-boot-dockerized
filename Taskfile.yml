@@ -33,7 +33,7 @@ tasks:
     summary: |
       Chiede quello che serve e lancia i comandi giusti nell'ordine giusto:
       come si chiama la cartella dei moduli, se il progetto usa PostgreSQL e
-      con quali credenziali, e poi i microservizi uno per uno (REST, REST
+      con quali credenziali e porta, e poi i microservizi uno per uno (REST, REST
       senza database, o interfaccia Thymeleaf; porta; H2 o PostgreSQL).
       Alla fine lancia `task check`.
 
@@ -374,6 +374,7 @@ tasks:
                               compound "Stack completo" che li avvia tutti
         .vscode/tasks.json    i comandi task dalla palette di VS Code
         .zed/tasks.json       gli stessi comandi per Zed
+        .zed/debug.json       le configurazioni di debug per Zed (F4)
 
       E, solo se mancano, i file che non dipendono dai moduli e che puoi
       modificare a piacere: .vscode/settings.json, .vscode/extensions.json,
