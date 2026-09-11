@@ -64,7 +64,9 @@ for module in $(sed -n 's/.*<module>\(.*\)<\/module>.*/\1/p' "$DEMO_DIR/pom.xml"
 done
 
 sort -t'|' -k1,1n -k2,2 "$TARGETS" -o "$TARGETS"
-COUNT="$(grep -c '.' "$TARGETS" 2>/dev/null || echo 0)"
+# grep -c esce con 1 quando non trova niente: senza il || il conteggio
+# resterebbe vuoto, e il confronto numerico piu' sotto protesterebbe.
+COUNT="$(grep -c '.' "$TARGETS" 2>/dev/null)" || COUNT=0
 
 echo ""
 echo "==> Configurazione degli editor"
@@ -186,6 +188,16 @@ if [ ! -f "$VSCODE_DIR/settings.json" ]; then
 {
     "java.configuration.updateBuildConfiguration": "automatic",
     "java.compile.nullAnalysis.mode": "automatic",
+    // Lo stesso JDK che usa il Taskfile. Se sulla macchina d'esame sta
+    // altrove, correggi qui il percorso (o togli il blocco: VS Code cerca da
+    // solo, ma puo' pescare un Java piu' vecchio).
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-25",
+            "path": "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot",
+            "default": true
+        }
+    ],
     // L'hot reload di task compile ricompila quello che hai salvato: senza
     // salvataggio automatico non si accorge di niente.
     "files.autoSave": "afterDelay",
