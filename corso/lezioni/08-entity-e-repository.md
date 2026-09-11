@@ -1,6 +1,6 @@
 # Le entity e i repository
 
-<!-- parte: B · Svolgere la traccia | quando: 09:05 | durata: 40 minuti | obiettivo: Scrivi le classi @Entity della traccia e i loro repository, e sai che cosa diventa ogni annotazione nel database. -->
+<!-- parte: B · Svolgere la traccia | quando: 09:05 | durata: 55 minuti | obiettivo: Scrivi le classi @Entity della traccia e i loro repository, e sai che cosa diventa ogni annotazione e ogni parola chiave del nome del metodo nel database. -->
 
 Un'entity è una classe Java che Hibernate trasforma in una tabella: un campo,
 una colonna; un oggetto, una riga. Il repository è l'interfaccia con cui la
@@ -169,21 +169,131 @@ public interface PrestitoRepository extends JpaRepository<PrestitoEntity, Long> 
 }
 ```
 
-`JpaRepository` ti dà già `findAll`, `findById`, `save`, `deleteById`, `count`.
-Il resto si ottiene dal nome del metodo:
+`JpaRepository<LibroEntity, Long>` ti dà già, senza scrivere niente:
+`findAll()`, `findById(Long)` (torna un `Optional`), `save(entity)` (inserisce
+o aggiorna, decide lui guardando l'`id`), `deleteById(Long)`, `count()`,
+`existsById(Long)`. Il resto — quello specifico della tua traccia — si scrive
+da solo nel nome del metodo: Spring Data lo legge e costruisce la query.
 
-| Metodo | La query che scrive Spring |
-| :--- | :--- |
-| `findByGenere(Genere g)` | `WHERE genere = ?` |
-| `findByTitoloContainingIgnoreCase(String t)` | `WHERE lower(titolo) LIKE %t%` |
-| `findByAnnoPubblicazioneBetween(int da, int a)` | `WHERE anno_pubblicazione BETWEEN ? AND ?` |
-| `findByAutoreCognome(String c)` | una `JOIN` su `autori`, `WHERE cognome = ?` |
-| `countByDisponibileFalse()` | `SELECT count(*) ... WHERE disponibile = false` |
-| `findTop5ByOrderByAnnoPubblicazioneDesc()` | i cinque più recenti |
+## Il nome del metodo è la query: tutte le parole chiave
 
-Quando il nome diventerebbe una frase, si scrive la query con `@Query("select
-l from LibroEntity l where ...")`, in JPQL: si ragiona su classi e campi, non su
-tabelle e colonne.
+Lo schema è `<verbo><NomeCampo><Condizione>And/Or<AltroCampo>...`. Il verbo
+decide che cosa torna, il resto la clausola `WHERE`. Il campo si scrive come
+in Java (`autore.cognome` diventa `AutoreCognome`, e Spring fa la `JOIN` da
+solo).
+
+| Verbo | Torna | Esempio |
+| :--- | :--- | :--- |
+| `findBy...` / `getBy...` / `queryBy...` | `List<T>` (o un solo `T`/`Optional<T>` se il campo è unico) | `findByIsbn(String isbn)` → `Optional<LibroEntity>` |
+| `existsBy...` | `boolean` | `existsByIsbn(String isbn)` |
+| `countBy...` | `long` | `countByGenere(Genere g)` |
+| `deleteBy...` / `removeBy...` | `void` o `long` (righe cancellate) | `deleteByDisponibileFalse()` |
+
+| Condizione nel nome | `WHERE` generato | Esempio |
+| :--- | :--- | :--- |
+| `findByGenere(Genere g)` | `genere = ?` | uguaglianza semplice |
+| `findByGenereAndDisponibileTrue(Genere g)` | `genere = ? AND disponibile = true` | `And`/`Or` fra più campi |
+| `findByAnnoPubblicazioneGreaterThan(int a)` | `anno_pubblicazione > ?` | anche `GreaterThanEqual`, `LessThan`, `LessThanEqual` |
+| `findByAnnoPubblicazioneBetween(int da, int a)` | `anno_pubblicazione BETWEEN ? AND ?` | due parametri, in ordine |
+| `findByTitoloContainingIgnoreCase(String t)` | `lower(titolo) LIKE lower('%'+?+'%')` | anche `StartingWith`, `EndingWith` |
+| `findByTitoloIsNull()` / `IsNotNull()` | `titolo IS NULL` / `IS NOT NULL` | senza parametri |
+| `findByGenereIn(List<Genere> generi)` | `genere IN (...)` | anche `NotIn` |
+| `findByDisponibileTrue()` / `False()` | `disponibile = true` / `= false` | scorciatoia per i booleani, meglio di `Is(true)` |
+| `findByGenereNot(Genere g)` | `genere <> ?` | negazione |
+| `findByAutoreCognome(String c)` | `JOIN autori ON ... WHERE cognome = ?` | attraversa la relazione `@ManyToOne` |
+| `findByOrderByAnnoPubblicazioneDesc()` | `ORDER BY anno_pubblicazione DESC` | anche senza condizione, solo ordinamento |
+| `findTop5ByOrderByAnnoPubblicazioneDesc()` | `ORDER BY ... DESC LIMIT 5` | `Top3`, `First10`... |
+| `findDistinctByGenere(Genere g)` | `SELECT DISTINCT ...` | toglie i duplicati |
+
+Si combinano: `findTop10ByGenereAndDisponibileTrueOrderByAnnoPubblicazioneDesc(Genere g)`
+è lungo da leggere ma resta un metodo solo, senza una riga di SQL.
+
+## Un solo risultato che potrebbe non esserci: `Optional`
+
+```java demo/catalogo-service/src/main/java/esame/catalogoservice/repository/LibroRepository.java
+public interface LibroRepository extends JpaRepository<LibroEntity, Long> {
+    Optional<LibroEntity> findByIsbn(String isbn);
+}
+```
+
+Nel service, non si controlla mai un `null` a mano: si sceglie che cosa fare
+quando manca, nello stesso punto in cui si legge.
+
+```java demo/catalogo-service/src/main/java/esame/catalogoservice/service/CatalogoService.java
+public LibroDto trovaPerIsbn(String isbn) {
+    LibroEntity libro = libroRepository.findByIsbn(isbn)
+            .orElseThrow(() -> new LibroNonTrovatoException(isbn));   // -> 404, vedi lezione 9
+    return toDto(libro);
+}
+```
+
+`findById` di `JpaRepository` torna `Optional<LibroEntity>` per lo stesso
+motivo: un id che non esiste più non è un errore di Java, è un caso normale
+da gestire.
+
+## Ordinare e paginare senza scriverlo nel nome
+
+Per un ordinamento deciso a runtime (non fisso come `OrderByTitoloAsc`) si
+passa un `Sort`; per una lista lunga, invece di tornare tutto, si passa un
+`Pageable` e si torna una `Page<T>`, che porta con sé anche il totale delle
+righe:
+
+```java demo/catalogo-service/src/main/java/esame/catalogoservice/repository/LibroRepository.java
+public interface LibroRepository extends JpaRepository<LibroEntity, Long> {
+    List<LibroEntity> findByGenere(Genere genere, Sort sort);
+    Page<LibroEntity> findByDisponibileTrue(Pageable pageable);
+}
+```
+
+```java
+libroRepository.findByGenere(Genere.GIALLO, Sort.by("titolo").ascending());
+Page<LibroEntity> pagina = libroRepository.findByDisponibileTrue(PageRequest.of(0, 20));
+pagina.getContent();        // i 20 elementi
+pagina.getTotalElements();  // quanti sono in tutto, non solo in questa pagina
+```
+
+Per una traccia d'esame, quasi sempre basta `List` senza paginazione: usala
+solo se il numero di righe è dichiaratamente grande.
+
+## Quando il nome non basta: `@Query`
+
+Un `JOIN` con più condizioni, un `GROUP BY`, o solo un nome che diventerebbe
+illeggibile: si scrive la query a mano, in **JPQL** (si ragiona su classi e
+campi Java, non su tabelle e colonne — niente `libri`, `LibroEntity`; niente
+`anno_pubblicazione`, `annoPubblicazione`):
+
+```java demo/catalogo-service/src/main/java/esame/catalogoservice/repository/LibroRepository.java
+public interface LibroRepository extends JpaRepository<LibroEntity, Long> {
+
+    @Query("select l from LibroEntity l where l.autore.cognome = :cognome and l.disponibile = true")
+    List<LibroEntity> disponibiliDiUnAutore(@Param("cognome") String cognome);
+
+    // native = true: SQL vero, per quando serve una funzione del database
+    // che JPQL non ha (qui, il conteggio per genere).
+    @Query(value = "select genere, count(*) from libri group by genere", nativeQuery = true)
+    List<Object[]> conteggioPerGenere();
+}
+```
+
+`@Param("cognome")` collega il segnaposto `:cognome` nella query al parametro
+del metodo — il nome deve combaciare. Una query nativa torna righe grezze
+(`Object[]`, o una proiezione con un'interfaccia), non entity: usala solo
+quando JPQL davvero non basta.
+
+Una query che **scrive** (`UPDATE`/`DELETE` in JPQL) vuole in più
+`@Modifying` e va chiamata dentro una transazione:
+
+```java
+@Modifying
+@Transactional
+@Query("update LibroEntity l set l.disponibile = false where l.id = :id")
+void segnaNonDisponibile(@Param("id") Long id);
+```
+
+Per una traccia d'esame è raro servirne una: quasi sempre basta caricare
+l'entity col repository, cambiarne un campo col setter, e richiamare `save`
+(Hibernate si accorge da solo che è un update, non un insert, perché l'`id`
+c'è già).
 
 ## Chi crea le tabelle
 
@@ -221,4 +331,6 @@ i campi, relazioni comprese, e con due entity che si nominano a vicenda
 > - [ ] le entity della traccia compilano e `task db-schema` le mostra
 > - [ ] sai perché gli enum si salvano come stringa
 > - [ ] sai dove sta la colonna di una relazione `@ManyToOne`
-> - [ ] sai scrivere una query col nome del metodo
+> - [ ] sai scrivere una query col nome del metodo, comprese `And`, `Between`, `ContainingIgnoreCase`, `OrderBy`
+> - [ ] sai quando un repository torna `Optional` e come si gestisce con `orElseThrow`
+> - [ ] sai quando serve `@Query` invece del nome del metodo
