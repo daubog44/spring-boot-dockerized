@@ -33,12 +33,14 @@ repository, service, controller): anche quello lo genera un comando,
 task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
 ```
 
-e per i DTO condivisi, i client Feign e le viste Thymeleaf:
+e per i DTO condivisi, i client Feign, le viste Thymeleaf, la sicurezza e la gestione errori:
 
 ```bash
 task new-dto NAME=Ordine FIELDS=id:long,numero:string:required,totale:decimal
-task new-client FROM=report-service TO=ordini-service DTO=OrdineDto
+task new-client FROM=report-service TO=ordini-service DTO=OrdineDto FIELDS=id:long,numero:string:required
 task new-view SERVICE=store-ui NAME=Ordini FIELDS=numero:string:required,totale:decimal
+task new-auth SERVICE=ordini-service TYPE=db
+task new-handler SERVICE=ordini-service
 ```
 
 e ti lascia aggiungere solo quello che conta davvero: le relazioni fra entity
@@ -213,6 +215,14 @@ task new-client FROM=report-service TO=ordini-service DTO=OrdineDto
 
 ```bash
 task new-view SERVICE=store-ui NAME=Ordini FIELDS=numero:string:required,totale:decimal
+```
+
+```bash
+task new-auth SERVICE=ordini-service TYPE=db
+```
+
+```bash
+task new-handler SERVICE=ordini-service
 ```
 
 ```bash

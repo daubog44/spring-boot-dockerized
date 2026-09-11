@@ -311,6 +311,41 @@ Test-Case 'new-view genera controller e template thymeleaf nel modulo UI' {
     Assert-Contains $tpl 'xmlns:th="http://www.thymeleaf.org"' 'manca namespace thymeleaf'
 }
 
+Test-Case 'new-client crea automaticamente il DTO in common-dto se sono passati FIELDS' {
+    Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'beta-ui', '-Name', 'BetaClient', '-Dto', 'AutoreDto', '-Fields', 'nome:string:required')) 'new-client con FIELDS fallito'
+    $dtoFile = Join-Path $demo 'common-dto/src/main/java/esame/common/dto/AutoreDto.java'
+    $clientFile = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/client/BetaClient.java')
+    Assert-That (Test-Path $dtoFile) 'AutoreDto.java non e'' stato creato automaticamente in common-dto'
+    Assert-That (Test-Path $clientFile) 'BetaClient.java non e'' stato creato nel chiamante'
+}
+
+Test-Case 'new-auth configura la sicurezza su database (UtenteEntity, Repo, UserDetailsService, BCrypt)' {
+    Assert-Ok (Invoke-Tool 'new-auth.ps1' @('-Service', 'epsilon-service', '-Type', 'db')) 'new-auth db e'' fallito'
+    $epsPath = Get-SandboxPackagePath 'epsilon-service'
+    Assert-That (Test-Path (Join-Path $demo "epsilon-service/src/main/java/$epsPath/entity/UtenteEntity.java")) 'manca UtenteEntity.java'
+    Assert-That (Test-Path (Join-Path $demo "epsilon-service/src/main/java/$epsPath/repository/UtenteRepository.java")) 'manca UtenteRepository.java'
+    Assert-That (Test-Path (Join-Path $demo "epsilon-service/src/main/java/$epsPath/service/CustomUserDetailsService.java")) 'manca CustomUserDetailsService.java'
+    Assert-That (Test-Path (Join-Path $demo "epsilon-service/src/main/java/$epsPath/config/SecurityConfig.java")) 'manca SecurityConfig.java'
+}
+
+Test-Case 'new-auth configura form login su modulo UI (LoginController, login.html)' {
+    Assert-Ok (Invoke-Tool 'new-auth.ps1' @('-Service', 'beta-ui', '-Type', 'form')) 'new-auth form e'' fallito'
+    $uiPath = Get-SandboxPackagePath 'beta-ui'
+    Assert-That (Test-Path (Join-Path $demo "beta-ui/src/main/java/$uiPath/controller/LoginController.java")) 'manca LoginController.java'
+    Assert-That (Test-Path (Join-Path $demo 'beta-ui/src/main/resources/templates/login.html')) 'manca login.html'
+    $tpl = Read-TextFile (Join-Path $demo 'beta-ui/src/main/resources/templates/login.html')
+    Assert-Contains $tpl 'th:action="@{/login}"' 'form action non corretta'
+}
+
+Test-Case 'new-handler genera GlobalExceptionHandler (@RestControllerAdvice)' {
+    Assert-Ok (Invoke-Tool 'new-handler.ps1' @('-Service', 'alfa-service')) 'new-handler e'' fallito'
+    $hPath = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/controller/GlobalExceptionHandler.java')
+    Assert-That (Test-Path $hPath) 'GlobalExceptionHandler.java non trovato'
+    $handler = Read-TextFile $hPath
+    Assert-Contains $handler '@RestControllerAdvice' 'manca @RestControllerAdvice'
+    Assert-Contains $handler 'MethodArgumentNotValidException' 'manca gestione validazione'
+}
+
 Test-Case 'add-dep aggiunge dal catalogo e crea SecurityConfig se security' {
     Assert-Ok (Invoke-Tool 'add-dep.ps1' @('-Module', 'alfa-service', '-Deps', 'security,mail')) 'add-dep e'' fallito'
     $pom = Get-Text 'demo/alfa-service/pom.xml'
