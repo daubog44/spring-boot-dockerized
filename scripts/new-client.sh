@@ -16,6 +16,7 @@ TO=""
 NAME=""
 DTO=""
 PATH_VAL=""
+FIELDS=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -24,12 +25,13 @@ while [ $# -gt 0 ]; do
     -Name|--name) NAME="$2"; shift 2 ;;
     -Dto|--dto) DTO="$2"; shift 2 ;;
     -Path|--path) PATH_VAL="$2"; shift 2 ;;
+    -Fields|--fields) FIELDS="$2"; shift 2 ;;
     *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
   esac
 done
 
 if [ -z "$FROM" ] || [ -z "$TO" ]; then
-  echo "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [NAME=<ClientName>] [PATH=<rotta>]" >&2
+  echo "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [PATH=<rotta>]" >&2
   exit 1
 fi
 
@@ -76,7 +78,35 @@ fi
 
 DTO_NAME="${DTO:-}"
 if [ -z "$DTO_NAME" ]; then
-  DTO_NAME="Object"
+  if [ -n "$FIELDS" ]; then
+    BASE_TO="$(printf '%s' "$TO" | sed -E 's/-(service|app|api)$//')"
+    DTO_NAME="$(to_pascal "$BASE_TO")Dto"
+  else
+    BASE_TO="$(printf '%s' "$TO" | sed -E 's/-(service|app|api)$//')"
+    CANDIDATE="$(to_pascal "$BASE_TO")Dto"
+    BASE_PKG="$(base_package "$DEMO_DIR")"
+    BASE_PKG_PATH="$(printf '%s' "$BASE_PKG" | tr '.' '/')"
+    if [ -f "$DEMO_DIR/common-dto/src/main/java/$BASE_PKG_PATH/common/dto/$CANDIDATE.java" ]; then
+      DTO_NAME="$CANDIDATE"
+    else
+      DTO_NAME="Object"
+    fi
+  fi
+fi
+
+# Auto-generazione DTO in common-dto se sono forniti FIELDS o se il DTO indicato non esiste ancora
+if [ "$DTO_NAME" != "Object" ]; then
+  BASE_PKG="$(base_package "$DEMO_DIR")"
+  BASE_PKG_PATH="$(printf '%s' "$BASE_PKG" | tr '.' '/')"
+  DTO_FILE="$DEMO_DIR/common-dto/src/main/java/$BASE_PKG_PATH/common/dto/$DTO_NAME.java"
+  if [ -n "$FIELDS" ] || [ ! -f "$DTO_FILE" ]; then
+    CLEAN_DTO_BASE="$(printf '%s' "$DTO_NAME" | sed -E 's/[Dd][Tt][Oo]$//')"
+    DTO_ARGS=(--name "$CLEAN_DTO_BASE")
+    if [ -n "$FIELDS" ]; then
+      DTO_ARGS+=(--fields "$FIELDS")
+    fi
+    bash "$SCRIPT_DIR/new-dto.sh" "${DTO_ARGS[@]}" >/dev/null
+  fi
 fi
 
 FROM_PKG="$(base_package "$DEMO_DIR").$(printf '%s' "$FROM" | tr -cd 'a-zA-Z0-9')"
