@@ -37,14 +37,14 @@ task learn
 ```
 
 Apre il corso: una pagina statica (niente server, niente rete) con diciassette
-lezioni dalla A alla Z — com'è fatto **questo** template (che parti da qui è
-vuoto: nessun modulo oltre a Eureka e `common-dto`), come si parlano i
-servizi, `common-dto`, le entity e i repository JPA con tutti gli esempi, la
-rete dell'esame — e poi una traccia vera svolta per intero, la **Biblioteca**
-(branch a parte, non qualcosa che hai già in questa cartella: la lezione 1 lo
-spiega), per vedere del codice funzionante prima di scrivere il tuo. Dentro ci
-sono anche tutte le guide, con la ricerca, e la mappa dei moduli del **tuo**
-progetto, letta dai file veri.
+lezioni dalla A alla Z — com'è fatto il template, come si parlano i servizi,
+`common-dto`, le entity e i repository JPA con tutti gli esempi, la rete
+dell'esame, e la traccia Biblioteca svolta pezzo per pezzo. Su **questo**
+branch il codice della Biblioteca c'è già, in `demo/`: la mappa dei moduli che
+il corso legge da `task learn` è la stessa che vedi qui, non un esempio da
+un'altra parte. Sul template vuoto (branch `main`) è diverso: lì la mappa è
+solo Eureka e `common-dto`, e il codice della Biblioteca nelle lezioni resta
+un esempio da leggere, come spiega la lezione 1.
 
 ## Documentazione
 
