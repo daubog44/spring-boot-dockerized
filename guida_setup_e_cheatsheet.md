@@ -271,10 +271,10 @@ net stop winnat
 net start winnat
 ```
 
-### 🚨 Emergenza 1-bis: "container exam-eureka is unhealthy"
-`task docker-up` si interrompe con `dependency failed to start: container exam-eureka is unhealthy`, ma nei log Eureka scrive `Started Eureka Server`. L'healthcheck usa `curl`, che l'immagine `eclipse-temurin:25-jre` non contiene. Il `demo/Dockerfile` di questo repo lo installa già; se aggiungi un healthcheck HTTP a un altro servizio vale la stessa regola. Per leggere l'esito delle probe:
+### 🚨 Emergenza 1-bis: "container ...-eureka-server-1 is unhealthy"
+`task docker-up` si interrompe con `dependency failed to start: container <cartella>-eureka-server-1 is unhealthy`, ma nei log Eureka scrive `Started Eureka Server`. L'healthcheck usa `curl`, che l'immagine `eclipse-temurin:25-jre` non contiene. Il `demo/Dockerfile` di questo repo lo installa già; se aggiungi un healthcheck HTTP a un altro servizio vale la stessa regola. Per leggere l'esito delle probe, dalla cartella dei moduli:
 ```bash
-docker inspect exam-eureka --format "{{json .State.Health}}"
+docker inspect $(docker compose ps -q eureka-server) --format "{{json .State.Health}}"
 ```
 
 ### 🚨 Emergenza 2: "Docker Compose non aggiorna il codice modificato"

@@ -1,7 +1,11 @@
+# Niente container_name: Docker Compose chiama i container
+# <cartella>-<servizio>-1, cosi' due copie del progetto sulla stessa macchina
+# (quella di prova e quella dell'esame) non si contendono lo stesso nome.
+# Per riferirti a un container usa il nome del servizio:
+#   docker compose logs eureka-server
 services:
   postgres:
     image: postgres:18.3-alpine
-    container_name: exam-postgres
     environment:
       POSTGRES_DB: esame
       POSTGRES_USER: exam
@@ -20,7 +24,6 @@ services:
       - postgres-data:/var/lib/postgresql
 
   eureka-server:
-    container_name: exam-eureka
     build:
       context: .
       args:

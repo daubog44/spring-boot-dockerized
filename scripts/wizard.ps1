@@ -154,7 +154,9 @@ function Invoke-ServiceWizard {
         Write-Host ''
         Write-Host "  Il modulo $Name c'e' gia': lo rifiniamo." -ForegroundColor Yellow
     } else {
-        $kind = Ask-Choice -Question "Che cos'e' $Name?" -Options @(
+        # ${Name}? con le graffe: in PowerShell "$Name?" cercherebbe una
+        # variabile che si chiama Name? e stamperebbe il vuoto.
+        $kind = Ask-Choice -Question "Che cos'e' ${Name}?" -Options @(
             'servizio REST con database (il caso normale: entity, repository, controller)',
             'servizio REST senza database (calcoli, orchestrazione, chiamate ad altri servizi)',
             'interfaccia web Thymeleaf (le pagine che si vedono alla demo)'
@@ -186,7 +188,7 @@ function Invoke-ServiceWizard {
         return
     }
 
-    $db = Ask-Choice -Question "Che database usa $Name?" -Options @(
+    $db = Ask-Choice -Question "Che database usa ${Name}?" -Options @(
         'H2 in memoria (parte da solo, si svuota a ogni riavvio: comodo mentre sviluppi)',
         'PostgreSQL, il database condiviso del docker-compose',
         'PostgreSQL, con un database tutto suo (un servizio, un database)'
@@ -278,7 +280,7 @@ while ($true) {
         $demoDir = Get-DemoDir
         $exists = Test-Path (Join-Path $demoDir "$name/pom.xml")
         if (-not $exists) {
-            $kind = Ask-Choice -Question "Che cos'e' $name?" -Options @(
+            $kind = Ask-Choice -Question "Che cos'e' ${name}?" -Options @(
                 'servizio REST con database H2',
                 'servizio REST senza database',
                 'interfaccia web Thymeleaf'

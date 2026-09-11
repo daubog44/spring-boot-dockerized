@@ -338,7 +338,6 @@ echo "  demo/Dockerfile          COPY $MODULE/pom.xml"
 
 COMPOSE="$DEMO_DIR/docker-compose.yml"
 COMPOSE_BLOCK="  $MODULE:
-    container_name: exam-$MODULE
     build:
       context: .
       args:

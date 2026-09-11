@@ -105,6 +105,7 @@ if ($withDb) {
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+
 '@
 }
 $driverDeps = ''
@@ -120,6 +121,7 @@ if ($withDb) {
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+
 '@
 }
 $viewDep = ''
@@ -129,6 +131,7 @@ if ($Ui) {
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
+
 '@
 }
 
@@ -353,7 +356,6 @@ Write-Step "demo/Dockerfile          COPY $module/pom.xml"
 $compose = Join-Path $demoDir 'docker-compose.yml'
 $composeBlock = @(
     "  ${module}:"
-    "    container_name: exam-$module"
     '    build:'
     '      context: .'
     '      args:'

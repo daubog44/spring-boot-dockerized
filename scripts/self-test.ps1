@@ -138,6 +138,10 @@ Test-Case 'new-service crea il modulo e lo collega ovunque' {
     Assert-Contains (Get-Text 'demo/pom.xml') '<module>alfa-service</module>' 'non aggiunto ai <modules>'
     Assert-Contains (Get-Text 'demo/Dockerfile') 'COPY alfa-service/pom.xml' 'non aggiunto al Dockerfile'
     Assert-Contains (Get-Text 'demo/docker-compose.yml') 'MODULE: alfa-service' 'non aggiunto al compose'
+    # Un nome fisso farebbe scontrare due copie del progetto sulla stessa macchina.
+    Assert-That ((Get-Text 'demo/docker-compose.yml') -notmatch '(?m)^\s+container_name:') 'il compose non deve fissare i nomi dei container'
+    # Ogni dipendenza sulla sua riga: e' un file che si consegna.
+    Assert-NotContains (Get-Text 'demo/alfa-service/pom.xml') '</dependency>        <dependency>' 'due dipendenze sulla stessa riga del pom'
     Assert-Contains (Get-Text 'scripts/dev.ps1') "Module = 'alfa-service'" 'non aggiunto alla lista di dev.ps1'
     Assert-Contains (Get-Text 'scripts/dev.sh') ':alfa-service:' 'non aggiunto alla lista di dev.sh'
 }

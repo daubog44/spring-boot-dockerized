@@ -95,7 +95,7 @@ if (-not $DbName -and -not $User -and -not $Password -and -not $Port) {
     Write-Host '    task db-config DBNAME=magazzino USER=wms PASSWORD=wms123'
     Write-Host '    task db-config PORT=5433'
     Write-Host ''
-    Write-Host "  psql: docker exec -it exam-postgres psql -U $oldUser -d $oldDb" -ForegroundColor DarkGray
+    Write-Host "  psql: docker compose exec postgres psql -U $oldUser -d $oldDb   (dalla cartella $(Split-Path -Leaf $demoDir))" -ForegroundColor DarkGray
     Write-Host ''
     exit 0
 }

@@ -351,7 +351,6 @@ Poi restano i cinque collegamenti della tabella qui sopra: la riga nei
 
 ```yaml
   ordini-service:
-    container_name: exam-ordini-service
     build:
       context: .
       args:

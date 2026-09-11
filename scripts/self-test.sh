@@ -87,7 +87,11 @@ assert_ok "new-service" &&
   assert_contains demo/Dockerfile "COPY alfa-service/pom.xml" &&
   assert_contains demo/docker-compose.yml "MODULE: alfa-service" &&
   assert_contains scripts/dev.ps1 "Module = 'alfa-service'" &&
-  assert_contains scripts/dev.sh ":alfa-service:"
+  assert_contains scripts/dev.sh ":alfa-service:" &&
+  # Un nome fisso farebbe scontrare due copie del progetto sulla stessa macchina.
+  { grep -qE '^[[:space:]]+container_name:' "$DEMO/docker-compose.yml" && fail "il compose non deve fissare i nomi dei container"; true; } &&
+  # Ogni dipendenza sulla sua riga: e' un file che si consegna.
+  assert_not_contains demo/alfa-service/pom.xml "</dependency>        <dependency>" "il pom del modulo"
 end_case
 
 start_case "il modulo nuovo e' coerente (task check)"
