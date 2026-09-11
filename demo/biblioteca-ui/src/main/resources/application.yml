@@ -3,6 +3,12 @@
 #   task set-port SERVICE=biblioteca-ui PORT=<porta>
 server:
   port: ${SERVER_PORT:8090}
+  servlet:
+    session:
+      # Solo cookie: senza, al primo prestito (quando il browser non ha ancora
+      # un JSESSIONID) Tomcat riscrive il redirect in "/;jsessionid=...", Spring
+      # non lo riconosce come "/" e la pagina risponde 500 senza il form.
+      tracking-modes: cookie
 
 spring:
   application:

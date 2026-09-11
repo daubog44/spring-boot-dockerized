@@ -50,7 +50,10 @@ function Invoke-Api {
     }
     try {
         $r = Invoke-WebRequest @params
-        $json = if ($r.Content) { $r.Content | ConvertFrom-Json } else { $null }
+        # Con un tipo che non conosce (l'actuator risponde
+        # application/vnd.spring-boot.actuator.v3+json) PowerShell 5.1 da' i byte.
+        $text = if ($r.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($r.Content) } else { $r.Content }
+        $json = if ($text) { $text | ConvertFrom-Json } else { $null }
         return [pscustomobject]@{ Code = [int]$r.StatusCode; Json = $json }
     } catch {
         $response = $_.Exception.Response
