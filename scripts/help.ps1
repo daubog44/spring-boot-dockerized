@@ -64,6 +64,8 @@ Write-Host '  coordinate: DEPS=org.apache.commons:commons-lang3:3.17.0' -Foregro
 Write-Section 'Controlli'
 Write-Cmd 'task check' 'moduli, porte, Docker e liste sono coerenti?'
 Write-Cmd 'task test' 'collauda gli strumenti in una copia usa-e-getta'
+Write-Cmd 'task ide-sync' 'riallinea VS Code e Zed ai moduli veri'
+Write-Note 'ide-sync lo chiamano da soli new-service, remove-service e set-port.'
 
 Write-Section 'Esame senza rete'
 Write-Cmd 'task offline-prep' 'DA FARE CON LA RETE: scarica tutto'

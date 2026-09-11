@@ -1,51 +1,21 @@
+// Generato da `task ide-sync`: lo riscrivono new-service, remove-service
+// e set-port. Le modifiche a mano si perdono al prossimo comando.
 {
     "version": "0.2.0",
     "configurations": [
         {
             "type": "java",
-            "name": "1. eureka-server (:8761)",
+            "name": "1. naming-server (:8761)",
             "request": "launch",
             "mainClass": "com.example.ttfcloud_esame.namingserver.Main",
             "projectName": "naming-server"
-        },
-        {
-            "type": "java",
-            "name": "2. tourist-service (:8081)",
-            "request": "launch",
-            "mainClass": "com.example.ttfcloud_esame.touristservice.Main",
-            "projectName": "tourist-service"
-        },
-        {
-            "type": "java",
-            "name": "3. random-service (:8082)",
-            "request": "launch",
-            "mainClass": "com.example.ttfcloud_esame.randomservice.Main",
-            "projectName": "random-service"
-        },
-        {
-            "type": "java",
-            "name": "4. store-service (:8083)",
-            "request": "launch",
-            "mainClass": "com.example.ttfcloud_esame.storeservice.Main",
-            "projectName": "store-service"
-        },
-        {
-            "type": "java",
-            "name": "5. event-ui (:8080)",
-            "request": "launch",
-            "mainClass": "com.example.ttfcloud_esame.ui.Main",
-            "projectName": "event-ui"
         }
     ],
     "compounds": [
         {
             "name": "Stack completo",
             "configurations": [
-                "1. eureka-server (:8761)",
-                "2. tourist-service (:8081)",
-                "3. random-service (:8082)",
-                "4. store-service (:8083)",
-                "5. event-ui (:8080)"
+                "1. naming-server (:8761)"
             ],
             "stopAll": true
         }

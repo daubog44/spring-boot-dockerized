@@ -1,6 +1,18 @@
 {
+    "java.configuration.updateBuildConfiguration": "automatic",
     "java.compile.nullAnalysis.mode": "automatic",
+    // L'hot reload di task compile ricompila quello che hai salvato: senza
+    // salvataggio automatico non si accorge di niente.
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 1000,
-    "java.configuration.updateBuildConfiguration": "automatic"
+    "files.exclude": {
+        "**/target": true,
+        "**/.dev-logs": true
+    },
+    "search.exclude": {
+        "**/target": true,
+        "**/consegna": true
+    },
+    "[java]": { "editor.tabSize": 4 },
+    "[yaml]": { "editor.tabSize": 2, "editor.insertSpaces": true }
 }

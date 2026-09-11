@@ -310,6 +310,51 @@ Test-Case 'remove-service rifiuta un modulo che non esiste' {
     Assert-Fails (Invoke-Tool 'remove-service.ps1' @('-Module', 'questo-non-esiste')) 'ha accettato un modulo inventato'
 }
 
+# --- La configurazione degli editor ------------------------------------------
+
+Test-Case 'new-service mette il modulo nuovo nel launch.json' {
+    $launch = Get-Text '.vscode/launch.json'
+    Assert-Contains $launch '"projectName": "alfa-service"' 'il modulo nuovo non e'' fra le configurazioni di debug'
+    Assert-Contains $launch '"projectName": "naming-server"' 'manca Eureka'
+    Assert-Contains $launch 'Stack completo' 'manca il compound che li avvia tutti'
+    # La classe Main deve essere quella vera, o il debug parte e non trova niente.
+    Assert-Contains $launch 'com.example.ttfcloud_esame.alfaservice.Main' 'classe Main sbagliata'
+    # common-dto e' una libreria: non si avvia.
+    Assert-NotContains $launch '"projectName": "common-dto"' 'una libreria non va fra le configurazioni di avvio'
+}
+
+Test-Case 'launch.json e tasks.json sono JSON validi' {
+    foreach ($relative in @('.vscode/launch.json', '.vscode/tasks.json', '.zed/tasks.json')) {
+        # I file di configurazione degli editor ammettono i commenti //: li
+        # togliamo prima di darli al parser.
+        $text = (Get-Text $relative) -replace '(?m)^\s*//.*$', ''
+        try { $null = ConvertFrom-Json $text } catch { throw "$relative non e' JSON valido: $($_.Exception.Message)" }
+    }
+}
+
+Test-Case 'remove-service toglie il modulo anche dal launch.json' {
+    Assert-Ok (Invoke-Tool 'new-service.ps1' @('-Name', 'delta-service')) 'new-service e'' fallito'
+    Assert-Contains (Get-Text '.vscode/launch.json') '"projectName": "delta-service"' 'non aggiunto al launch.json'
+    Assert-Ok (Invoke-Tool 'remove-service.ps1' @('-Module', 'delta-service')) 'remove-service e'' fallito'
+    Assert-NotContains (Get-Text '.vscode/launch.json') 'delta-service' 'rimasto nel launch.json'
+}
+
+Test-Case 'set-port aggiorna la porta scritta nel launch.json' {
+    Assert-Ok (Invoke-Tool 'set-port.ps1' @('-Module', 'alfa-service', '-Port', '8399')) 'set-port e'' fallito'
+    Assert-Contains (Get-Text '.vscode/launch.json') 'alfa-service (:8399)' 'la porta nel launch.json e'' rimasta indietro'
+}
+
+Test-Case 'check si accorge se il launch.json e'' rimasto indietro' {
+    $launchPath = Join-Path $sandbox '.vscode/launch.json'
+    $saved = Read-TextFile $launchPath
+    Write-TextFile -Path $launchPath -Text ($saved -replace '"projectName": "alfa-service"', '"projectName": "servizio-fantasma"')
+    $r = Invoke-Tool 'check.ps1' @('-ProjectOnly')
+    Assert-Fails $r 'check non si e'' accorto del modulo fantasma'
+    Assert-Contains $r.Output 'task ide-sync' 'check non dice come rimediare'
+    Write-TextFile -Path $launchPath -Text $saved
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'rimesso a posto, check dovrebbe passare'
+}
+
 # --- Database: credenziali, dati di prova, schema ----------------------------
 
 Test-Case 'db-config stampa la configurazione del database' {

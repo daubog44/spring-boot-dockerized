@@ -1,0 +1,91 @@
+// Generato da `task ide-sync`. Palette: "task: Spawn".
+[
+    {
+        "label": "task dev",
+        "command": "task",
+        "args": ["dev"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    },
+    {
+        "label": "task compile",
+        "command": "task",
+        "args": ["compile"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    },
+    {
+        "label": "task logs",
+        "command": "task",
+        "args": ["logs"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    },
+    {
+        "label": "task status",
+        "command": "task",
+        "args": ["status"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    },
+    {
+        "label": "task dev-down",
+        "command": "task",
+        "args": ["dev-down"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    },
+    {
+        "label": "task check",
+        "command": "task",
+        "args": ["check"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    },
+    {
+        "label": "task test",
+        "command": "task",
+        "args": ["test"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    },
+    {
+        "label": "task docker-up",
+        "command": "task",
+        "args": ["docker-up"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    },
+    {
+        "label": "task docker-down",
+        "command": "task",
+        "args": ["docker-down"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    },
+    {
+        "label": "task db-schema",
+        "command": "task",
+        "args": ["db-schema"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    },
+    {
+        "label": "task seed-data",
+        "command": "task",
+        "args": ["seed-data"],
+        "use_new_terminal": false,
+        "allow_concurrent_runs": false,
+        "reveal": "always"
+    }
+]

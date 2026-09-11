@@ -61,6 +61,8 @@ echo ""
 echo "Controlli"
 cmd "task check" "moduli, porte, Docker e liste sono coerenti?"
 cmd "task test" "collauda gli strumenti in una copia usa-e-getta"
+cmd "task ide-sync" "riallinea VS Code e Zed ai moduli veri"
+note "ide-sync lo chiamano da soli new-service, remove-service e set-port."
 
 echo ""
 echo "Esame senza rete"

@@ -389,6 +389,12 @@ Write-Step ("scripts/dev.ps1          {0} -> {1}:{2}" -f $short, $module, $Port)
 Add-LinesBefore -Path $devSh -Start '^SERVICES=\(' -Anchor '^\)' -NewLines @("  ""${short}:${module}:${Port}""")
 Write-Step ("scripts/dev.sh           {0} -> {1}:{2}" -f $short, $module, $Port)
 
+# --- Gli editor ---------------------------------------------------------------
+# Un launch.json che elenca servizi che non esistono e' peggio di non averlo.
+
+& (Join-Path $PSScriptRoot 'ide-sync.ps1') | Out-Null
+Write-Step 'configurazione di VS Code e Zed riallineata'
+
 # --- Fatto --------------------------------------------------------------------
 
 Write-Host ''

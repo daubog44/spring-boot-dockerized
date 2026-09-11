@@ -56,6 +56,7 @@ E, già pronto e configurato per i moduli che creerai:
 - **springdoc-openapi**: ogni modulo creato da `task new-service` espone `/swagger-ui.html` dal primo avvio, senza configurazione (per gli altri c'è `task enable-swagger`).
 - **PostgreSQL** in `docker-compose.yml` (database `esame`, utente e password `exam`): c'è un container, **non collegato a niente** finché non lo chiedi. I moduli generati partono con H2 in memoria; `task use-postgres SERVICE=<modulo>` sposta un modulo sul database vero, e con `DBNAME=` gliene dà uno tutto suo dentro lo stesso container.
 - **Dockerfile unico** parametrico sul modulo: un'immagine per servizio, senza un Dockerfile per cartella.
+- **Configurazione degli editor** gia' pronta e **mantenuta dai comandi**: `.vscode/launch.json` (un profilo di debug per servizio, piu' il compound *Stack completo*), `.vscode/tasks.json` e `.zed/tasks.json` (i comandi `task` dalla palette), piu' `settings.json`, `extensions.json` e `.editorconfig`. Li riscrivono `new-service`, `remove-service` e `set-port`; se restano indietro lo dice `task check`.
 
 ---
 
@@ -157,6 +158,24 @@ task test
 
 Collauda gli strumenti stessi su una copia usa-e-getta del progetto. Lancialo
 appena ti siedi: se passa, sai che funzionano quando ti serviranno.
+
+### L'editor
+
+Apri **la cartella del repository**, non quella di un singolo servizio: e' un
+progetto Maven multi-modulo.
+
+- **VS Code**: `F5` → **Stack completo** avvia tutti i servizi in debug, Eureka
+  per primo. Serve l'*Extension Pack for Java*; le altre estensioni consigliate
+  te le propone VS Code stesso (`.vscode/extensions.json`).
+- **Zed**: palette → *task: Spawn* per i comandi `task`. Per il Java serve
+  l'estensione *Java*; per il debug passa da VS Code o IntelliJ.
+- **IntelliJ IDEA**: niente da configurare, apri il pom aggregatore.
+
+Se l'elenco dei servizi non torna (hai toccato i moduli a mano):
+
+```bash
+task ide-sync
+```
 
 ### Il database e la consegna
 

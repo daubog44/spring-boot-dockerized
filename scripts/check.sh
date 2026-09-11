@@ -193,6 +193,28 @@ else
 ' "compose valido" "saltato (docker non installato)"
 fi
 
+# --- La configurazione degli editor -------------------------------------------
+# Un launch.json che elenca servizi spariti manda in errore il tasto Debug, e
+# uno che non li elenca non lo fa partire affatto.
+
+LAUNCH="$REPO_ROOT/.vscode/launch.json"
+if [ -f "$LAUNCH" ]; then
+  LAUNCHED="$(grep -oE '"projectName"[[:space:]]*:[[:space:]]*"[^"]+"' "$LAUNCH" | sed -E 's/.*"([^"]+)"$/\1/')"
+  while read -r _name module _port; do
+    [ -z "$module" ] && continue
+    printf '%s
+' "$LAUNCHED" | grep -qx "$module" || add_error "$module: manca in .vscode/launch.json"
+  done <<<"$DEV_PS"
+  for name in $LAUNCHED; do
+    [ -f "$DEMO_DIR/$name/pom.xml" ] || add_error "$name: e' in .vscode/launch.json ma il modulo non esiste"
+  done
+  [ -n "$ERRORS" ] && add_error "riallinea con: task ide-sync"
+  report "editor (launch.json)"
+else
+  printf '  %-26s%s
+' "editor (launch.json)" "assente: task ide-sync"
+fi
+
 # --- Esito --------------------------------------------------------------------
 
 echo ""

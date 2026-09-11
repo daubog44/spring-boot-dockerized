@@ -146,6 +146,12 @@ if [ "$IS_EUREKA" = "1" ]; then
   done
 fi
 
+# --- Gli editor ---------------------------------------------------------------
+# Nel launch.json la porta compare nel nome della configurazione.
+
+bash "$SCRIPT_DIR/ide-sync.sh" >/dev/null 2>&1
+echo "  configurazione di VS Code e Zed riallineata"
+
 # --- 5. Cosa resta da guardare a mano ----------------------------------------
 
 # Collaudo e documentazione hanno indirizzi scritti per esteso: non li tocchiamo
