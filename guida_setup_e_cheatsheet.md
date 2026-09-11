@@ -309,22 +309,25 @@ Se restano indietro lo segnala `task check`, alla voce *editor (launch.json)*.
 
 ---
 
-## Prima e dopo: preparazione offline e consegna
+## Prima e dopo: la rete dell'esame e la consegna
 
-Se il giorno dell'esame non avrai rete, la sera prima:
+All'esame la rete passa da una whitelist di domini: Maven Central sì, il resto
+non si sa. `task rete` dice, dominio per dominio, che cosa passa e che cosa
+fare se no. La sera prima, con la connessione di casa:
 
 ```bash
 task offline-prep
 ```
 
-Scarica le dipendenze Maven in `~/.m2`, le immagini Docker di base e fa una
-prima build dei container. `task offline` verifica lo stato e prova davvero una
-compilazione offline (`mvnw -o`). Portati la cartella del progetto **e** la
-cartella `~/.m2` su una chiavetta: il template e' la cartella, non serve altro.
+Scarica le dipendenze Maven in `~/.m2`, anche quelle dei moduli che creerai,
+le immagini Docker di base e fa una prima build dei container. `task offline`
+verifica lo stato e prova davvero una compilazione offline (`mvnw -o`).
+Portati la cartella del progetto **e** la cartella `~/.m2` su una chiavetta: il
+template è la cartella, non serve altro.
 
-Senza rete presenta con `task dev` piu' `task run-db` (il solo PostgreSQL in
-container): non ricompila niente dentro Docker, quindi e' il modo che regge
-meglio.
+Se Docker Hub non passa, presenta con `task dev` più `task run-db` (il solo
+PostgreSQL in container): non ricompila niente dentro Docker, quindi è il modo
+che regge meglio.
 
 A fine giornata:
 
@@ -336,3 +339,6 @@ Prepara `consegna/` con il progetto pronto da eseguire (i moduli senza
 `target/`, accanto a pom e compose), l'allegato tecnico già compilato (moduli,
 porte, endpoint, schema del database), le istruzioni di esecuzione, e un
 archivio unico da consegnare: scompattato, parte con `docker compose up --build`.
+Le parti dell'allegato da scrivere a mano (analisi, algoritmo, che cosa fa ogni
+modulo) stanno in `allegato.md`: la consegna le mette al loro posto prima di
+fare l'archivio, quindi si può rilanciare quante volte si vuole.
