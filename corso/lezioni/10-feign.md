@@ -35,6 +35,18 @@ Il `Main` generato da `task new-service` ha già `@EnableFeignClients`: ogni
 interfaccia `@FeignClient` sotto il suo pacchetto diventa un bean che puoi
 iniettare come qualsiasi altro.
 
+## Generare il client con un comando: `task new-client`
+
+Puoi generare l'interfaccia `@FeignClient` collegata al servizio target direttamente:
+
+```bash
+task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto
+```
+
+Crea `CatalogoClient.java` sotto `prestiti-service/.../client/`, già annotato con
+`@FeignClient(name = "CATALOGO-SERVICE")` e con i metodi HTTP (`GET`, `POST`, `PUT`, `DELETE`)
+predisposti per scambiare `LibroDto`.
+
 ## Usarlo
 
 ```java demo/prestiti-service/src/main/java/esame/prestitiservice/service/PrestitoService.java

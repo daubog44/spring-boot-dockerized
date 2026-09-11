@@ -185,6 +185,87 @@ if ($added.Count -eq 0) {
 
 Add-LinesBefore -Path $pomPath -Anchor '^\s*</dependencies>' -NewLines $lines
 
+# --- Se e' stata aggiunta security, predisponi una SecurityConfig funzionante ---
+if ($added -contains 'spring-boot-starter-security') {
+    $package = Get-ModulePackage -Module $Module
+    $packagePath = $package -replace '\.', '/'
+    $configDir = Join-Path $demoDir "$Module/src/main/java/$packagePath/config"
+    $securityFile = Join-Path $configDir 'SecurityConfig.java'
+    if (-not (Test-Path $securityFile)) {
+        if (-not (Test-Path $configDir)) { New-Item -ItemType Directory -Path $configDir -Force | Out-Null }
+        $secSrc = @"
+package $package.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.SecurityFilterChain;
+
+/**
+ * Configurazione Spring Security generata da task add-dep DEPS=security.
+ * Evita il blocco totale delle richieste (401/403) tipico di Spring Boot di default.
+ */
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            // Disabilita CSRF per consentire POST/PUT/DELETE da client REST e Postman
+            .csrf(csrf -> csrf.disable())
+            .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+            .authorizeHttpRequests(auth -> auth
+                // Rotte di documentazione e diagnostica sempre aperte
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/actuator/**", "/h2-console/**").permitAll()
+                // Regole di autorizzazione specifiche (modifica o decommenta se richiesto dalla traccia):
+                // .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                // Tutte le altre richieste permesse di default per non bloccare lo stack
+                .anyRequest().permitAll()
+            )
+            .httpBasic(httpBasic -> {});
+
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService(PasswordEncoder encoder) {
+        UserDetails admin = User.builder()
+            .username("admin")
+            .password(encoder.encode("admin123"))
+            .roles("ADMIN", "USER")
+            .build();
+
+        UserDetails user = User.builder()
+            .username("user")
+            .password(encoder.encode("user123"))
+            .roles("USER")
+            .build();
+
+        return new InMemoryUserDetailsManager(admin, user);
+    }
+}
+"@
+        Write-TextFile -Path $securityFile -Text ($secSrc.Trim() + "`n")
+        Write-Host ''
+        Write-Host "  [+] Generato $Module/src/main/java/$packagePath/config/SecurityConfig.java" -ForegroundColor Cyan
+        Write-Host "      Configurazione base: Swagger e API libere, CSRF disattivato, utenti in-memory (admin/user)."
+    }
+}
+
 Write-Host ''
 Write-Host "==> demo/$Module/pom.xml aggiornato:" -ForegroundColor Green
 foreach ($artifact in $added) { Write-Step $artifact }

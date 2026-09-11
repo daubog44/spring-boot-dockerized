@@ -88,6 +88,29 @@ for dir in "$DEMO_DIR"/*/; do
   echo "  $name/  ($(du -sk "$OUT_DIR/$name" | cut -f1) KB)"
 done
 
+# --- Pulizia interna: la consegna non deve avere tracce del template ---------
+COMMON_DTO_DEST="$OUT_DIR/common-dto"
+if [ -d "$COMMON_DTO_DEST" ]; then
+  rm -rf "$COMMON_DTO_DEST/src/main/java/devdata"
+  rm -rf "$COMMON_DTO_DEST/src/main/resources/META-INF"
+  if [ -f "$COMMON_DTO_DEST/pom.xml" ]; then
+    python3 -c '
+import sys, re
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    text = f.read()
+text = re.sub(r"(?s)\s*<!-- Per il pacchetto devdata.*?jakarta\.persistence-api\s*</artifactId>\s*<optional>true</optional>\s*</dependency>", "", text)
+with open(sys.argv[1], "w", encoding="utf-8") as f:
+    f.write(text)
+' "$COMMON_DTO_DEST/pom.xml" 2>/dev/null || true
+  fi
+fi
+
+for yml in "$OUT_DIR"/*/src/main/resources/application.yml; do
+  [ -f "$yml" ] || continue
+  awk '/^[[:space:]]*dev-data:/{skip=1; next} skip && /^[[:space:]]+rows:/{next} {skip=0; print}' "$yml" > "$yml.tmp" && mv "$yml.tmp" "$yml"
+done
+echo "  pulizia consegna: rimosse classi del template (devdata) e configurazioni interne"
+
 # --- Quello che serve a farlo girare -----------------------------------------
 
 for file in docker-compose.yml Dockerfile .dockerignore pom.xml mvnw mvnw.cmd; do

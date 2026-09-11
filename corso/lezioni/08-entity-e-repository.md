@@ -102,16 +102,101 @@ Senza `@Enumerated(EnumType.STRING)` Hibernate salverebbe la posizione:
 `GIALLO` = 2. Basta aggiungere un genere in mezzo e tutti i dati già salvati
 cambiano significato. Con `STRING` si salva il nome, e l'ordine non conta.
 
-## La relazione
+## Le relazioni tra tabelle (nello stesso modulo)
 
-`@ManyToOne` sta dal lato «molti»: tanti libri hanno lo stesso autore, e la
-colonna `autore_id` sta nella tabella `libri`. Il lato opposto
-(`@OneToMany(mappedBy = "autore")` in `AutoreEntity`) si aggiunge solo se ti
-serve davvero la lista dei libri di un autore: una relazione nei due sensi,
-trasformata in JSON, gira in tondo all'infinito. È un'altra ragione per cui
-dai servizi escono DTO e non entity.
+All'interno dello **stesso modulo**, le tabelle risiedono nello stesso database.
+JPA supporta tutte le cardinalità: ecco come si scrivono e le regole per non
+sbagliare.
 
-## Fra due servizi, niente relazioni
+### 1. Many-to-One e One-to-Many (la più frequente all'esame)
+
+Tanti libri hanno un solo autore (`@ManyToOne`); un autore ha una collezione di
+libri (`@OneToMany`). La colonna della chiave esterna (`autore_id`) sta
+**sempre** nella tabella del lato *Molti* (`libri`).
+
+**Lato proprietario (`LibroEntity`, dove sta la chiave esterna):**
+
+```java
+@ManyToOne(fetch = FetchType.LAZY, optional = false)
+@JoinColumn(name = "autore_id", nullable = false)
+private AutoreEntity autore;
+```
+
+**Lato inverso (`AutoreEntity`, opzionale: aggiungilo solo se ti serve):**
+
+```java
+@OneToMany(mappedBy = "autore", cascade = CascadeType.ALL, orphanRemoval = true)
+private List<LibroEntity> libri = new ArrayList<>();
+```
+
+- `mappedBy = "autore"` indica il nome del campo Java nella classe `LibroEntity`.
+- `cascade = CascadeType.ALL`: salvando o cancellando l'autore, si sincronizzano anche i suoi libri.
+- `orphanRemoval = true`: se togli un libro dalla lista `libri`, Hibernate lo elimina dalla tabella.
+
+### 2. Many-to-Many (Molti a Molti)
+
+Tanti studenti seguono molti corsi; ogni corso ha molti studenti. Hibernate crea
+automaticamente la tabella di giunzione ponte (`studenti_corsi`).
+
+**Lato proprietario (`StudenteEntity`):**
+
+```java
+@ManyToMany(fetch = FetchType.LAZY)
+@JoinTable(
+    name = "studenti_corsi",
+    joinColumns = @JoinColumn(name = "studente_id"),
+    inverseJoinColumns = @JoinColumn(name = "corso_id")
+)
+private Set<CorsoEntity> corsi = new HashSet<>();
+```
+
+**Lato inverso (`CorsoEntity`):**
+
+```java
+@ManyToMany(mappedBy = "corsi", fetch = FetchType.LAZY)
+private Set<StudenteEntity> studenti = new HashSet<>();
+```
+
+> 💡 **Regola d'oro d'esame per Many-to-Many**: Se la relazione ha **dati propri**
+> (es. `dataIscrizione`, `votoEsame`), **non** usare `@ManyToMany` semplice!
+> Crea un'entità intermedia `IscrizioneEntity` che ha due `@ManyToOne`:
+> uno verso `StudenteEntity` e uno verso `CorsoEntity`.
+
+### 3. One-to-One (Uno a Uno)
+
+Un utente ha un solo profilo/tessera. La chiave esterna (`tessera_id`) sta
+in una delle due tabelle (es. `utenti`), con vincolo di unicità `unique = true`:
+
+```java
+// In UtenteEntity (lato che detiene la foreign key tessera_id)
+@OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+@JoinColumn(name = "tessera_id", unique = true)
+private TesseraEntity tessera;
+```
+
+```java
+// In TesseraEntity (lato inverso, opzionale)
+@OneToOne(mappedBy = "tessera", fetch = FetchType.LAZY)
+private UtenteEntity utente;
+```
+
+### Le 4 trappole da evitare all'esame
+
+1. **Usa sempre `fetch = FetchType.LAZY`**: di default `@ManyToOne` e `@OneToOne`
+   usano `EAGER`, caricando a cascata decine di record non richiesti.
+2. **Inizializza sempre le collezioni**: `= new ArrayList<>()` o `= new HashSet<>()`,
+   altrimenti rischi `NullPointerException`.
+3. **MAI `@Data` di Lombok sulle entity con relazioni**: genera in automatico
+   `toString()`, `equals()` e `hashCode()` ricorsivi. Con relazioni bidirezionali,
+   `toString()` entra in un loop infinito che fa esplodere la JVM con `StackOverflowError`.
+   Usa solo `@Getter`, `@Setter`, `@NoArgsConstructor`.
+4. **Evita il loop JSON Jackson**: se serializzi un'entity con relazione bidirezionale,
+   Jackson va in loop infinito. La soluzione pulita è **restituire sempre DTO** dai
+   controller (o mettere `@JsonIgnore` sul lato inverso).
+
+---
+
+## Fra due servizi, niente relazioni nel database
 
 ```java demo/prestiti-service/src/main/java/esame/prestitiservice/entity/PrestitoEntity.java
 // Il libro vive in un altro servizio, con il suo database: qui se ne tiene

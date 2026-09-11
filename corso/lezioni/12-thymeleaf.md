@@ -20,6 +20,18 @@ niente framework: un form HTML fa già tutto quello che serve.
 Il modulo creato con `task new-service NAME=biblioteca-ui UI=1` ha già la
 dipendenza di Thymeleaf, un `HomeController` e una pagina da sostituire.
 
+## Generare una vista completa con tabella e form: `task new-view`
+
+Per non dover scrivere a mano controller, tabella, form e gestione errori:
+
+```bash
+task new-view SERVICE=biblioteca-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int
+```
+
+Genera:
+1. `controller/LibriUiController.java`: controller Spring MVC con `@GetMapping` (elenco + form vuoto) e `@PostMapping` (salvataggio con `@Valid` e binding errori).
+2. `src/main/resources/templates/libri.html`: pagina HTML completa, con stile pulito, tabella dinamica `th:each` e form collegato `th:object` con visualizzazione errori `th:errors`.
+
 ## Il controller
 
 ```java demo/biblioteca-ui/src/main/java/esame/bibliotecaui/HomeController.java
