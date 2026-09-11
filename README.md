@@ -92,6 +92,10 @@ task new-service NAME=ordini-service
 ```
 
 ```bash
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
+```
+
+```bash
 task add-dep SERVICE=store-service DEPS=security,mail
 ```
 

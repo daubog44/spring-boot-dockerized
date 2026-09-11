@@ -228,6 +228,57 @@ Test-Case 'new-service senza NAME spiega come si usa' {
     Assert-Contains $r.Output 'task new-service NAME=' 'il messaggio non dice come si usa'
 }
 
+Test-Case 'new-entity genera entity, repository, service e controller' {
+    Assert-Ok (Invoke-Tool 'new-service.ps1' @('-Name', 'epsilon-service')) 'new-service epsilon-service e'' fallito'
+    $r = Invoke-Tool 'new-entity.ps1' @('-Service', 'epsilon-service', '-Name', 'Libro',
+        '-Fields', 'titolo:string(150):required,isbn:string(13):unique,annoPubblicazione:int:min(1450):max(2100),disponibile:bool:required,genere:enum(ROMANZO|SAGGIO|GIALLO)')
+    Assert-Ok $r 'new-entity e'' fallito'
+
+    $pkg = Get-SandboxPackagePath 'epsilon-service'
+    $base = "demo/epsilon-service/src/main/java/$pkg"
+    $entity = Get-Text "$base/entity/LibroEntity.java"
+    Assert-Contains $entity '@Table(name = "libro")' 'il nome tabella non e'' quello atteso'
+    Assert-Contains $entity '@Column(nullable = false, length = 150)' 'required + string(N) non genera il @Column atteso'
+    Assert-Contains $entity '@Column(unique = true, length = 13)' 'unique + string(N) non genera il @Column atteso'
+    Assert-Contains $entity '@Min(1450)' 'manca @Min dal modificatore min(N)'
+    Assert-Contains $entity '@Max(2100)' 'manca @Max dal modificatore max(N)'
+    Assert-Contains $entity '@NotBlank' 'un campo string required non ha @NotBlank'
+    Assert-Contains $entity '@NotNull' 'un campo non-string required non ha @NotNull'
+    Assert-Contains $entity '@Enumerated(EnumType.STRING)' 'il campo enum non ha @Enumerated'
+    Assert-Contains $entity 'private Genere genere;' 'il tipo del campo enum non e'' il nome dell''enum'
+
+    $enum = Get-Text "$base/entity/Genere.java"
+    Assert-Contains $enum 'ROMANZO,' 'manca un valore dell''enum'
+    Assert-Contains $enum 'GIALLO' 'manca l''ultimo valore dell''enum'
+
+    $repo = Get-Text "$base/repository/LibroRepository.java"
+    Assert-Contains $repo 'extends JpaRepository<LibroEntity, Long>' 'il repository non estende JpaRepository'
+
+    $service = Get-Text "$base/service/LibroService.java"
+    Assert-Contains $service 'ResponseStatusException(HttpStatus.NOT_FOUND' 'il service non risponde 404 su un id assente'
+    Assert-Contains $service 'esistente.setTitolo(dati.getTitolo());' 'aggiorna() non copia un campo da FIELDS='
+
+    $controller = Get-Text "$base/controller/LibroController.java"
+    Assert-Contains $controller '@RequestMapping("/api/libro")' 'il percorso REST non e'' quello atteso'
+    Assert-Contains $controller '@Valid @RequestBody LibroEntity nuovo' 'la creazione non valida il corpo con @Valid'
+    Assert-Contains $controller '@ResponseStatus(HttpStatus.CREATED)' 'la creazione non risponde 201'
+
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo new-entity il progetto non e'' coerente'
+}
+
+Test-Case 'new-entity rifiuta un modulo senza database' {
+    Assert-Ok (Invoke-Tool 'new-service.ps1' @('-Name', 'epsilon-nodb-service', '-NoDb')) 'new-service NoDb e'' fallito'
+    $r = Invoke-Tool 'new-entity.ps1' @('-Service', 'epsilon-nodb-service', '-Name', 'Cosa')
+    Assert-Fails $r 'ha accettato un modulo NODB=1, che non ha JPA'
+    Assert-Contains $r.Output 'non ha un database' 'il messaggio non spiega perche'''
+}
+
+Test-Case 'new-entity rifiuta un''entity che esiste gia''' {
+    $r = Invoke-Tool 'new-entity.ps1' @('-Service', 'epsilon-service', '-Name', 'Libro', '-Fields', 'x:int')
+    Assert-Fails $r 'ha rigenerato un''entity che esisteva gia'''
+    Assert-Contains $r.Output 'gia''' 'il messaggio non dice che c''e'' gia'''
+}
+
 Test-Case 'add-dep aggiunge dal catalogo' {
     Assert-Ok (Invoke-Tool 'add-dep.ps1' @('-Module', 'alfa-service', '-Deps', 'security,mail')) 'add-dep e'' fallito'
     $pom = Get-Text 'demo/alfa-service/pom.xml'

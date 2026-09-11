@@ -320,11 +320,38 @@ usare `@Data` sulle entity: genera `equals`, `hashCode` e `toString` su tutti
 i campi, relazioni comprese, e con due entity che si nominano a vicenda
 `toString` non finisce più.
 
+## Le stesse quattro classi, ogni volta: `task new-entity`
+
+Ogni tabella della traccia rifà lo stesso giro: un'entity, un repository, un
+service col CRUD, un controller con Swagger. Adesso che sai cosa c'è dentro
+ognuno, un comando li scrive per te:
+
+```bash
+task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):unique,annoPubblicazione:int:min(1450):max(2100),disponibile:bool:required,genere:enum(ROMANZO|SAGGIO|GIALLO)
+```
+
+`FIELDS` è una lista `nome:tipo[:modificatore]*`: i tipi sono `string`,
+`string(N)`, `text`, `int`, `long`, `decimal`, `bool`, `date`, `datetime`,
+`email`, `enum(A|B|C)` (genera anche l'enum, in un file a parte); i
+modificatori sono `required`, `unique`, `min(N)`, `max(N)`. Il catalogo
+completo è in `task --summary new-entity`.
+
+Quello che **non** genera, apposta: le relazioni con altre entity
+(`@ManyToOne`, `@OneToMany`...) e le regole della tua traccia nel service. Le
+aggiungi tu, a mano, dopo — sono la parte che si valuta, non boilerplate. Il
+controller generato torna `LibroEntity` direttamente: se questi dati li
+consuma anche un altro servizio via Feign, o vuoi nascondere dei campi,
+sostituiscilo con un DTO come hai visto nella lezione 9 (te lo ricorda anche
+un commento nel file generato).
+
 > **Prova tu**
 >
 > Aggiungi a `LibroEntity` un campo `editore` (una stringa di 80 caratteri, che
 > può mancare) e a `LibroRepository` il metodo `findByGenere(Genere genere)`.
 > Poi lancia `task db-schema` e cerca la colonna nuova nella tabella `libri`.
+> Poi prova anche il comando: `task new-entity SERVICE=catalogo-service
+> NAME=Autore FIELDS=nome:string(80):required,cognome:string(80):required` e
+> guarda i quattro file che genera.
 
 > **Fatto quando**
 >
@@ -334,3 +361,4 @@ i campi, relazioni comprese, e con due entity che si nominano a vicenda
 > - [ ] sai scrivere una query col nome del metodo, comprese `And`, `Between`, `ContainingIgnoreCase`, `OrderBy`
 > - [ ] sai quando un repository torna `Optional` e come si gestisce con `orElseThrow`
 > - [ ] sai quando serve `@Query` invece del nome del metodo
+> - [ ] sai cosa genera `task new-entity` e cosa resta da aggiungere a mano
