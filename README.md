@@ -26,7 +26,15 @@ task new-service NAME=ordini-service
 
 che crea il modulo *e* lo collega dove serve — pom aggregatore, Dockerfile,
 docker-compose, lista di avvio — senza che tu debba ricordarti nessuno dei sei
-posti.
+posti. Dentro un modulo, ogni tabella si scrive con lo stesso schema (entity,
+repository, service, controller): anche quello lo genera un comando,
+
+```bash
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
+```
+
+e ti lascia aggiungere solo quello che conta davvero: le relazioni fra entity
+e le regole della tua traccia.
 
 ---
 

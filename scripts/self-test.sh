@@ -163,6 +163,46 @@ run_tool new-service.sh
 assert_fails "new-service senza nome" && assert_out_contains "task new-service NAME="
 end_case
 
+start_case "new-entity genera entity, repository, service e controller"
+run_tool new-service.sh --name epsilon-service
+assert_ok "new-service epsilon-service" &&
+run_tool new-entity.sh --service epsilon-service --name Libro \
+  --fields "titolo:string(150):required,isbn:string(13):unique,annoPubblicazione:int:min(1450):max(2100),disponibile:bool:required,genere:enum(ROMANZO|SAGGIO|GIALLO)" &&
+assert_ok "new-entity" &&
+EPS_BASE="demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)" &&
+assert_contains "$EPS_BASE/entity/LibroEntity.java" '@Table(name = "libro")' "il nome tabella non e' quello atteso" &&
+assert_contains "$EPS_BASE/entity/LibroEntity.java" "@Column(nullable = false, length = 150)" "required + string(N)" &&
+assert_contains "$EPS_BASE/entity/LibroEntity.java" "@Column(unique = true, length = 13)" "unique + string(N)" &&
+assert_contains "$EPS_BASE/entity/LibroEntity.java" "@Min(1450)" "manca @Min" &&
+assert_contains "$EPS_BASE/entity/LibroEntity.java" "@Max(2100)" "manca @Max" &&
+assert_contains "$EPS_BASE/entity/LibroEntity.java" "@NotBlank" "manca @NotBlank" &&
+assert_contains "$EPS_BASE/entity/LibroEntity.java" "@NotNull" "manca @NotNull" &&
+assert_contains "$EPS_BASE/entity/LibroEntity.java" "@Enumerated(EnumType.STRING)" "manca @Enumerated" &&
+assert_contains "$EPS_BASE/entity/LibroEntity.java" "private Genere genere;" "il tipo del campo enum e' sbagliato" &&
+assert_contains "$EPS_BASE/entity/Genere.java" "ROMANZO," "manca un valore dell'enum" &&
+assert_contains "$EPS_BASE/entity/Genere.java" "GIALLO" "manca l'ultimo valore dell'enum" &&
+assert_contains "$EPS_BASE/repository/LibroRepository.java" "extends JpaRepository<LibroEntity, Long>" "il repository non estende JpaRepository" &&
+assert_contains "$EPS_BASE/service/LibroService.java" "ResponseStatusException(HttpStatus.NOT_FOUND" "manca il 404 sul service" &&
+assert_contains "$EPS_BASE/service/LibroService.java" "esistente.setTitolo(dati.getTitolo());" "aggiorna() non copia un campo" &&
+assert_contains "$EPS_BASE/controller/LibroController.java" '@RequestMapping("/api/libro")' "il percorso REST non e' quello atteso" &&
+assert_contains "$EPS_BASE/controller/LibroController.java" "@Valid @RequestBody LibroEntity nuovo" "manca @Valid sulla creazione" &&
+assert_contains "$EPS_BASE/controller/LibroController.java" "@ResponseStatus(HttpStatus.CREATED)" "manca il 201 sulla creazione" &&
+run_tool check.sh --project-only &&
+assert_ok "dopo new-entity il progetto non e' coerente"
+end_case
+
+start_case "new-entity rifiuta un modulo senza database"
+run_tool new-service.sh --name epsilon-nodb-service --no-db
+assert_ok "new-service NoDb" &&
+run_tool new-entity.sh --service epsilon-nodb-service --name Cosa &&
+assert_fails "ha accettato un modulo NODB=1, che non ha JPA" && assert_out_contains "non ha un database"
+end_case
+
+start_case "new-entity rifiuta un'entity che esiste gia'"
+run_tool new-entity.sh --service epsilon-service --name Libro --fields "x:int"
+assert_fails "ha rigenerato un'entity che esisteva gia'" && assert_out_contains "gia'"
+end_case
+
 start_case "add-dep aggiunge dal catalogo"
 run_tool add-dep.sh --module alfa-service --deps security,mail
 assert_ok "add-dep" &&
