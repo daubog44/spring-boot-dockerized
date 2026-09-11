@@ -262,11 +262,7 @@ docker compose ps
 ```
 
 ```bash
-<<<<<<< branch
-docker logs exam-wms-service --tail 50
-=======
-docker compose logs eureka-server --tail 50
->>>>>>> main
+docker compose logs wms-service --tail 50
 ```
 
 Per verificare quali servizi si sono effettivamente registrati su Eureka:
