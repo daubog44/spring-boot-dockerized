@@ -1,3 +1,6 @@
+# stato interno di go-task (checksum, cronologia): non e' del progetto
+.task/
+
 # log dei servizi avviati con `task dev`
 .dev-logs/
 

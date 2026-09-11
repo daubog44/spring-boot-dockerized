@@ -1,6 +1,0 @@
-spring.application.name: exchange-service
-server.port: 8000
-
-exchange:
-  disclaimer: disclaimer
-  delay: 12
