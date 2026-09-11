@@ -316,12 +316,25 @@ if ($withDb) {
 "@
 }
 
+$sessionBlock = ''
+if ($Ui) {
+    $sessionBlock = @"
+
+  servlet:
+    session:
+      # Solo cookie: senza, al primo invio di un form (quando il browser non ha
+      # ancora un JSESSIONID) Tomcat riscrive il redirect in "/;jsessionid=...",
+      # Spring non lo riconosce piu' come "/" e la pagina risponde 500.
+      tracking-modes: cookie
+"@
+}
+
 $yml = @"
 # La porta si legge da SERVER_PORT (in Docker la passa docker-compose.yml) e
 # ricade sul valore qui sotto quando lo avvii in locale. Per cambiarla:
 #   task set-port SERVICE=$module PORT=<porta>
 server:
-  port: `${SERVER_PORT:$Port}
+  port: `${SERVER_PORT:$Port}$sessionBlock
 
 spring:
   application:

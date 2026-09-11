@@ -153,6 +153,8 @@ Test-Case 'ogni copia del progetto ha il suo progetto Docker Compose' {
     $nome = ("" + (& powershell -NoProfile -ExecutionPolicy Bypass -Command ". '$(Join-Path $sandboxScripts 'dev-lib.ps1')'; `$env:COMPOSE_PROJECT_NAME")).Trim()
     Assert-That ($nome -eq $atteso) "progetto Compose '$nome' invece di '$atteso'"
     Assert-Contains (Get-Text 'Taskfile.yml') 'COMPOSE_PROJECT_NAME:' 'il Taskfile non passa il nome del progetto a docker compose'
+    # Un docker compose lanciato a mano da demo/ lo trova in demo/.env.
+    Assert-Contains (Get-Text 'demo/.env') "COMPOSE_PROJECT_NAME=$atteso" 'demo/.env non porta il nome del progetto'
 }
 
 Test-Case 'new-service crea il modulo e lo collega ovunque' {
@@ -192,6 +194,8 @@ Test-Case 'new-service UI=1 genera Thymeleaf e la pagina, senza JPA' {
     Assert-NotContains $pom 'spring-boot-starter-data-jpa' 'una UI non deve avere JPA'
     Assert-That (Test-Path (Join-Path $demo 'beta-ui/src/main/resources/templates/index.html')) 'manca la pagina index.html'
     Assert-NotContains (Get-Text 'demo/beta-ui/src/main/resources/application.yml') 'datasource' 'una UI non deve avere datasource'
+    # Senza, il primo POST con redirect finisce su "/;jsessionid=..." e risponde 500.
+    Assert-Contains (Get-Text 'demo/beta-ui/src/main/resources/application.yml') 'tracking-modes: cookie' 'la UI deve tenere la sessione solo nel cookie'
 }
 
 Test-Case 'new-service NODB=1 lascia fuori database e driver' {

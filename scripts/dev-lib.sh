@@ -21,6 +21,17 @@ if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
   COMPOSE_PROJECT_NAME="$(basename "$(dev_repo_root)" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9_-]+/-/g; s/^[^a-z0-9]+//')"
   export COMPOSE_PROJECT_NAME
 fi
+# Anche un `docker compose` scritto a mano dentro demo/ (le guide lo usano per
+# fermare un servizio o leggerne i log) deve trovare lo stesso progetto:
+# Compose legge il nome da demo/.env, che git ignora.
+_compose_env="$(dev_repo_root)/demo/.env"
+if [ -n "$COMPOSE_PROJECT_NAME" ] && [ -d "$(dirname "$_compose_env")" ] &&
+  ! grep -qx "COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME" "$_compose_env" 2>/dev/null; then
+  { echo "COMPOSE_PROJECT_NAME=$COMPOSE_PROJECT_NAME"
+    grep -v '^[[:space:]]*COMPOSE_PROJECT_NAME[[:space:]]*=' "$_compose_env" 2>/dev/null || true
+  } >"$_compose_env.tmp" && mv "$_compose_env.tmp" "$_compose_env"
+fi
+unset _compose_env
 
 # Tutte le porte da controllare: le fisse piu' quelle dell'ultimo avvio
 # (che possono differire se e' stato passato --ui-port).
