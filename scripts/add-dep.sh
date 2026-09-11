@@ -13,6 +13,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEMO_DIR="$REPO_ROOT/demo"
+# shellcheck source=scripts/scaffold-lib.sh
+. "$SCRIPT_DIR/scaffold-lib.sh"
 
 MODULE=""
 DEPS=""
@@ -158,6 +160,81 @@ fi
 N="$(grep -nE '^[[:space:]]*</dependencies>' "$POM" | head -n 1 | cut -d: -f1)"
 [ -n "$N" ] || { echo "Non trovo </dependencies> in $POM: aggiungi la dipendenza a mano." >&2; exit 1; }
 awk -v n="$((N - 1))" -v text="$BLOCK" '{ print } NR == n { printf "%s", text }' "$POM" >"$POM.tmp" && mv "$POM.tmp" "$POM"
+
+# Se e' stata aggiunta security, genera SecurityConfig.java
+if printf '%s' "$ADDED" | grep -q 'spring-boot-starter-security'; then
+  PKG="$(base_package "$DEMO_DIR").$(printf '%s' "$MODULE" | tr -cd 'a-zA-Z0-9')"
+  PKG_PATH="$(printf '%s' "$PKG" | tr '.' '/')"
+  CFG_DIR="$DEMO_DIR/$MODULE/src/main/java/$PKG_PATH/config"
+  SEC_FILE="$CFG_DIR/SecurityConfig.java"
+  if [ ! -e "$SEC_FILE" ]; then
+    mkdir -p "$CFG_DIR"
+    cat > "$SEC_FILE" <<EOF
+package $PKG.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.SecurityFilterChain;
+
+/**
+ * Configurazione Spring Security generata da task add-dep DEPS=security.
+ * Evita il blocco totale delle richieste (401/403) tipico di Spring Boot di default.
+ */
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/actuator/**", "/h2-console/**").permitAll()
+                .anyRequest().permitAll()
+            )
+            .httpBasic(httpBasic -> {});
+
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService(PasswordEncoder encoder) {
+        UserDetails admin = User.builder()
+            .username("admin")
+            .password(encoder.encode("admin123"))
+            .roles("ADMIN", "USER")
+            .build();
+
+        UserDetails user = User.builder()
+            .username("user")
+            .password(encoder.encode("user123"))
+            .roles("USER")
+            .build();
+
+        return new InMemoryUserDetailsManager(admin, user);
+    }
+}
+EOF
+    echo ""
+    echo "  [+] Generato $MODULE/src/main/java/$PKG_PATH/config/SecurityConfig.java"
+    echo "      Configurazione base: Swagger e API libere, CSRF disattivato, utenti in-memory (admin/user)."
+  fi
+fi
 
 echo ""
 echo "==> demo/$MODULE/pom.xml aggiornato:"

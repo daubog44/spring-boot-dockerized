@@ -96,6 +96,12 @@ task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required
 ```
 
 ```bash
+task new-dto NAME=Ordine FIELDS=id:long,numero:string:required,totale:decimal
+task new-client FROM=report-service TO=ordini-service DTO=OrdineDto
+task new-view SERVICE=store-ui NAME=Ordini FIELDS=numero:string:required,totale:decimal
+```
+
+```bash
 task add-dep SERVICE=store-service DEPS=security,mail
 ```
 
@@ -187,6 +193,7 @@ task wizard
 Per un microservizio solo: `task wizard SERVICE=<nome>`. Non fa niente di
 magico: chiama `set-java`, `rename-project`, `set-package`, `db-config`,
 `new-service` e `use-postgres` nell'ordine giusto, e finisce con `task check`.
+
 
 Scritte le entity, due comandi le mettono al lavoro. Tutti e due passano dal
 database vero, non dalla lettura dei sorgenti: avviano l'applicazione, lasciano
