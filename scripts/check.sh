@@ -219,6 +219,26 @@ else
   printf '  %-26s%s\n' "editor (debug)" "assente: task ide-sync"
 fi
 
+# --- Java: il JDK della macchina basta al progetto? --------------------------
+# Riguarda la macchina, non i file: le prove automatiche lo saltano. Un JDK
+# piu' nuovo del progetto va bene (compila per la versione vecchia), uno piu'
+# vecchio no: "release version 25 not supported".
+
+if [ "$PROJECT_ONLY" -eq 1 ]; then
+  printf '  %-26s%s\n' "java" "saltato (--project-only)"
+else
+  . "$SCRIPT_DIR/scaffold-lib.sh"
+  WANTED="$(project_java_version "$DEMO_DIR")"
+  JDK="$(machine_jdk || true)"
+  JDK_VERSION="${JDK%%|*}"
+  if [ -z "$JDK" ]; then
+    add_error "non trovo un JDK (JAVA_HOME o PATH): Maven non puo' compilare. Installa Java $WANTED, poi task set-java"
+  elif [ -n "$WANTED" ] && [ "$JDK_VERSION" -lt "$WANTED" ]; then
+    add_error "il progetto chiede Java $WANTED e il JDK di questa macchina e' Java $JDK_VERSION: task set-java (o installa Java $WANTED)"
+  fi
+  report "java" "OK (progetto Java $WANTED, JDK ${JDK_VERSION:-?})"
+fi
+
 # --- Esito --------------------------------------------------------------------
 
 echo ""

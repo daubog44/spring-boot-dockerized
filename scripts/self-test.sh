@@ -58,6 +58,12 @@ $TOOL_OUT"; }
 assert_fails() { [ "$TOOL_CODE" -ne 0 ] || fail "${1:-il comando} doveva fallire e invece e' andato bene"; }
 assert_out_contains() { printf '%s' "$TOOL_OUT" | grep -qF -- "$1" || fail "l'output non contiene '$1'"; }
 
+# Il pacchetto di un modulo nella copia di prova, come percorso: la base cambia
+# da un branch all'altro (e la cambiano il wizard e set-package), quindi la
+# leggiamo ogni volta.
+. "$SB_SCRIPTS/scaffold-lib.sh"
+sb_package_path() { printf '%s/%s' "$(base_package "$DEMO" | tr '.' '/')" "$(printf '%s' "$1" | tr -cd 'a-zA-Z0-9')"; }
+
 start_case() { CURRENT="$1"; FAILURE=""; }
 end_case() {
   if [ -z "$FAILURE" ]; then
@@ -80,7 +86,7 @@ start_case "new-service crea il modulo e lo collega ovunque"
 run_tool new-service.sh --name alfa-service
 assert_ok "new-service" &&
   assert_file demo/alfa-service/pom.xml &&
-  assert_file demo/alfa-service/src/main/java/com/example/ttfcloud_esame/alfaservice/Main.java &&
+  assert_file "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/Main.java" &&
   assert_file demo/alfa-service/src/main/resources/application.yml &&
   assert_contains demo/alfa-service/pom.xml "<artifactId>alfa-service</artifactId>" &&
   assert_contains demo/pom.xml "<module>alfa-service</module>" &&
@@ -293,13 +299,14 @@ assert_contains "$LAUNCH" '"projectName": "alfa-service"' "le configurazioni di 
 assert_contains "$LAUNCH" '"projectName": "naming-server"' "le configurazioni di debug"
 assert_contains "$LAUNCH" 'Stack completo' "il compound che li avvia tutti"
 # La classe Main deve essere quella vera, o il debug parte e non trova niente.
-assert_contains "$LAUNCH" 'com.example.ttfcloud_esame.alfaservice.Main' "la classe Main"
+ALFA_MAIN="$(sb_package_path alfa-service | tr '/' '.').Main"
+assert_contains "$LAUNCH" "$ALFA_MAIN" "la classe Main"
 # common-dto e' una libreria: non si avvia.
 assert_not_contains "$LAUNCH" '"projectName": "common-dto"' "una libreria non va fra le configurazioni di avvio"
 # Zed ha il suo file, con l'adattatore della sua estensione Java.
 assert_contains ".zed/debug.json" '"projectName": "alfa-service"' "il debug.json di Zed"
 assert_contains ".zed/debug.json" '"adapter": "Java"' "il debug.json di Zed"
-assert_contains ".zed/debug.json" 'com.example.ttfcloud_esame.alfaservice.Main' "la classe Main nel debug.json"
+assert_contains ".zed/debug.json" "$ALFA_MAIN" "la classe Main nel debug.json"
 assert_not_contains ".zed/debug.json" '"projectName": "common-dto"' "una libreria non va nel debug.json"
 end_case
 
@@ -378,6 +385,39 @@ run_tool db-config.sh --db-name "non valido!"
 assert_fails "db-config con un nome impossibile"
 end_case
 
+# --- Java e pacchetto -----------------------------------------------------------
+
+start_case "set-java imposta la versione in pom, Dockerfile e VS Code"
+run_tool set-java.sh --version 21
+assert_ok "set-java VERSION=21"
+assert_contains demo/pom.xml "<java.version>21</java.version>" "il pom"
+assert_contains demo/Dockerfile "eclipse-temurin:21-jdk" "l'immagine di build"
+assert_contains demo/Dockerfile "eclipse-temurin:21-jre" "l'immagine finale"
+assert_contains .vscode/settings.json '"JavaSE-21"' "il runtime di VS Code"
+end_case
+
+start_case "set-java rifiuta una versione troppo vecchia per Spring Boot 4"
+run_tool set-java.sh --version 11
+assert_fails "set-java VERSION=11"
+assert_contains demo/pom.xml "<java.version>21</java.version>" "il pom dopo il rifiuto"
+end_case
+
+start_case "set-java senza VERSION usa il JDK di questa macchina"
+JDK="$(machine_jdk || true)"
+if [ -z "$JDK" ]; then
+  echo "  SALTATA  $CURRENT -- su questa macchina non c'e' un JDK"
+  SKIPPED=$((SKIPPED + 1))
+else
+  run_tool set-java.sh
+  assert_ok "set-java"
+  assert_contains demo/pom.xml "<java.version>${JDK%%|*}</java.version>" "il pom segue il JDK della macchina"
+  assert_contains .vscode/settings.json "${JDK#*|}" "VS Code punta al JDK della macchina"
+  assert_contains Taskfile.yml "${JDK#*|}" "il JDK di ripiego del Taskfile"
+  run_tool check.sh --project-only
+  assert_ok "task check dopo set-java"
+  end_case
+fi
+
 # --- Il wizard ----------------------------------------------------------------
 # Le risposte gliele diamo da un file (WIZARD_ANSWERS), una per riga: una riga
 # vuota vale come Invio.
@@ -396,10 +436,11 @@ assert_out_contains "risposte sono finite"
 end_case
 
 start_case "il wizard monta database e servizi rispondendo alle domande"
-# cartella invariata; PostgreSQL con credenziali e porta; un servizio REST con
+# cartella invariata; pacchetto it.wiz; PostgreSQL con credenziali e porta; un servizio REST con
 # il database condiviso; un'interfaccia web senza Swagger; Invio per finire.
 printf '%s\n' \
   '' \
+  it.wiz \
   s wizdb wiz wizpass 5439 \
   omega-service 1 '' 2 \
   sigma-ui 3 '' n \
@@ -410,6 +451,8 @@ assert_contains "demo/docker-compose.yml" "POSTGRES_DB: wizdb" "il database scel
 assert_contains "demo/docker-compose.yml" '"5439:5432"' "la porta scelta"
 assert_contains "demo/omega-service/src/main/resources/application.yml" "jdbc:postgresql://localhost:5439/wizdb" "il servizio sul database condiviso, sulla porta scelta"
 assert_file "demo/sigma-ui/src/main/resources/templates/index.html"
+assert_file "demo/omega-service/src/main/java/it/wiz/omegaservice/Main.java"
+assert_file "demo/naming-server/src/main/java/it/wiz/namingserver/Main.java"
 assert_contains ".vscode/launch.json" '"projectName": "omega-service"' "il launch.json"
 assert_contains ".zed/debug.json" '"projectName": "sigma-ui"' "il debug.json di Zed"
 run_tool check.sh --project-only
@@ -417,9 +460,10 @@ assert_ok "task check dopo il wizard"
 end_case
 
 # Da qui in poi serve un dominio con delle @Entity: lo scriviamo noi.
-ENTITY_DIR="$DEMO/alfa-service/src/main/java/com/example/ttfcloud_esame/alfaservice"
+ALFA_PATH="$(sb_package_path alfa-service)"
+ENTITY_DIR="$DEMO/alfa-service/src/main/java/$ALFA_PATH"
 cat >"$ENTITY_DIR/DepositoEntity.java" <<'JAVA'
-package com.example.ttfcloud_esame.alfaservice;
+package __PKG__;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -435,12 +479,12 @@ public class DepositoEntity {
 }
 JAVA
 cat >"$ENTITY_DIR/StatoArticolo.java" <<'JAVA'
-package com.example.ttfcloud_esame.alfaservice;
+package __PKG__;
 
 public enum StatoArticolo { DISPONIBILE, ESAURITO }
 JAVA
 cat >"$ENTITY_DIR/ArticoloEntity.java" <<'JAVA'
-package com.example.ttfcloud_esame.alfaservice;
+package __PKG__;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -478,7 +522,7 @@ JAVA
 # Nome e cognome, un anno, un id che punta a un altro servizio: i valori
 # devono sembrare veri, non "nome 1", 10, 20.
 cat >"$ENTITY_DIR/SocioEntity.java" <<'JAVA'
-package com.example.ttfcloud_esame.alfaservice;
+package __PKG__;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -496,6 +540,9 @@ public class SocioEntity {
     private Long tesseraId;
 }
 JAVA
+
+# I file qui sopra dicono __PKG__: al suo posto va il pacchetto del modulo.
+sed -i "s/__PKG__/$(printf '%s' "$ALFA_PATH" | tr '/' '.')/" "$ENTITY_DIR"/*.java
 
 start_case "seed-data ricava le INSERT dalle @Entity"
 run_tool seed-data.sh --module alfa-service --rows 3
@@ -544,6 +591,38 @@ assert_out_contains 'Tabella `deposito_entity`'
 assert_out_contains "erDiagram"
 assert_out_contains "FK"
 assert_out_contains '| `stato` | VARCHAR(20) |'
+end_case
+
+start_case "set-package sposta i sorgenti e riscrive package, import e mainClass"
+OLD_BASE="$(base_package "$DEMO")"
+ALFA_OLD="$DEMO/alfa-service/src/main/java/$(sb_package_path alfa-service)"
+# Una stringa che nomina la base ma non un suo sottopacchetto: deve restare com'e'.
+printf 'package %s.alfaservice;\n\nclass Frase {\n    static final String TESTO = "%s.pdf";\n}\n' "$OLD_BASE" "$OLD_BASE" >"$ALFA_OLD/Frase.java"
+run_tool set-package.sh --package it.prova
+assert_ok "set-package"
+ALFA_NEW="demo/alfa-service/src/main/java/it/prova/alfaservice"
+assert_file "$ALFA_NEW/Main.java"
+assert_file "$ALFA_NEW/ArticoloEntity.java"
+[ -d "$ALFA_OLD" ] && fail "la cartella vecchia e' rimasta"
+assert_contains "$ALFA_NEW/ArticoloEntity.java" "package it.prova.alfaservice;" "il package"
+assert_contains "$ALFA_NEW/Frase.java" "\"$OLD_BASE.pdf\"" "una stringa che non era un pacchetto"
+assert_file "demo/naming-server/src/main/java/it/prova/namingserver/Main.java"
+assert_contains demo/naming-server/pom.xml "<mainClass>it.prova.namingserver.Main</mainClass>" "la mainClass del pom"
+assert_contains .vscode/launch.json "it.prova.alfaservice.Main" "il launch.json"
+VECCHI="$(grep -rlE "^[[:space:]]*(package|import)[[:space:]]+$(printf '%s' "$OLD_BASE" | sed 's/\./\\./g')\." "$DEMO" --include='*.java' 2>/dev/null | grep -v '/target/' || true)"
+[ -z "$VECCHI" ] || fail "package o import ancora col pacchetto vecchio: $VECCHI"
+run_tool new-service.sh --name zeta-service --no-db
+assert_ok "new-service dopo set-package"
+assert_file "demo/zeta-service/src/main/java/it/prova/zetaservice/Main.java"
+run_tool check.sh --project-only
+assert_ok "task check dopo set-package"
+end_case
+
+start_case "set-package rifiuta un pacchetto non valido"
+run_tool set-package.sh --package It.Prova
+assert_fails "set-package con le maiuscole"
+run_tool set-package.sh --package it.class
+assert_fails "set-package con una parola riservata"
 end_case
 
 start_case "consegna prepara un archivio che parte appena scompattato"

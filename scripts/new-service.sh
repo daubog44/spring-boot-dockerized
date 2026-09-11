@@ -38,7 +38,9 @@ MODULE_DIR="$DEMO_DIR/$MODULE"
 [ -e "$MODULE_DIR" ] && { echo "Il modulo esiste gia': $MODULE_DIR" >&2; exit 1; }
 
 SHORT="${MODULE%-service}"
-PACKAGE="com.example.ttfcloud_esame.$(printf '%s' "$MODULE" | tr -cd 'a-zA-Z0-9')"
+# <base>.<modulo senza trattini>: la base e' quella di Eureka (task set-package).
+. "$SCRIPT_DIR/scaffold-lib.sh"
+PACKAGE="$(base_package "$DEMO_DIR").$(printf '%s' "$MODULE" | tr -cd 'a-zA-Z0-9')"
 PACKAGE_PATH="$(printf '%s' "$PACKAGE" | tr '.' '/')"
 APP_NAME="$(printf '%s' "$MODULE" | tr 'a-z' 'A-Z')"
 DB_PREFIX="$(printf '%s' "$SHORT" | tr 'a-z-' 'A-Z_')"

@@ -259,6 +259,25 @@ echo ""
 echo "  Eureka (naming-server) c'e' gia': e' il registro dei servizi, e"
 echo "  senza di lui i nomi delle chiamate Feign non si risolvono."
 
+# 0. Java: il progetto si allinea al JDK di questa macchina, senza domande.
+. "$SCRIPT_DIR/scaffold-lib.sh"
+JDK="$(machine_jdk || true)"
+JDK_VERSION="${JDK%%|*}"
+PROJECT_JAVA="$(project_java_version "$(demo_dir)")"
+echo ""
+if [ -z "$JDK" ]; then
+  echo "  Non trovo un JDK (JAVA_HOME o PATH): il progetto resta su Java $PROJECT_JAVA."
+  echo "  Installane uno da 17 in su, poi task set-java."
+elif [ "$JDK_VERSION" -lt 17 ]; then
+  echo "  Il JDK di questa macchina e' Java $JDK_VERSION: Spring Boot 4 vuole almeno Java 17."
+  echo "  Il progetto resta su Java $PROJECT_JAVA: installa un JDK piu' recente, poi task set-java."
+elif [ "$JDK_VERSION" != "$PROJECT_JAVA" ]; then
+  echo "  Il progetto e' su Java $PROJECT_JAVA, il JDK di questa macchina e' Java $JDK_VERSION: li allineo."
+  step set-java.sh
+else
+  echo "  Java $PROJECT_JAVA: lo stesso del JDK di questa macchina."
+fi
+
 # 1. Il nome del progetto
 DEMO_NAME="$(basename "$(demo_dir)")"
 ask_text 'Come si chiama la cartella con i moduli Maven?' "$DEMO_NAME" '^[a-z][a-z0-9-]*$' \
@@ -266,6 +285,14 @@ ask_text 'Come si chiama la cartella con i moduli Maven?' "$DEMO_NAME" '^[a-z][a
 PROJECT_NAME="$ANSWER"
 if [ "$PROJECT_NAME" != "$DEMO_NAME" ]; then
   step rename-project.sh --name "$PROJECT_NAME"
+fi
+
+# 1-bis. Il pacchetto Java
+BASE_PACKAGE="$(base_package "$(demo_dir)")"
+ask_text 'Pacchetto Java di base' "$BASE_PACKAGE" '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$' \
+  "Ogni modulo stara' in src/main/java/<pacchetto>/<modulo>/; oggi: src/main/java/$(printf '%s' "$BASE_PACKAGE" | tr '.' '/')/"
+if [ "$ANSWER" != "$BASE_PACKAGE" ]; then
+  step set-package.sh --package "$ANSWER"
 fi
 
 # 2. Il database

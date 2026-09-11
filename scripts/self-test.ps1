@@ -78,6 +78,14 @@ function Get-BashPath {
 
 function Get-Text { param([string]$RelativePath) ; return (Read-TextFile (Join-Path $sandbox $RelativePath)) }
 
+# Il pacchetto di un modulo nella copia di prova, come percorso: la base cambia
+# da un branch all'altro (e la cambiano il wizard e set-package), quindi la
+# leggiamo ogni volta.
+function Get-SandboxPackagePath {
+    param([string]$Module)
+    return ((Get-ModulePackage -Module $Module -Base (Get-BasePackage -RepoRoot $sandbox)) -replace '\.', '/')
+}
+
 function Assert-That {
     param([bool]$Condition, [string]$Message)
     if (-not $Condition) { throw $Message }
@@ -130,7 +138,7 @@ Test-Case 'new-service crea il modulo e lo collega ovunque' {
     Assert-Ok $r 'new-service e'' fallito'
 
     Assert-That (Test-Path (Join-Path $demo 'alfa-service/pom.xml')) 'manca il pom del modulo'
-    Assert-That (Test-Path (Join-Path $demo 'alfa-service/src/main/java/com/example/ttfcloud_esame/alfaservice/Main.java')) 'manca Main.java'
+    Assert-That (Test-Path (Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/Main.java'))) 'manca Main.java'
     Assert-That (Test-Path (Join-Path $demo 'alfa-service/src/main/resources/application.yml')) 'manca application.yml'
 
     [void][xml](Get-Text 'demo/alfa-service/pom.xml')
@@ -327,14 +335,15 @@ Test-Case 'new-service mette il modulo nuovo nel launch.json' {
     Assert-Contains $launch '"projectName": "naming-server"' 'manca Eureka'
     Assert-Contains $launch 'Stack completo' 'manca il compound che li avvia tutti'
     # La classe Main deve essere quella vera, o il debug parte e non trova niente.
-    Assert-Contains $launch 'com.example.ttfcloud_esame.alfaservice.Main' 'classe Main sbagliata'
+    $alfaMain = ((Get-SandboxPackagePath 'alfa-service') -replace '/', '.') + '.Main'
+    Assert-Contains $launch $alfaMain 'classe Main sbagliata'
     # common-dto e' una libreria: non si avvia.
     Assert-NotContains $launch '"projectName": "common-dto"' 'una libreria non va fra le configurazioni di avvio'
     # Zed ha il suo file, con l'adattatore della sua estensione Java.
     $zedDebug = Get-Text '.zed/debug.json'
     Assert-Contains $zedDebug '"projectName": "alfa-service"' 'il modulo nuovo non e'' nel debug.json di Zed'
     Assert-Contains $zedDebug '"adapter": "Java"' 'il debug.json di Zed non usa l''adattatore Java'
-    Assert-Contains $zedDebug 'com.example.ttfcloud_esame.alfaservice.Main' 'classe Main sbagliata nel debug.json'
+    Assert-Contains $zedDebug $alfaMain 'classe Main sbagliata nel debug.json'
     Assert-NotContains $zedDebug '"projectName": "common-dto"' 'una libreria non va nel debug.json'
 }
 
@@ -402,6 +411,31 @@ Test-Case 'db-config rifiuta un valore che PostgreSQL non accetterebbe' {
     Assert-Fails (Invoke-Tool 'db-config.ps1' @('-DbName', 'non valido!')) 'ha accettato un nome impossibile'
 }
 
+# --- Java e pacchetto -----------------------------------------------------------
+
+Test-Case 'set-java imposta la versione in pom, Dockerfile e VS Code' {
+    Assert-Ok (Invoke-Tool 'set-java.ps1' @('-Version', '21')) 'set-java VERSION=21 e'' fallito'
+    Assert-Contains (Get-Text 'demo/pom.xml') '<java.version>21</java.version>' 'il pom non e'' passato a Java 21'
+    Assert-Contains (Get-Text 'demo/Dockerfile') 'eclipse-temurin:21-jdk' 'l''immagine di build e'' rimasta indietro'
+    Assert-Contains (Get-Text 'demo/Dockerfile') 'eclipse-temurin:21-jre' 'l''immagine finale e'' rimasta indietro'
+    Assert-Contains (Get-Text '.vscode/settings.json') '"JavaSE-21"' 'il runtime di VS Code e'' rimasto indietro'
+}
+
+Test-Case 'set-java rifiuta una versione troppo vecchia per Spring Boot 4' {
+    Assert-Fails (Invoke-Tool 'set-java.ps1' @('-Version', '11')) 'ha accettato Java 11'
+    Assert-Contains (Get-Text 'demo/pom.xml') '<java.version>21</java.version>' 'dopo il rifiuto il pom e'' cambiato lo stesso'
+}
+
+Test-Case 'set-java senza VERSION usa il JDK di questa macchina' {
+    $jdk = Get-MachineJdk
+    if (-not $jdk) { throw 'SALTATO: su questa macchina non c''e'' un JDK' }
+    Assert-Ok (Invoke-Tool 'set-java.ps1') 'set-java e'' fallito'
+    Assert-Contains (Get-Text 'demo/pom.xml') "<java.version>$($jdk.Version)</java.version>" 'il pom non segue il JDK della macchina'
+    Assert-Contains (Get-Text '.vscode/settings.json') $jdk.Home 'VS Code non punta al JDK della macchina'
+    Assert-Contains (Get-Text 'Taskfile.yml') $jdk.Home 'il JDK di ripiego del Taskfile e'' rimasto indietro'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo set-java il progetto non e'' coerente'
+}
+
 # --- Il wizard ----------------------------------------------------------------
 # Le risposte gliele diamo da un file (WIZARD_ANSWERS), una per riga: una riga
 # vuota vale come Invio.
@@ -435,6 +469,7 @@ Test-Case 'il wizard monta database e servizi rispondendo alle domande' {
     $answers = Join-Path $sandbox 'risposte.txt'
     $lines = @(
         ''                                          # cartella dei moduli: resta com'e'
+        'it.wiz'                                    # pacchetto Java: it.wiz invece di quello di oggi
         's', 'wizdb', 'wiz', 'wizpass', '5439'      # PostgreSQL, credenziali, porta
         'omega-service', '1', '', '2'               # REST con database, porta automatica, database condiviso
         'sigma-ui', '3', '', 'n'                    # interfaccia web, porta automatica, niente Swagger
@@ -451,15 +486,18 @@ Test-Case 'il wizard monta database e servizi rispondendo alle domande' {
     Assert-Contains $compose '"5439:5432"' 'la porta scelta non e'' pubblicata'
     Assert-Contains (Get-Text 'demo/omega-service/src/main/resources/application.yml') 'jdbc:postgresql://localhost:5439/wizdb' 'il servizio non punta al database condiviso, sulla porta scelta'
     Assert-That (Test-Path (Join-Path $demo 'sigma-ui/src/main/resources/templates/index.html')) 'l''interfaccia web non ha la sua pagina'
+    Assert-That (Test-Path (Join-Path $demo 'omega-service/src/main/java/it/wiz/omegaservice/Main.java')) 'il servizio non e'' nel pacchetto scelto'
+    Assert-That (Test-Path (Join-Path $demo 'naming-server/src/main/java/it/wiz/namingserver/Main.java')) 'Eureka non si e'' spostato nel pacchetto scelto'
     Assert-Contains (Get-Text '.vscode/launch.json') '"projectName": "omega-service"' 'il servizio non e'' nel launch.json'
     Assert-Contains (Get-Text '.zed/debug.json') '"projectName": "sigma-ui"' 'l''interfaccia non e'' nel debug.json di Zed'
     Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo il wizard il progetto non e'' coerente'
 }
 
 # Da qui in poi serve un dominio con delle @Entity: lo scriviamo noi.
-$entityDir = Join-Path $demo 'alfa-service/src/main/java/com/example/ttfcloud_esame/alfaservice'
+$alfaPackage = (Get-SandboxPackagePath 'alfa-service') -replace '/', '.'
+$entityDir = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service'))
 Write-TextFile -Path (Join-Path $entityDir 'DepositoEntity.java') -Text @'
-package com.example.ttfcloud_esame.alfaservice;
+package __PKG__;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -475,12 +513,12 @@ public class DepositoEntity {
 }
 '@
 Write-TextFile -Path (Join-Path $entityDir 'StatoArticolo.java') -Text @'
-package com.example.ttfcloud_esame.alfaservice;
+package __PKG__;
 
 public enum StatoArticolo { DISPONIBILE, ESAURITO }
 '@
 Write-TextFile -Path (Join-Path $entityDir 'ArticoloEntity.java') -Text @'
-package com.example.ttfcloud_esame.alfaservice;
+package __PKG__;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -518,7 +556,7 @@ public class ArticoloEntity {
 # Nome e cognome, un anno, un id che punta a un altro servizio: i valori
 # devono sembrare veri, non "nome 1", 10, 20.
 Write-TextFile -Path (Join-Path $entityDir 'SocioEntity.java') -Text @'
-package com.example.ttfcloud_esame.alfaservice;
+package __PKG__;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -536,6 +574,11 @@ public class SocioEntity {
     private Long tesseraId;
 }
 '@
+
+# I file qui sopra dicono __PKG__: al suo posto va il pacchetto del modulo.
+foreach ($file in (Get-ChildItem -Path $entityDir -Filter '*.java')) {
+    [void](Edit-TextFile -Path $file.FullName -Pattern '__PKG__' -Replacement $alfaPackage)
+}
 
 Test-Case 'seed-data ricava le INSERT dalle @Entity' {
     Assert-Ok (Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '3')) 'seed-data e'' fallito'
@@ -587,6 +630,37 @@ Test-Case 'db-schema ricava tabelle e relazioni dalle @Entity' {
     Assert-Contains $r.Output 'erDiagram' 'manca il diagramma ER'
     Assert-Contains $r.Output 'FK' 'la chiave esterna non e'' segnata'
     Assert-Contains $r.Output '| `stato` | VARCHAR(20) |' 'la lunghezza di un enum con @Column(length) e'' ignorata'
+}
+
+Test-Case 'set-package sposta i sorgenti e riscrive package, import e mainClass' {
+    $old = Get-BasePackage -RepoRoot $sandbox
+    $alfaOld = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service'))
+    # Una stringa che nomina la base ma non un suo sottopacchetto: deve restare com'e'.
+    Write-TextFile -Path (Join-Path $alfaOld 'Frase.java') -Text ("package $old.alfaservice;`n`nclass Frase {`n    static final String TESTO = `"$old.pdf`";`n}`n")
+    Assert-Ok (Invoke-Tool 'set-package.ps1' @('-Package', 'it.prova')) 'set-package e'' fallito'
+
+    $alfaNew = Join-Path $demo 'alfa-service/src/main/java/it/prova/alfaservice'
+    Assert-That (Test-Path (Join-Path $alfaNew 'Main.java')) 'Main.java non e'' nella cartella nuova'
+    Assert-That (Test-Path (Join-Path $alfaNew 'ArticoloEntity.java')) 'le entity non si sono spostate'
+    Assert-That (-not (Test-Path $alfaOld)) 'la cartella vecchia e'' rimasta'
+    Assert-Contains (Read-TextFile (Join-Path $alfaNew 'ArticoloEntity.java')) 'package it.prova.alfaservice;' 'package non riscritto'
+    Assert-Contains (Read-TextFile (Join-Path $alfaNew 'Frase.java')) "`"$old.pdf`"" 'ha riscritto una stringa che non era un pacchetto'
+    Assert-That (Test-Path (Join-Path $demo 'naming-server/src/main/java/it/prova/namingserver/Main.java')) 'Eureka non si e'' spostato'
+    Assert-Contains (Get-Text 'demo/naming-server/pom.xml') '<mainClass>it.prova.namingserver.Main</mainClass>' 'la mainClass del pom e'' rimasta indietro'
+    Assert-Contains (Get-Text '.vscode/launch.json') 'it.prova.alfaservice.Main' 'launch.json non riallineato'
+    $vecchi = @(Get-ChildItem -Path $demo -Recurse -Filter '*.java' | Where-Object {
+        $_.FullName -notmatch '[\\/]target[\\/]' -and (Read-TextFile $_.FullName) -match ('(?m)^\s*(package|import)\s+' + [regex]::Escape($old) + '\.')
+    })
+    Assert-That ($vecchi.Count -eq 0) ('package o import ancora col pacchetto vecchio: ' + (($vecchi | Select-Object -First 3 | ForEach-Object { $_.Name }) -join ', '))
+
+    Assert-Ok (Invoke-Tool 'new-service.ps1' @('-Name', 'zeta-service', '-NoDb')) 'new-service dopo set-package e'' fallito'
+    Assert-That (Test-Path (Join-Path $demo 'zeta-service/src/main/java/it/prova/zetaservice/Main.java')) 'il modulo nuovo non usa la base nuova'
+    Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo set-package il progetto non e'' coerente'
+}
+
+Test-Case 'set-package rifiuta un pacchetto non valido' {
+    Assert-Fails (Invoke-Tool 'set-package.ps1' @('-Package', 'It.Prova')) 'ha accettato le maiuscole'
+    Assert-Fails (Invoke-Tool 'set-package.ps1' @('-Package', 'it.class')) 'ha accettato una parola riservata'
 }
 
 Test-Case 'consegna prepara un archivio che parte appena scompattato' {
