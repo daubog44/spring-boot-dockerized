@@ -102,6 +102,46 @@ foreach ($module in $modules) {
     Write-Step ($module.Name + "/  ($size KB)")
 }
 
+# --- Pulizia interna: la consegna non deve avere tracce del template ---------
+# devdata e' uno strumento di sviluppo (seed-data, db-schema): nello zip finale
+# non deve comparire, cosi' il progetto consegnato contiene esclusivamente codice
+# scritto per l'esame.
+$commonDtoDest = Join-Path $OutDir 'common-dto'
+if (Test-Path $commonDtoDest) {
+    $devDataDir = Join-Path $commonDtoDest 'src/main/java/devdata'
+    if (Test-Path $devDataDir) { Remove-Item -Recurse -Force $devDataDir }
+    $metaInfDir = Join-Path $commonDtoDest 'src/main/resources/META-INF'
+    if (Test-Path $metaInfDir) { Remove-Item -Recurse -Force $metaInfDir }
+
+    $dtoPom = Join-Path $commonDtoDest 'pom.xml'
+    if (Test-Path $dtoPom) {
+        $pomText = Read-TextFile $dtoPom
+        $pomClean = [regex]::Replace($pomText, '(?s)\s*<!-- Per il pacchetto devdata.*?jakarta\.persistence-api\s*</artifactId>\s*<optional>true</optional>\s*</dependency>', '')
+        Write-TextFile -Path $dtoPom -Text $pomClean
+    }
+}
+
+foreach ($module in $modules) {
+    $ymlPath = Join-Path $OutDir "$($module.Name)/src/main/resources/application.yml"
+    if (Test-Path $ymlPath) {
+        $yText = Read-TextFile $ymlPath
+        $eol = Get-TextEol $yText
+        $yLines = Split-TextLines $yText
+        $cleanLines = @()
+        $skip = $false
+        foreach ($l in $yLines) {
+            if ($l -match '^\s*dev-data:') { $skip = $true; continue }
+            if ($skip) {
+                if ($l -match '^\s+rows:') { continue }
+                $skip = $false
+            }
+            $cleanLines += $l
+        }
+        Write-TextFile -Path $ymlPath -Text ($cleanLines -join $eol)
+    }
+}
+Write-Step 'pulizia consegna: rimosse classi del template (devdata) e configurazioni interne'
+
 # --- Quello che serve a farlo girare -----------------------------------------
 
 foreach ($file in @('docker-compose.yml', 'Dockerfile', '.dockerignore', 'pom.xml', 'mvnw', 'mvnw.cmd')) {

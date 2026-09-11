@@ -279,12 +279,46 @@ Test-Case 'new-entity rifiuta un''entity che esiste gia''' {
     Assert-Contains $r.Output 'gia''' 'il messaggio non dice che c''e'' gia'''
 }
 
-Test-Case 'add-dep aggiunge dal catalogo' {
+Test-Case 'new-dto genera record in common-dto con validazione' {
+    Assert-Ok (Invoke-Tool 'new-dto.ps1' @('-Name', 'Libro', '-Fields', 'id:long,titolo:string(150):required,disponibile:bool')) 'new-dto e'' fallito'
+    $dtoFile = Join-Path $demo 'common-dto/src/main/java/esame/common/dto/LibroDto.java'
+    Assert-That (Test-Path $dtoFile) 'LibroDto.java non e'' in common-dto'
+    $dto = Get-Text 'demo/common-dto/src/main/java/esame/common/dto/LibroDto.java'
+    Assert-Contains $dto 'public record LibroDto' 'non e'' un record Java'
+    Assert-Contains $dto '@Size(max = 150)' 'manca @Size'
+    Assert-Contains $dto '@NotBlank' 'manca @NotBlank'
+}
+
+Test-Case 'new-client genera FeignClient collegato al servizio target' {
+    Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'epsilon-service', '-Dto', 'LibroDto')) 'new-client e'' fallito'
+    $clientFile = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/client/EpsilonClient.java')
+    Assert-That (Test-Path $clientFile) 'EpsilonClient.java non e'' nel modulo chiamante'
+    $client = Read-TextFile $clientFile
+    Assert-Contains $client '@FeignClient(name = "EPSILON-SERVICE")' 'nome Eureka errato'
+    Assert-Contains $client 'List<LibroDto> getAll()' 'manca getAll'
+}
+
+Test-Case 'new-view genera controller e template thymeleaf nel modulo UI' {
+    Assert-Ok (Invoke-Tool 'new-view.ps1' @('-Service', 'beta-ui', '-Name', 'Libri', '-Fields', 'titolo:string:required,autore:string')) 'new-view e'' fallito'
+    $ctrlFile = Join-Path $demo ('beta-ui/src/main/java/' + (Get-SandboxPackagePath 'beta-ui') + '/controller/LibriUiController.java')
+    $tplFile = Join-Path $demo 'beta-ui/src/main/resources/templates/libri.html'
+    Assert-That (Test-Path $ctrlFile) 'LibriUiController.java non trovato'
+    Assert-That (Test-Path $tplFile) 'libri.html non trovato'
+    $ctrl = Read-TextFile $ctrlFile
+    Assert-Contains $ctrl '@Controller' 'manca @Controller'
+    Assert-Contains $ctrl '@RequestMapping("/libri")' 'rotta non corretta'
+    $tpl = Read-TextFile $tplFile
+    Assert-Contains $tpl 'xmlns:th="http://www.thymeleaf.org"' 'manca namespace thymeleaf'
+}
+
+Test-Case 'add-dep aggiunge dal catalogo e crea SecurityConfig se security' {
     Assert-Ok (Invoke-Tool 'add-dep.ps1' @('-Module', 'alfa-service', '-Deps', 'security,mail')) 'add-dep e'' fallito'
     $pom = Get-Text 'demo/alfa-service/pom.xml'
     [void][xml]$pom
     Assert-Contains $pom 'spring-boot-starter-security' 'manca security'
     Assert-Contains $pom 'spring-boot-starter-mail' 'manca mail'
+    $secFile = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/config/SecurityConfig.java')
+    Assert-That (Test-Path $secFile) 'manca SecurityConfig.java generato da add-dep security'
 }
 
 Test-Case 'add-dep non duplica quello che c''e'' gia''' {
@@ -725,6 +759,8 @@ Test-Case 'consegna prepara un archivio che parte appena scompattato' {
         }
         $target = @(Get-ChildItem -Path $dest -Recurse -Directory -Filter 'target')
         Assert-That ($target.Count -eq 0) 'nella consegna ci sono cartelle target/'
+        Assert-That (-not (Test-Path (Join-Path $dest 'common-dto/src/main/java/devdata'))) 'devdata e'' rimasto in common-dto nella consegna'
+        Assert-That (-not (Test-Path (Join-Path $dest 'common-dto/src/main/resources/META-INF'))) 'META-INF e'' rimasto in common-dto nella consegna'
         $zips = @(Get-ChildItem -Path $dest -Recurse -File -Filter '*.zip')
         Assert-That ($zips.Count -eq 0) ('archivi dentro l''archivio: ' + ($zips.Name -join ', '))
         Assert-NotContains (Read-TextFile (Join-Path $dest 'ISTRUZIONI-ESECUZIONE.md')) 'Scompatta ogni archivio' 'le istruzioni chiedono ancora di ricomporre il progetto'

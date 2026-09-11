@@ -20,6 +20,24 @@ La prova ha una durata tipica di **6 ore** e richiede la consegna di un archivio
 
 ---
 
+## 1.1 Matrice delle Responsabilità: Tu vs Template / Comandi task
+
+All'esame il tempo è prezioso: delega agli strumenti il lavoro meccanico e concentrati su quello che viene valutato dalla commissione:
+
+| Ambito | Cosa deleghi al Template / ai comandi `task` | Cosa spetta a TE (Candidato) |
+| :--- | :--- | :--- |
+| **Architettura & Moduli** | `task new-service` collega il modulo in tutti i 6 punti (pom aggregatore, Dockerfile, docker-compose, dev, VS Code, porte). | Scegliere i nomi dei moduli dalla traccia (es. `catalogo-service`, `ordini-service`, `ui-service`). |
+| **Persistenza & Entity** | `task new-entity` genera Entity, Repository, Service CRUD e Controller REST con Swagger. | Definire le **relazioni JPA** (@ManyToOne, @ManyToMany...) all'interno del modulo e i metodi custom del repository. |
+| **Microservizi & Database** | Ogni modulo ha il suo database isolato (H2 in-memory o Postgres dedicato con `task use-postgres`). | **NON creare mai chiavi esterne tra moduli diversi!** Usare solo l'ID numerico (`Long libroId`) e OpenFeign. |
+| **Contratti DTO & Record** | `task new-dto` genera i record Java in `common-dto` con validazione Bean Validation. | Decidere quali campi esporre e scambiare tra i microservizi. |
+| **Chiamate tra Servizi** | `task new-client` crea l'interfaccia `@FeignClient` pronta con metodi CRUD risolti tramite Eureka. | Invocare il client nel `@Service` chiamante e gestire le eccezioni di business (es. 404 se un record non esiste). |
+| **Interfaccia Web (UI)** | `task new-view` crea Controller Thymeleaf e template HTML con tabella dinamica e form validato. | Personalizzare i campi del form e visualizzare i dati ricevuti da Feign nel Model. |
+| **Sicurezza (Spring Security)** | `task add-dep SERVICE=... DEPS=security` genera `SecurityConfig.java` già funzionante (CSRF disattivato, Swagger/Eureka aperti, utenti `admin`/`user`). | Configurare le regole di autorizzazione per ruolo (es. `.requestMatchers("/admin/**").hasRole("ADMIN")`) se richieste dalla traccia. |
+| **Logica di Business & Algoritmo** | *Nessuna automazione (apposta)*. | **È il cuore della valutazione:** implementare i calcoli, controlli di disponibilità, regole di sconto, algoritmi richiesti. |
+| **Documentazione & Consegna** | `task db-schema` estrae lo schema ER; `task consegna` prepara lo zip pulito rimuovendo tutte le classi interne del template (`devdata`). | Scrivere analisi del problema, algoritmo e risposte teoriche in `allegato.md`. |
+
+---
+
 ## 2. Workflow Operativo d'Esame in 6 Ore (Passo-Passo)
 
 Per massimizzare il punteggio e completare l'esame senza stress, segui questa tabella di marcia temporale:
@@ -377,6 +395,63 @@ JSON, la causa è quasi sempre questa.
 **Cosa ci va e cosa no**: DTO e piccoli `enum` condivisi. Non ci vanno le
 `@Entity` (sono il modello del database di *un* servizio, non un contratto fra
 servizi) né la logica di business.
+
+### 5.5 Spring Security: Perché blocca tutto di default e come usarla all'esame
+
+Quando aggiungi `spring-boot-starter-security` (con `task add-dep SERVICE=... DEPS=security`), Spring Boot attiva immediatamente l'autoconfigurazione di sicurezza:
+1. **Blocca ogni rotta di default**: qualsiasi richiesta riceve `401 Unauthorized` (o redirect a `/login`).
+2. **Genera una password casuale al boot**: visibile nei log con `Using generated security password: ...`.
+3. **Abilita la protezione CSRF**: qualsiasi chiamata REST `POST`, `PUT`, `DELETE` inviata da Postman, curl o Feign viene bloccata con `403 Forbidden` perché priva del token CSRF.
+
+#### Come si risolve per l'esame
+Con `task add-dep SERVICE=... DEPS=security`, il template crea automaticamente `config/SecurityConfig.java`:
+- Disabilita CSRF per consentire chiamate REST senza token.
+- Apre in `permitAll()` le rotte tecniche (`/swagger-ui/**`, `/v3/api-docs/**`, `/actuator/**`, `/h2-console/**`).
+- Registra due utenti in-memory (`admin`/`admin123` con ruolo `ADMIN`, `user`/`user123` con ruolo `USER`).
+- Se la traccia richiede autorizzazioni per ruolo, basta una sola riga nel bean `SecurityFilterChain`:
+  ```java
+  .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
+  .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("USER", "ADMIN")
+  ```
+
+### 5.6 Relazioni JPA tra tabelle & Il confine sacro tra Microservizi
+
+#### 1. All'interno dello stesso modulo (Stesso Database)
+- **Many-to-One / One-to-Many**: La chiave esterna `autore_id` sta nella tabella del lato *Molti* (`libri`).
+  ```java
+  // In LibroEntity (lato Molti, detiene la FK)
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "autore_id", nullable = false)
+  private AutoreEntity autore;
+
+  // In AutoreEntity (lato Uno, opzionale)
+  @OneToMany(mappedBy = "autore", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<LibroEntity> libri = new ArrayList<>();
+  ```
+- **Many-to-Many**: Per relazioni N:N pure, Hibernate crea una tabella di giunzione automatica:
+  ```java
+  @ManyToMany(fetch = FetchType.LAZY)
+  @JoinTable(name = "studenti_corsi",
+      joinColumns = @JoinColumn(name = "studente_id"),
+      inverseJoinColumns = @JoinColumn(name = "corso_id"))
+  private Set<CorsoEntity> corsi = new HashSet<>();
+  ```
+  *Attenzione*: se la relazione ha attributi extra (es. `dataIscrizione`, `voto`), non usare `@ManyToMany`: crea un'entità intermedia con due `@ManyToOne`.
+- **One-to-One**: Chiave esterna univoca (`unique = true`):
+  ```java
+  @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+  @JoinColumn(name = "tessera_id", unique = true)
+  private TesseraEntity tessera;
+  ```
+- **Regole d'oro**:
+  1. Usa sempre `FetchType.LAZY`.
+  2. Mai `@Data` di Lombok sulle Entity con relazioni (causa `StackOverflowError` nel `toString()`).
+  3. Inizializza sempre le liste (`= new ArrayList<>()`).
+  4. Restituisci DTO dai controller per evitare loop infiniti di serializzazione JSON Jackson.
+
+#### 2. Tra Moduli Diversi (Microservizi Diversi)
+> **NON creare MAI relazioni JPA o chiavi esterne SQL che attraversano due moduli!**
+> Ogni microservizio ha il proprio database. Salva esclusivamente l'ID numerico come colonna semplice (`private Long libroId;`) e recupera i dettagli invocando l'API REST dell'altro servizio via **OpenFeign** (`task new-client`) scambiando DTO (`task new-dto`).
 
 ---
 

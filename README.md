@@ -177,6 +177,7 @@ Per un microservizio solo: `task wizard SERVICE=<nome>`. Non fa niente di
 magico: chiama `set-java`, `rename-project`, `set-package`, `db-config`,
 `new-service` e `use-postgres` nell'ordine giusto, e finisce con `task check`.
 
+
 Scritte le entity, due comandi le mettono al lavoro. Tutti e due passano dal
 database vero, non dalla lettura dei sorgenti: avviano l'applicazione, lasciano
 che Hibernate crei le tabelle e lavorano su quelle.

@@ -248,6 +248,65 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-entity.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .TABLE}} -Table {{.TABLE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-entity.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .TABLE}} --table {{.TABLE}}{{end}} {{.CLI_ARGS}}{{end}}'
 
+  new-dto:
+    desc: "Genera un DTO/Record in common-dto (task new-dto NAME=Libro FIELDS=...)"
+    summary: |
+      Genera un Java record moderno (o una classe con Lombok, se CLASS=1)
+      in common-dto con campi e annotazioni di validazione (jakarta.validation).
+      I DTO sono i contratti scambiati fra i microservizi (via Feign o REST):
+      non contengono logica ne' annotazioni JPA.
+
+      Variabili:
+        NAME=<Nome>        OBBLIGATORIA, in PascalCase: Libro, Ordine
+        FIELDS=<campi>     facoltativa: nome:tipo[:modificatore]*
+                           Tipi: string, string(N), text, int, long,
+                           decimal, bool, date, datetime, email, enum(A|B)
+                           Modificatori: required, min(N), max(N)
+        SERVICE=<modulo>   facoltativa: default common-dto
+        CLASS=1            genera una classe classica invece di un record
+
+      Esempio:
+        task new-dto NAME=Libro FIELDS=id:long,titolo:string(150):required,disponibile:bool
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-dto.ps1{{if .NAME}} -Name {{.NAME}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .CLASS}} -Class{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-dto.sh{{if .NAME}} --name {{.NAME}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .CLASS}} --class{{end}} {{.CLI_ARGS}}{{end}}'
+
+  new-client:
+    desc: "Genera un client OpenFeign per chiamare un altro microservizio (task new-client FROM=... TO=...)"
+    summary: |
+      Genera un'interfaccia @FeignClient nel modulo chiamante (FROM) gia'
+      collegata al nome logico del servizio target (TO) registrato su Eureka,
+      con i metodi CRUD pronti.
+
+      Variabili:
+        FROM=<modulo>      OBBLIGATORIA: modulo chiamante (es. prestiti-service)
+        TO=<modulo>        OBBLIGATORIA: modulo da chiamare (es. catalogo-service)
+        DTO=<NomeDto>      facoltativa: nome del DTO di common-dto (es. LibroDto)
+        NAME=<Nome>        facoltativa: nome client (default: derivato da TO)
+        PATH=<rotta>       facoltativa: prefisso rotta (default: /api/<risorsa>)
+
+      Esempio:
+        task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-client.ps1{{if .FROM}} -From {{.FROM}}{{end}}{{if .TO}} -To {{.TO}}{{end}}{{if .DTO}} -Dto {{.DTO}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .PATH}} -Path {{.PATH}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-client.sh{{if .FROM}} --from {{.FROM}}{{end}}{{if .TO}} --to {{.TO}}{{end}}{{if .DTO}} --dto {{.DTO}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .PATH}} --path {{.PATH}}{{end}} {{.CLI_ARGS}}{{end}}'
+
+  new-view:
+    desc: "Genera controller Thymeleaf e vista HTML con tabella e form (task new-view SERVICE=event-ui NAME=Libri)"
+    summary: |
+      Genera in un modulo UI:
+        1. Il controller Spring MVC (@Controller) con GET (lista) e POST (salvataggio)
+        2. Il template HTML (templates/<nome>.html) con tabella reattiva e form con validazione
+
+      Variabili:
+        SERVICE=<modulo>   OBBLIGATORIA: modulo UI (es. event-ui)
+        NAME=<Nome>        OBBLIGATORIA: PascalCase (es. Libri, Eventi)
+        ROUTE=<percorso>   facoltativa: default /<nome>
+        FIELDS=<campi>     facoltativa: nome:tipo[:required]* (string, int, long, decimal, bool, date)
+
+      Esempio:
+        task new-view SERVICE=event-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-view.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .ROUTE}} -Route {{.ROUTE}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-view.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .ROUTE}} --route {{.ROUTE}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}} {{.CLI_ARGS}}{{end}}'
+
   add-dep:
     desc: "Aggiunge dipendenze al pom di un modulo (task add-dep SERVICE=wms-service DEPS=security,mail)"
     summary: |
