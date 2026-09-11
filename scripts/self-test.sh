@@ -203,11 +203,39 @@ run_tool new-entity.sh --service epsilon-service --name Libro --fields "x:int"
 assert_fails "ha rigenerato un'entity che esisteva gia'" && assert_out_contains "gia'"
 end_case
 
-start_case "add-dep aggiunge dal catalogo"
+start_case "new-dto genera record in common-dto con validazione"
+run_tool new-dto.sh --name Libro --fields "id:long,titolo:string(150):required,disponibile:bool"
+assert_ok "new-dto" &&
+  assert_file "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/LibroDto.java" &&
+  assert_contains "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/LibroDto.java" "public record LibroDto" &&
+  assert_contains "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/LibroDto.java" "@Size(max = 150)" &&
+  assert_contains "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/LibroDto.java" "@NotBlank"
+end_case
+
+start_case "new-client genera FeignClient collegato al servizio target"
+run_tool new-client.sh --from alfa-service --to epsilon-service --dto LibroDto
+assert_ok "new-client" &&
+  assert_file "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" &&
+  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" '@FeignClient(name = "EPSILON-SERVICE")' &&
+  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" "List<LibroDto> getAll()"
+end_case
+
+start_case "new-view genera controller e template thymeleaf nel modulo UI"
+run_tool new-view.sh --service beta-ui --name Libri --fields "titolo:string:required,autore:string"
+assert_ok "new-view" &&
+  assert_file "demo/beta-ui/src/main/java/$(sb_package_path beta-ui)/controller/LibriUiController.java" &&
+  assert_file "demo/beta-ui/src/main/resources/templates/libri.html" &&
+  assert_contains "demo/beta-ui/src/main/java/$(sb_package_path beta-ui)/controller/LibriUiController.java" "@Controller" &&
+  assert_contains "demo/beta-ui/src/main/java/$(sb_package_path beta-ui)/controller/LibriUiController.java" '@RequestMapping("/libri")' &&
+  assert_contains "demo/beta-ui/src/main/resources/templates/libri.html" 'xmlns:th="http://www.thymeleaf.org"'
+end_case
+
+start_case "add-dep aggiunge dal catalogo e crea SecurityConfig se security"
 run_tool add-dep.sh --module alfa-service --deps security,mail
 assert_ok "add-dep" &&
   assert_contains demo/alfa-service/pom.xml "spring-boot-starter-security" &&
-  assert_contains demo/alfa-service/pom.xml "spring-boot-starter-mail"
+  assert_contains demo/alfa-service/pom.xml "spring-boot-starter-mail" &&
+  assert_file "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/config/SecurityConfig.java"
 end_case
 
 start_case "add-dep non duplica quello che c'e' gia'"
@@ -664,6 +692,8 @@ else
     [ -f "$DEST/$p" ] || fail "il Dockerfile copia $p, che non c'e'"
   done
   [ -z "$(find "$DEST" -type d -name target)" ] || fail "nella consegna ci sono cartelle target/"
+  [ ! -d "$DEST/common-dto/src/main/java/devdata" ] || fail "devdata e' rimasto in common-dto nella consegna"
+  [ ! -d "$DEST/common-dto/src/main/resources/META-INF" ] || fail "META-INF e' rimasto in common-dto nella consegna"
   [ -z "$(find "$DEST" -type f -name '*.zip')" ] || fail "archivi dentro l'archivio"
   grep -q 'Scompatta ogni archivio' "$DEST/ISTRUZIONI-ESECUZIONE.md" && fail "le istruzioni chiedono ancora di ricomporre il progetto"
   rm -rf "$DEST"

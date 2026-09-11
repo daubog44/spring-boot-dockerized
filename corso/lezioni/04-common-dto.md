@@ -59,6 +59,20 @@ public record NuovoPrestitoRequest(
 | `PrestitoDto` | `prestiti-service` | `biblioteca-ui` |
 | `NuovoPrestitoRequest` | `biblioteca-ui` | `prestiti-service` |
 
+## Scrivere i DTO con un comando: `task new-dto`
+
+Invece di creare a mano i record in `common-dto`, puoi generarli con un comando:
+
+```bash
+task new-dto NAME=Libro FIELDS=id:long,titolo:string(150):required,isbn:string(13):required,disponibile:bool
+task new-dto NAME=NuovoPrestitoRequest FIELDS=libroId:long:required,utenteEmail:email:required,giorni:int:min(1):max(60)
+```
+
+Crea il file in `demo/common-dto/src/main/java/esame/common/dto/` come Java `record`
+moderno con le annotazioni di validazione (`@NotNull`, `@NotBlank`, `@Email`, `@Min`, `@Max`).
+Se preferisci una classe classica con getter e setter Lombok, aggiungi `CLASS=1`.
+
+
 Il record è la forma giusta per un DTO: immutabile, con costruttore,
 accessori, `equals` e `toString` già fatti, e Jackson lo trasforma in JSON e
 ritorno senza configurazione. Le annotazioni di validazione sui componenti

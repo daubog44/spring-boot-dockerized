@@ -19,6 +19,14 @@ repository, service, controller): anche quello lo genera un comando,
 task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
 ```
 
+e per i DTO condivisi, i client Feign e le viste Thymeleaf:
+
+```bash
+task new-dto NAME=Ordine FIELDS=id:long,numero:string:required,totale:decimal
+task new-client FROM=report-service TO=ordini-service DTO=OrdineDto
+task new-view SERVICE=store-ui NAME=Ordini FIELDS=numero:string:required,totale:decimal
+```
+
 e ti lascia aggiungere solo quello che conta davvero: le relazioni fra entity
 e le regole della tua traccia.
 
@@ -175,6 +183,22 @@ devono restare d'accordo. Un comando per ognuna di queste cose:
 
 ```bash
 task new-service NAME=ordini-service
+```
+
+```bash
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
+```
+
+```bash
+task new-dto NAME=Ordine FIELDS=id:long,numero:string:required,totale:decimal
+```
+
+```bash
+task new-client FROM=report-service TO=ordini-service DTO=OrdineDto
+```
+
+```bash
+task new-view SERVICE=store-ui NAME=Ordini FIELDS=numero:string:required,totale:decimal
 ```
 
 ```bash
