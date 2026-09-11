@@ -282,4 +282,4 @@ Per verificare quali servizi si sono effettivamente registrati su Eureka:
 docker compose exec eureka-server curl -s -H "Accept: application/json" http://localhost:8761/eureka/apps
 ```
 
-I container non hanno un nome fisso: Docker Compose li chiama `<cartella>-<servizio>-1`, così la copia di prova e quella dell'esame non si contendono lo stesso nome. Per questo i comandi qui sopra usano il nome del **servizio** (`eureka-server`, `postgres`), e vanno lanciati dalla cartella dei moduli.
+I container non hanno un nome fisso: Docker Compose li chiama `<progetto>-<servizio>-1`, e il progetto è la cartella del repository (lo impostano il Taskfile e gli script). Così la copia di prova e quella dell'esame hanno container e volume del database loro, anche con credenziali diverse. Per questo i comandi qui sopra usano il nome del **servizio** (`eureka-server`, `postgres`), e vanno lanciati dalla cartella dei moduli; fuori da `task`, `docker compose` usa il nome della cartella dei moduli, quindi aggiungi `-p <cartella-del-repository>`.

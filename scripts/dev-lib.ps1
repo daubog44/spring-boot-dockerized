@@ -12,6 +12,13 @@
 # (per esempio dopo un riavvio del PC con dei processi Java rimasti appesi).
 $DevDefaultPorts = @(8761, 8081, 8082, 8083, 8080)
 
+# Un progetto Docker Compose per copia del template, col nome della cartella
+# del repository (come fa il Taskfile): con quello di default, demo, due copie
+# si prendevano container e volume del database a vicenda.
+if (-not $env:COMPOSE_PROJECT_NAME) {
+    $env:COMPOSE_PROJECT_NAME = (Split-Path -Leaf (Split-Path -Parent $PSScriptRoot)).ToLowerInvariant() -replace '[^a-z0-9_-]+', '-' -replace '^[^a-z0-9]+', ''
+}
+
 function Get-DevLogDir {
     Join-Path (Split-Path -Parent $PSScriptRoot) '.dev-logs'
 }
@@ -301,6 +308,21 @@ function Stop-DevStack {
                 $stopped++
             } else {
                 Write-Host '  (docker compose non raggiungibile: container ancora accesi)' -ForegroundColor Yellow
+            }
+            # Un container di un'altra copia del template, o di prima che ogni
+            # copia avesse il suo progetto Compose, puo' tenere ancora le porte:
+            # si ferma come un'applicazione estranea (fermato, non cancellato).
+            foreach ($port in $portsToFree) {
+                foreach ($row in @(docker ps --filter "publish=$port" --format '{{.ID}} {{.Names}}' 2>$null)) {
+                    if ($row -notmatch '^(\S+)\s+(\S+)') { continue }
+                    if ($KeepForeign) {
+                        Write-Host "  porta $port tenuta dal container $($Matches[2]): lasciato acceso." -ForegroundColor Yellow
+                        continue
+                    }
+                    Write-Host "  fermo il container $($Matches[2]), che teneva la porta $port" -ForegroundColor Yellow
+                    docker stop $Matches[1] 2>&1 | Out-Null
+                    $stopped++
+                }
             }
         } finally {
             $ErrorActionPreference = $previousPreference
