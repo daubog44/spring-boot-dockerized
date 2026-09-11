@@ -128,9 +128,63 @@ function Get-ModuleShortName {
     return ($Module -replace '-service$', '')
 }
 
+function Get-BasePackage {
+    # Il pacchetto Java di base (esame, it.rossi...). Non sta in un file di
+    # configurazione: e' quello di Eureka meno l'ultimo pezzo
+    # (esame.namingserver -> esame). Lo cambia task set-package, e
+    # new-service lo segue da solo.
+    param([string]$RepoRoot = (Get-ScaffoldRepoRoot))
+    $aggr = Join-Path $RepoRoot (Get-AggregatorName -RepoRoot $RepoRoot)
+    $roots = @(Join-Path $aggr 'naming-server/src/main/java')
+    $roots += @(Get-ChildItem -Path $aggr -Directory | ForEach-Object { Join-Path $_.FullName 'src/main/java' })
+    foreach ($root in $roots) {
+        if (-not (Test-Path $root)) { continue }
+        foreach ($file in (Get-ChildItem -Path $root -Recurse -Filter '*.java')) {
+            $text = Read-TextFile $file.FullName
+            if ($text -notmatch '@SpringBootApplication') { continue }
+            $hit = [regex]::Match($text, '(?m)^\s*package\s+([\w.]+)\.\w+\s*;')
+            if ($hit.Success) { return $hit.Groups[1].Value }
+        }
+    }
+    return 'esame'
+}
+
 function Get-ModulePackage {
-    param([Parameter(Mandatory = $true)][string]$Module)
-    return ('com.example.ttfcloud_esame.' + ($Module -replace '[^a-zA-Z0-9]', ''))
+    # ordini-service -> <base>.ordiniservice
+    param([Parameter(Mandatory = $true)][string]$Module, [string]$Base = '')
+    if (-not $Base) { $Base = Get-BasePackage }
+    return ($Base + '.' + ($Module -replace '[^a-zA-Z0-9]', ''))
+}
+
+function Get-MachineJdk {
+    # Il JDK con cui Maven compilera': quello di JAVA_HOME se c'e', se no il
+    # java del PATH. Restituisce versione (17, 21, 25...) e cartella, o $null.
+    $candidates = @()
+    if ($env:JAVA_HOME) { $candidates += (Join-Path $env:JAVA_HOME 'bin\java.exe') }
+    $onPath = Get-Command java -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($onPath) { $candidates += $onPath.Source }
+    foreach ($java in $candidates) {
+        if (-not (Test-Path $java)) { continue }
+        # java scrive le proprieta' su stderr: la redirezione la fa cmd, se no
+        # PowerShell 5.1 trasformerebbe ogni riga in un errore.
+        $out = (cmd /c "`"$java`" -XshowSettings:properties -version 2>&1") -join "`n"
+        $versionHit = [regex]::Match($out, 'java\.specification\.version = (\S+)')
+        if (-not $versionHit.Success) { continue }
+        $homeHit = [regex]::Match($out, 'java\.home = ([^\r\n]+)')
+        # Java 8 si presenta come 1.8.
+        $version = [int]($versionHit.Groups[1].Value -replace '^1\.', '')
+        return [pscustomobject]@{ Version = $version; Home = ($homeHit.Groups[1].Value.Trim() -replace '\\', '/') }
+    }
+    return $null
+}
+
+function Get-ProjectJavaVersion {
+    # La versione di Java del progetto: <java.version> del pom aggregatore.
+    param([string]$RepoRoot = (Get-ScaffoldRepoRoot))
+    $pom = Join-Path (Join-Path $RepoRoot (Get-AggregatorName -RepoRoot $RepoRoot)) 'pom.xml'
+    $hit = [regex]::Match((Read-TextFile $pom), '<java\.version>(\d+)</java\.version>')
+    if ($hit.Success) { return [int]$hit.Groups[1].Value }
+    return 0
 }
 
 function Write-Step {

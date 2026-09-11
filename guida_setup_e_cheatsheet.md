@@ -17,7 +17,7 @@ java --version
 ```
 
 - **Docker Desktop / Docker Engine**: Deve essere in esecuzione.
-- **Java 25**: Utilizzata dal progetto (`JAVA_HOME` impostato o gestito automaticamente).
+- **Java 17 o più recente** (il template nasce su Java 25): `task set-java` allinea pom, Dockerfile e VS Code al JDK installato (quello di `JAVA_HOME`, se no quello del `PATH`). Lo fa da solo anche `task wizard`, all'inizio.
 - **Task (`go-task`)**: Strumento per l'automazione dei comandi d'esame.
 
 ---

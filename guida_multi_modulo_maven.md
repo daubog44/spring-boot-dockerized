@@ -310,7 +310,7 @@ questo non contiene **nessuna versione**:
 La classe `Main`, che accende discovery e client Feign:
 
 ```java
-package com.example.ttfcloud_esame.ordiniservice;
+package esame.ordiniservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

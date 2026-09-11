@@ -227,20 +227,33 @@ function Write-IfMissing {
     Write-Step "$Label (creato)"
 }
 
-Write-IfMissing -Path (Join-Path $vscodeDir 'settings.json') -Label '.vscode/settings.json' -Lines @(
+# Il runtime Java di VS Code: la versione del progetto, e la cartella del JDK
+# di questa macchina se e' proprio quella (poi la tiene aggiornata task
+# set-java). Se il JDK non c'e' o e' un altro, niente blocco: VS Code se lo
+# cerca da solo.
+$runtimeLines = @()
+if (-not (Test-Path (Join-Path $vscodeDir 'settings.json'))) {
+    $javaVersion = Get-ProjectJavaVersion -RepoRoot $repoRoot
+    $jdk = Get-MachineJdk
+    if ($jdk -and $jdk.Version -eq $javaVersion) {
+        $runtimeLines = @(
+            '    // Lo stesso JDK che usa il Taskfile: lo aggiorna task set-java.'
+            '    "java.configuration.runtimes": ['
+            '        {'
+            ('            "name": "JavaSE-' + $javaVersion + '",')
+            ('            "path": "' + $jdk.Home + '",')
+            '            "default": true'
+            '        }'
+            '    ],'
+        )
+    }
+}
+
+Write-IfMissing -Path (Join-Path $vscodeDir 'settings.json') -Label '.vscode/settings.json' -Lines (@(
     '{'
     '    "java.configuration.updateBuildConfiguration": "automatic",'
     '    "java.compile.nullAnalysis.mode": "automatic",'
-    '    // Lo stesso JDK che usa il Taskfile. Se sulla macchina d''esame sta'
-    '    // altrove, correggi qui il percorso (o togli il blocco: VS Code cerca'
-    '    // da solo, ma puo'' pescare un Java piu'' vecchio).'
-    '    "java.configuration.runtimes": ['
-    '        {'
-    '            "name": "JavaSE-25",'
-    '            "path": "C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot",'
-    '            "default": true'
-    '        }'
-    '    ],'
+) + $runtimeLines + @(
     '    // L''hot reload di task compile ricompila quello che hai salvato: senza'
     '    // salvataggio automatico non si accorge di niente.'
     '    "files.autoSave": "afterDelay",'
@@ -256,7 +269,7 @@ Write-IfMissing -Path (Join-Path $vscodeDir 'settings.json') -Label '.vscode/set
     '    "[java]": { "editor.tabSize": 4 },'
     '    "[yaml]": { "editor.tabSize": 2, "editor.insertSpaces": true }'
     '}'
-)
+))
 
 Write-IfMissing -Path (Join-Path $vscodeDir 'extensions.json') -Label '.vscode/extensions.json' -Lines @(
     '{'

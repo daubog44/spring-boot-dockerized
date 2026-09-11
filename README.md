@@ -177,8 +177,8 @@ task wizard
 ```
 
 Per un microservizio solo: `task wizard SERVICE=<nome>`. Non fa niente di
-magico: chiama `rename-project`, `db-config`, `new-service` e `use-postgres`
-nell'ordine giusto, e finisce con `task check`.
+magico: chiama `set-java`, `rename-project`, `set-package`, `db-config`,
+`new-service` e `use-postgres` nell'ordine giusto, e finisce con `task check`.
 
 Scritte le entity, due comandi le leggono e ne ricavano il resto:
 

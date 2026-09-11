@@ -219,6 +219,51 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/set-port.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .PORT}} -Port {{.PORT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/set-port.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .PORT}} --port {{.PORT}}{{end}} {{.CLI_ARGS}}{{end}}'
 
+  set-java:
+    desc: "Allinea il progetto al Java di questa macchina (task set-java, oppure VERSION=21)"
+    summary: |
+      La versione di Java e' scritta in quattro posti: <java.version> del pom,
+      le immagini eclipse-temurin del Dockerfile, il runtime di VS Code
+      (.vscode/settings.json) e il JDK di ripiego del Taskfile. Questo comando
+      li mette d'accordo, di default con il JDK installato qui: quello di
+      JAVA_HOME, altrimenti il java del PATH. Il wizard lo lancia da solo.
+
+      Variabili (facoltative):
+        VERSION=<n>   una versione precisa invece di quella della macchina
+                      (almeno 17: e' il minimo di Spring Boot 4)
+
+      Esempi:
+        task set-java
+        task set-java VERSION=21
+
+      Se la versione cambia, cambiano anche le immagini Docker di base: con
+      la rete, task offline-prep.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/set-java.ps1{{if .VERSION}} -Version {{.VERSION}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/set-java.sh{{if .VERSION}} --version {{.VERSION}}{{end}} {{.CLI_ARGS}}{{end}}'
+
+  set-package:
+    desc: "Cambia il pacchetto Java di base di tutti i moduli (task set-package PACKAGE=it.rossi)"
+    summary: |
+      Il pacchetto di un modulo e' <base>.<modulo senza trattini>: con la base
+      esame, ordini-service sta in src/main/java/esame/ordiniservice/.
+      Questo comando cambia la base in tutti i moduli: sposta le cartelle dei
+      sorgenti, riscrive package, import, mainClass e configurazione, riallinea
+      gli editor e lancia task check. I moduli creati dopo con new-service
+      usano la base nuova. Il wizard la chiede all'inizio.
+
+      Variabili:
+        PACKAGE=<base>   parole minuscole separate da punti (esame, it.rossi);
+                         senza, stampa quella attuale
+
+      Esempi:
+        task set-package
+        task set-package PACKAGE=it.rossi
+
+      Poi task build: ricompila da capo e toglie le classi compilate col
+      pacchetto vecchio.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/set-package.ps1{{if .PACKAGE}} -Package {{.PACKAGE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/set-package.sh{{if .PACKAGE}} --package {{.PACKAGE}}{{end}} {{.CLI_ARGS}}{{end}}'
+
   remove-service:
     desc: "Toglie un modulo dal progetto e da tutti i file che lo nominano (task remove-service SERVICE=<modulo>)"
     summary: |

@@ -111,21 +111,29 @@ comando solo li mette tutti in piedi, facendoti le domande giuste:
 task wizard
 ```
 
-Ti chiede, nell'ordine:
+Prima di tutto, senza chiedere niente, **allinea Java al JDK di questo PC**:
+se il progetto è su Java 25 e sulla macchina del laboratorio c'è Java 21,
+passa a 21 il pom, le immagini Docker e VS Code (`task set-java`). Se il JDK
+è più vecchio di 17, il minimo di Spring Boot 4, te lo dice e lascia stare.
+
+Poi ti chiede, nell'ordine:
 
 1. **come si chiama la cartella con i moduli Maven** — di default `demo`,
    perché così nasce da Spring Initializr; dagli il nome del progetto e la
    rinomina ovunque sia scritta (Taskfile, script, guide);
-2. **se il progetto usa PostgreSQL**, e con quale database, utente, password e
+2. **il pacchetto Java di base** — di default `esame`, così i sorgenti stanno
+   in `src/main/java/esame/<modulo>/`; se la traccia o il docente vogliono
+   `it.cognome`, scrivilo qui e sposta tutto (`task set-package`);
+3. **se il progetto usa PostgreSQL**, e con quale database, utente, password e
    porta — se sul PC la 5432 è già occupata (nei laboratori capita, con un
    PostgreSQL installato) te ne propone un'altra;
-3. **i microservizi, uno per uno**: nome, che cos'è (servizio REST con
+4. **i microservizi, uno per uno**: nome, che cos'è (servizio REST con
    database, servizio REST senza, interfaccia Thymeleaf), su quale porta, e se
    usa H2 in memoria o PostgreSQL — condiviso o tutto suo.
 
 Alla fine lancia `task check` da solo. Non fa niente di magico: chiama
-`rename-project`, `db-config`, `new-service` e `use-postgres` nell'ordine
-giusto, gli stessi comandi che puoi dare a mano.
+`set-java`, `rename-project`, `set-package`, `db-config`, `new-service` e
+`use-postgres` nell'ordine giusto, gli stessi comandi che puoi dare a mano.
 
 Per un microservizio solo, quando la traccia te ne fa venire in mente un altro
 a metà giornata:

@@ -289,6 +289,27 @@ if (Get-Command docker -ErrorAction SilentlyContinue) {
     Write-Host ('  {0,-26}{1}' -f 'compose valido', 'saltato (docker non installato)') -ForegroundColor DarkGray
 }
 
+# --- Java: il JDK della macchina basta al progetto? --------------------------
+
+# Riguarda la macchina, non i file: le prove automatiche lo saltano. Un JDK
+# piu' nuovo del progetto va bene (compila per la versione vecchia), uno piu'
+# vecchio no: "release version 25 not supported".
+if ($ProjectOnly) {
+    Write-Host ('  {0,-26}{1}' -f 'java', 'saltato (-ProjectOnly)') -ForegroundColor DarkGray
+} else {
+    $errors = @()
+    $wanted = Get-ProjectJavaVersion -RepoRoot $repoRoot
+    $jdk = Get-MachineJdk
+    if (-not $jdk) {
+        $errors += "non trovo un JDK (JAVA_HOME o PATH): Maven non puo' compilare. Installa Java $wanted, poi task set-java"
+    } elseif ($jdk.Version -lt $wanted) {
+        $errors += "il progetto chiede Java $wanted e il JDK di questa macchina e' Java $($jdk.Version): task set-java (o installa Java $wanted)"
+    }
+    $note = if ($jdk) { "OK (progetto Java $wanted, JDK $($jdk.Version))" } else { 'OK' }
+    Write-Check -Label 'java' -Errors $errors -OkNote $note
+    $problems += $errors
+}
+
 # --- Esito --------------------------------------------------------------------
 
 Write-Host ''
