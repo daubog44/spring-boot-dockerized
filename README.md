@@ -204,9 +204,10 @@ E a fine giornata:
 task consegna NOME=COGNOME_NOME
 ```
 
-Prepara `consegna/`: i moduli zippati senza `target/`, l'allegato tecnico gia'
-compilato, le istruzioni di esecuzione, il compose, e un archivio unico da
-consegnare.
+Prepara `consegna/`: il progetto pronto da eseguire (i moduli senza `target/`,
+accanto a pom e compose), l'allegato tecnico già compilato con moduli, porte,
+endpoint e schema, le istruzioni di esecuzione, e un archivio unico da
+consegnare. Chi lo corregge lo scompatta e lancia `docker compose up --build`.
 
 ### Esame senza rete
 

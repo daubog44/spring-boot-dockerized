@@ -546,6 +546,39 @@ assert_out_contains "FK"
 assert_out_contains '| `stato` | VARCHAR(20) |'
 end_case
 
+start_case "consegna prepara un archivio che parte appena scompattato"
+run_tool consegna.sh --nome ROSSI_MARIO
+assert_ok "consegna"
+ZIP="$SANDBOX/consegna/ROSSI_MARIO.zip"
+DEST="$SANDBOX/consegna-scompattata"
+if [ ! -f "$ZIP" ]; then
+  fail "manca consegna/ROSSI_MARIO.zip"
+else
+  # Scompattato come farebbe chi corregge, e poi quello che la build cerca:
+  # i moduli del pom aggregatore e i pom che il Dockerfile copia.
+  mkdir -p "$DEST"
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -q "$ZIP" -d "$DEST"
+  else
+    (cd "$DEST" && jar xf "$ZIP")
+  fi
+  for f in docker-compose.yml Dockerfile pom.xml mvnw .mvn/wrapper/maven-wrapper.properties ALLEGATO-TECNICO.md ISTRUZIONI-ESECUZIONE.md SCHEMA-DATABASE.md; do
+    [ -e "$DEST/$f" ] || fail "scompattato l'archivio, manca $f accanto al compose"
+  done
+  for mod in $(grep -oE '<module>[^<]+</module>' "$DEST/pom.xml" | sed -E 's#</?module>##g'); do
+    [ -f "$DEST/$mod/pom.xml" ] || fail "il pom aggregatore cerca $mod/pom.xml, che non c'e'"
+    [ -d "$DEST/$mod/src" ] || fail "mancano i sorgenti di $mod"
+  done
+  for p in $(grep -oE '^COPY[[:space:]]+[^[:space:]]+/pom\.xml' "$DEST/Dockerfile" | awk '{print $2}'); do
+    [ -f "$DEST/$p" ] || fail "il Dockerfile copia $p, che non c'e'"
+  done
+  [ -z "$(find "$DEST" -type d -name target)" ] || fail "nella consegna ci sono cartelle target/"
+  [ -z "$(find "$DEST" -type f -name '*.zip')" ] || fail "archivi dentro l'archivio"
+  grep -q 'Scompatta ogni archivio' "$DEST/ISTRUZIONI-ESECUZIONE.md" && fail "le istruzioni chiedono ancora di ricomporre il progetto"
+  rm -rf "$DEST"
+fi
+end_case
+
 # Questa cambia il nome della cartella dei moduli: va per ultima.
 start_case "rename-project rinomina la cartella e i file che la nominano"
 # Un modulo che comincia con il nome della cartella (biblioteca e

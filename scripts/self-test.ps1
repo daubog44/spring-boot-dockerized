@@ -589,6 +589,42 @@ Test-Case 'db-schema ricava tabelle e relazioni dalle @Entity' {
     Assert-Contains $r.Output '| `stato` | VARCHAR(20) |' 'la lunghezza di un enum con @Column(length) e'' ignorata'
 }
 
+Test-Case 'consegna prepara un archivio che parte appena scompattato' {
+    Assert-Ok (Invoke-Tool 'consegna.ps1' @('-Nome', 'ROSSI_MARIO')) 'consegna e'' fallita'
+    $zip = Join-Path $sandbox 'consegna/ROSSI_MARIO.zip'
+    Assert-That (Test-Path $zip) 'manca consegna/ROSSI_MARIO.zip'
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+    try { $entries = @($archive.Entries | ForEach-Object { $_.FullName }) } finally { $archive.Dispose() }
+    $storte = @($entries | Where-Object { $_ -match '\\' })
+    Assert-That ($storte.Count -eq 0) ('percorsi con la barra rovesciata: ' + (($storte | Select-Object -First 3) -join ', '))
+
+    # Scompattato come farebbe chi corregge, e poi quello che la build cerca:
+    # i moduli del pom aggregatore e i pom che il Dockerfile copia.
+    $dest = Join-Path $sandbox 'consegna-scompattata'
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $dest)
+    try {
+        foreach ($f in @('docker-compose.yml', 'Dockerfile', 'pom.xml', 'mvnw', '.mvn/wrapper/maven-wrapper.properties', 'ALLEGATO-TECNICO.md', 'ISTRUZIONI-ESECUZIONE.md', 'SCHEMA-DATABASE.md')) {
+            Assert-That (Test-Path (Join-Path $dest $f)) "scompattato l'archivio, manca $f accanto al compose"
+        }
+        foreach ($m in [regex]::Matches((Read-TextFile (Join-Path $dest 'pom.xml')), '<module>([^<]+)</module>')) {
+            $mod = $m.Groups[1].Value
+            Assert-That (Test-Path (Join-Path $dest "$mod/pom.xml")) "il pom aggregatore cerca $mod/pom.xml, che non c'e'"
+            Assert-That (Test-Path (Join-Path $dest "$mod/src")) "mancano i sorgenti di $mod"
+        }
+        foreach ($m in [regex]::Matches((Read-TextFile (Join-Path $dest 'Dockerfile')), '(?m)^COPY\s+(\S+/pom\.xml)\s')) {
+            Assert-That (Test-Path (Join-Path $dest $m.Groups[1].Value)) "il Dockerfile copia $($m.Groups[1].Value), che non c'e'"
+        }
+        $target = @(Get-ChildItem -Path $dest -Recurse -Directory -Filter 'target')
+        Assert-That ($target.Count -eq 0) 'nella consegna ci sono cartelle target/'
+        $zips = @(Get-ChildItem -Path $dest -Recurse -File -Filter '*.zip')
+        Assert-That ($zips.Count -eq 0) ('archivi dentro l''archivio: ' + ($zips.Name -join ', '))
+        Assert-NotContains (Read-TextFile (Join-Path $dest 'ISTRUZIONI-ESECUZIONE.md')) 'Scompatta ogni archivio' 'le istruzioni chiedono ancora di ricomporre il progetto'
+    } finally {
+        Remove-Item -Recurse -Force $dest -ErrorAction SilentlyContinue
+    }
+}
+
 # Questa cambia il nome della cartella dei moduli: va per ultima.
 Test-Case 'rename-project rinomina la cartella e i file che la nominano' {
     # Un modulo che comincia con il nome della cartella (biblioteca e
