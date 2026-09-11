@@ -563,6 +563,23 @@ run_tool rete.sh --url http://127.0.0.1:9/ --timeout 3
 assert_ok "task rete" && assert_out_contains "NON risponde"
 end_case
 
+start_case "offline-prep scarica anche una copia di scorta di task"
+{ assert_contains scripts/offline.sh ".tools/task" "offline-prep non prepara una copia di scorta di task" &&
+  assert_contains scripts/offline.sh "usa-task-locale.sh" "offline non dice come usare la copia locale"; }
+end_case
+
+start_case "usa-task-locale trova ed espone la copia locale di task"
+SENZA_COPIA="$(. "$SB_SCRIPTS/usa-task-locale.sh" 2>&1)"
+mkdir -p "$SANDBOX/.tools/task"
+: > "$SANDBOX/.tools/task/task"
+chmod +x "$SANDBOX/.tools/task/task"
+# In un sottoshell ($(...)): il PATH aggiornato da "source" non deve
+# restare appiccicato allo script di collaudo.
+CON_COPIA_PATH="$(. "$SB_SCRIPTS/usa-task-locale.sh" >/dev/null 2>&1; printf '%s' "$PATH")"
+{ printf '%s' "$SENZA_COPIA" | grep -qF "offline-prep" || fail "senza una copia locale non spiega come procurarsela"; } &&
+  { printf '%s' "$CON_COPIA_PATH" | grep -qF "$SANDBOX/.tools/task" || fail "non aggiunge la copia locale al PATH di questa shell"; }
+end_case
+
 start_case "learn raccoglie lezioni, guide e moduli in contenuti.js"
 run_tool learn.sh --no-open
 JS="$SANDBOX/corso/contenuti.js"
