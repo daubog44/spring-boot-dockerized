@@ -95,10 +95,17 @@ task new-service NAME=ordini-service
 task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
 ```
 
+<<<<<<< HEAD
+=======
+e per i DTO condivisi, i client Feign, le viste Thymeleaf, la sicurezza e la gestione errori:
+
+>>>>>>> d61b740 (feat: new-auth, new-handler, auto-dto in new-client, remove-h2 option, lesson 18 security)
 ```bash
 task new-dto NAME=Ordine FIELDS=id:long,numero:string:required,totale:decimal
-task new-client FROM=report-service TO=ordini-service DTO=OrdineDto
+task new-client FROM=report-service TO=ordini-service DTO=OrdineDto FIELDS=id:long,numero:string:required
 task new-view SERVICE=store-ui NAME=Ordini FIELDS=numero:string:required,totale:decimal
+task new-auth SERVICE=ordini-service TYPE=db
+task new-handler SERVICE=ordini-service
 ```
 
 ```bash
@@ -128,6 +135,13 @@ dettaglio di uno.
 Sviluppo:
 
 - `task wizard`: Fa le domande e monta il progetto (`SERVICE=<modulo>` per uno solo).
+- `task new-service NAME=<nome>`: Genera un nuovo microservizio Spring Boot collegato.
+- `task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=...`: Genera Entity, Repository, Service e Controller.
+- `task new-dto NAME=<Nome> FIELDS=...`: Genera un DTO con validazione in common-dto.
+- `task new-client FROM=<da> TO=<a> DTO=<NomeDto> [FIELDS=...]`: Genera FeignClient (e DTO correlato se specificato).
+- `task new-view SERVICE=<modulo> NAME=<Nome> FIELDS=...`: Genera Controller e template Thymeleaf per UI.
+- `task new-auth SERVICE=<modulo> TYPE=db|inmemory|form`: Configura Spring Security con zero boilerplate.
+- `task new-handler SERVICE=<modulo>`: Genera GlobalExceptionHandler (@RestControllerAdvice).
 - `task consegna NOME=COGNOME_NOME`: Prepara la cartella da consegnare.
 - `task seed-data`: Dati di prova ricavati dalle `@Entity`.
 - `task db-schema`: Schema concettuale e logico ricavato dalle `@Entity`.
@@ -193,7 +207,6 @@ task wizard
 Per un microservizio solo: `task wizard SERVICE=<nome>`. Non fa niente di
 magico: chiama `set-java`, `rename-project`, `set-package`, `db-config`,
 `new-service` e `use-postgres` nell'ordine giusto, e finisce con `task check`.
-
 
 Scritte le entity, due comandi le mettono al lavoro. Tutti e due passano dal
 database vero, non dalla lettura dei sorgenti: avviano l'applicazione, lasciano

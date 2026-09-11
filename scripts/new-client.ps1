@@ -33,7 +33,8 @@ param(
     [string]$To = '',
     [string]$Name = '',
     [string]$Dto = '',
-    [string]$Path = ''
+    [string]$Path = '',
+    [string]$Fields = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,8 +44,8 @@ $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
 
 if (-not $From -or -not $To) {
-    throw "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [NAME=<ClientName>] [PATH=<rotta>]`n" +
-          "Esempio: task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto"
+    throw "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [PATH=<rotta>]`n" +
+          "Esempio: task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto FIELDS=id:long,titolo:string:required"
 }
 
 $fromDir = Join-Path $demoDir $From
@@ -98,13 +99,33 @@ if (-not $routePath) {
 }
 
 if (-not $dtoName) {
-    $targetBase = $To -replace '-(service|app|api)$', ''
-    $candidateDto = (Convert-ToPascal $targetBase) + 'Dto'
-    $commonDtoDir = Join-Path $demoDir 'common-dto/src/main/java'
-    if (Test-Path (Join-Path $commonDtoDir "esame/common/dto/$candidateDto.java")) {
-        $dtoName = $candidateDto
+    if ($Fields) {
+        $targetBase = $To -replace '-(service|app|api)$', ''
+        $dtoName = (Convert-ToPascal $targetBase) + 'Dto'
     } else {
-        $dtoName = 'Object'
+        $targetBase = $To -replace '-(service|app|api)$', ''
+        $candidateDto = (Convert-ToPascal $targetBase) + 'Dto'
+        $basePkg = Get-BasePackage
+        $basePkgPath = $basePkg -replace '\.', '/'
+        $commonDtoDir = Join-Path $demoDir "common-dto/src/main/java/$basePkgPath/common/dto"
+        if (Test-Path (Join-Path $commonDtoDir "$candidateDto.java")) {
+            $dtoName = $candidateDto
+        } else {
+            $dtoName = 'Object'
+        }
+    }
+}
+
+# Auto-generazione DTO in common-dto se sono forniti FIELDS o se il DTO indicato non esiste ancora
+if ($dtoName -ne 'Object') {
+    $basePkg = Get-BasePackage
+    $basePkgPath = $basePkg -replace '\.', '/'
+    $dtoFile = Join-Path $demoDir "common-dto/src/main/java/$basePkgPath/common/dto/$dtoName.java"
+    if ($Fields -or (-not (Test-Path $dtoFile))) {
+        $cleanDtoBase = $dtoName -replace '(?i)dto$', ''
+        $dtoParams = @{ Name = $cleanDtoBase }
+        if ($Fields) { $dtoParams['Fields'] = $Fields }
+        & (Join-Path $PSScriptRoot 'new-dto.ps1') @dtoParams | Out-Null
     }
 }
 

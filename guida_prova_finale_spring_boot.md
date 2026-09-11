@@ -32,7 +32,8 @@ All'esame il tempo è prezioso: delega agli strumenti il lavoro meccanico e conc
 | **Contratti DTO & Record** | `task new-dto` genera i record Java in `common-dto` con validazione Bean Validation. | Decidere quali campi esporre e scambiare tra i microservizi. |
 | **Chiamate tra Servizi** | `task new-client` crea l'interfaccia `@FeignClient` pronta con metodi CRUD risolti tramite Eureka. | Invocare il client nel `@Service` chiamante e gestire le eccezioni di business (es. 404 se un record non esiste). |
 | **Interfaccia Web (UI)** | `task new-view` crea Controller Thymeleaf e template HTML con tabella dinamica e form validato. | Personalizzare i campi del form e visualizzare i dati ricevuti da Feign nel Model. |
-| **Sicurezza (Spring Security)** | `task add-dep SERVICE=... DEPS=security` genera `SecurityConfig.java` già funzionante (CSRF disattivato, Swagger/Eureka aperti, utenti `admin`/`user`). | Configurare le regole di autorizzazione per ruolo (es. `.requestMatchers("/admin/**").hasRole("ADMIN")`) se richieste dalla traccia. |
+| **Sicurezza (Spring Security)** | `task new-auth` genera la sicurezza completa: in-memory, su database (`UtenteEntity`, `UtenteRepository`, `CustomUserDetailsService`, BCrypt) o Web (`login.html` Thymeleaf). | Configurare le regole di autorizzazione per ruolo (es. `.requestMatchers("/admin/**").hasRole("ADMIN")`) se richieste dalla traccia. |
+| **Gestione Errori REST** | `task new-handler` genera `@RestControllerAdvice` con formattazione automatica degli errori di validazione (@Valid), 404 e 500 in JSON. | Definire eventuali messaggi di errore custom di business. |
 | **Logica di Business & Algoritmo** | *Nessuna automazione (apposta)*. | **È il cuore della valutazione:** implementare i calcoli, controlli di disponibilità, regole di sconto, algoritmi richiesti. |
 | **Documentazione & Consegna** | `task db-schema` estrae lo schema ER; `task consegna` prepara lo zip pulito rimuovendo tutte le classi interne del template (`devdata`). | Scrivere analisi del problema, algoritmo e risposte teoriche in `allegato.md`. |
 
@@ -403,16 +404,20 @@ Quando aggiungi `spring-boot-starter-security` (con `task add-dep SERVICE=... DE
 2. **Genera una password casuale al boot**: visibile nei log con `Using generated security password: ...`.
 3. **Abilita la protezione CSRF**: qualsiasi chiamata REST `POST`, `PUT`, `DELETE` inviata da Postman, curl o Feign viene bloccata con `403 Forbidden` perché priva del token CSRF.
 
-#### Come si risolve per l'esame
-Con `task add-dep SERVICE=... DEPS=security`, il template crea automaticamente `config/SecurityConfig.java`:
-- Disabilita CSRF per consentire chiamate REST senza token.
-- Apre in `permitAll()` le rotte tecniche (`/swagger-ui/**`, `/v3/api-docs/**`, `/actuator/**`, `/h2-console/**`).
-- Registra due utenti in-memory (`admin`/`admin123` con ruolo `ADMIN`, `user`/`user123` con ruolo `USER`).
-- Se la traccia richiede autorizzazioni per ruolo, basta una sola riga nel bean `SecurityFilterChain`:
-  ```java
-  .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
-  .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("USER", "ADMIN")
-  ```
+#### Come si risolve per l'esame: `task new-auth`
+
+Usa il comando `task new-auth SERVICE=<modulo> [TYPE=inmemory|db|form]` per generare l'architettura esatta richiesta dalla traccia:
+- **`TYPE=inmemory` (default per REST)**: Genera `SecurityConfig.java` con Basic Auth, CSRF disabilitato, Swagger/Actuator/H2 aperti e utenti in-memory (`admin`/`admin123` e `user`/`user123`).
+- **`TYPE=db` (Autenticazione su Database)**: Genera `UtenteEntity`, `UtenteRepository`, `CustomUserDetailsService` con crittografia BCrypt e seed automatico iniziale degli utenti a database vuoto.
+- **`TYPE=form` (Web UI con Thymeleaf)**: Configura il Form Login con sessione, genera `LoginController` e crea il template `templates/login.html` stilizzato con gestione di errori e logout.
+
+Per la spiegazione teorica dettagliata (come funzionano i filtri, taglib `sec:authorize` in Thymeleaf e domande d'esame su OAuth2/Keycloak), consulta la **[Lezione 18 del Corso: Sicurezza e Autenticazione](./corso/lezioni/18-sicurezza-e-autenticazione.md)**.
+
+Se la traccia richiede autorizzazioni per ruolo, basta una sola riga nel bean `SecurityFilterChain`:
+```java
+.requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
+.requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("USER", "ADMIN")
+```
 
 ### 5.6 Relazioni JPA tra tabelle & Il confine sacro tra Microservizi
 

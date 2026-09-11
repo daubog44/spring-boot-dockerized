@@ -32,7 +32,8 @@
 #>
 param(
     [string]$Module = '',
-    [string]$DbName = ''
+    [string]$DbName = '',
+    [switch]$RemoveH2
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,7 +45,7 @@ $moduleDir = Join-Path $demoDir $Module
 $compose = Join-Path $demoDir 'docker-compose.yml'
 
 if (-not $Module) {
-    throw "Uso: task use-postgres SERVICE=<modulo> [DBNAME=<database>]"
+    throw "Uso: task use-postgres SERVICE=<modulo> [DBNAME=<database>] [REMOVE_H2=1]"
 }
 if (-not (Test-Path (Join-Path $moduleDir 'pom.xml'))) {
     $available = (Get-ChildItem -Path $demoDir -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'pom.xml') } | ForEach-Object { $_.Name }) -join ', '
@@ -90,6 +91,14 @@ if ($missing.Count -gt 0) {
     Write-Step ("pom.xml: aggiunte " + ($missing -join ', '))
 } else {
     Write-Step 'pom.xml: data-jpa e driver PostgreSQL gia'' presenti'
+}
+
+if ($RemoveH2) {
+    $pomPath = Join-Path $moduleDir 'pom.xml'
+    $pomCurrent = Read-TextFile $pomPath
+    $cleanPom = [regex]::Replace($pomCurrent, '(?s)\s*<dependency>\s*<groupId>com\.h2database</groupId>\s*<artifactId>h2</artifactId>.*?</dependency>', '')
+    Write-TextFile -Path $pomPath -Text $cleanPom
+    Write-Step 'pom.xml: rimossa dipendenza h2'
 }
 
 # --- 2. application.yml -------------------------------------------------------
