@@ -154,6 +154,79 @@ grep -qE 'image:[[:space:]]*postgres' "$DEMO_DIR/docker-compose.yml" && HAS_POST
 PG_PORT="$(grep -oE '^[[:space:]]+-[[:space:]]*"[0-9]+:5432"' "$DEMO_DIR/docker-compose.yml" | head -n 1 | grep -oE '[0-9]+:5432' | cut -d: -f1 || true)"
 [ -n "$PG_PORT" ] || PG_PORT=5432
 
+# --- Le parti scritte a mano: allegato.md -------------------------------------
+# L'analisi, l'algoritmo e la descrizione dei moduli li scrivi tu, in
+# allegato.md nella cartella del progetto: sta li' e non in consegna/, che a
+# ogni giro si rifa' da zero. Qui si prendono le sue sezioni per titolo e si
+# mettono al loro posto nell'allegato, PRIMA di fare l'archivio: cosi'
+# l'archivio ha sempre dentro il testo, e una consegna rifatta non lo perde.
+
+ALLEGATO="$REPO_ROOT/allegato.md"
+HINT_ANALISI="[Due o tre paragrafi: cosa chiede la traccia, quali sono gli attori, che cosa fa il sistema nel suo insieme.]"
+HINT_ALGORITMO="[Se la traccia chiede un algoritmo (calcolo di una distanza, scelta di un'ubicazione, estrazione casuale...), spiegalo qui a parole e indica la classe e il metodo che lo implementano.]"
+HINT_MODULO="[Una o due righe su cosa fa e su come lo fa.]"
+HINT_DOMANDA="[Facoltativa: la risposta alla domanda teorica, se la traccia la vuole nell'allegato.]"
+if [ ! -f "$ALLEGATO" ]; then
+  {
+    echo "# Allegato tecnico: le parti scritte da te"
+    echo ""
+    echo "task consegna prende ogni sezione di questo file e la mette al suo posto in"
+    echo "ALLEGATO-TECNICO.md, accanto a quello che ricava dal progetto (moduli, porte,"
+    echo "endpoint, schema del database). Scrivi sotto ogni titolo e lascia i titoli"
+    echo "come sono: una sezione ancora fra parentesi quadre conta come da scrivere, e"
+    echo "la consegna te lo ricorda."
+    echo ""
+    printf '## Analisi\n\n%s\n\n## Algoritmo\n\n%s\n\n' "$HINT_ANALISI" "$HINT_ALGORITMO"
+    while read -r name module port; do
+      [ -z "$module" ] && continue
+      printf '## %s\n\n%s\n\n' "$module" "$HINT_MODULO"
+    done <<<"$SERVICES"
+    printf '## Domanda A\n\n%s\n\n## Domanda B\n\n%s\n' "$HINT_DOMANDA" "$HINT_DOMANDA"
+  } >"$ALLEGATO"
+  echo "  allegato.md creato: e' li' che scrivi analisi, algoritmo e moduli"
+fi
+
+# Il testo scritto sotto "## <titolo>", senza righe vuote ai bordi; niente se
+# la sezione manca o e' ancora fra parentesi quadre.
+part_text() { # titolo
+  local text
+  text="$(awk -v want="$(printf '%s' "$1" | tr 'A-Z' 'a-z')" '
+    /^##[ \t]+/ { t = $0; sub(/^##[ \t]+/, "", t); gsub(/`/, "", t); sub(/[ \t\r]+$/, "", t); cur = tolower(t); next }
+    cur == want { sub(/\r$/, ""); buf[n++] = $0 }
+    END {
+      s = 0; while (s < n && buf[s] ~ /^[ \t]*$/) s++
+      e = n - 1; while (e >= s && buf[e] ~ /^[ \t]*$/) e--
+      for (i = s; i <= e; i++) print buf[i]
+    }' "$ALLEGATO")"
+  case "$text" in "["*) ;; *) printf '%s' "$text" ;; esac
+}
+has_part() { grep -qiE "^##[[:space:]]+\`?$1\`?[[:space:]]*\$" "$ALLEGATO"; }
+
+# Un modulo nato dopo l'ultima consegna: la sua sezione si aggiunge in fondo.
+ADDED=""
+while read -r name module port; do
+  [ -z "$module" ] && continue
+  if ! has_part "$module"; then
+    printf '\n## %s\n\n%s\n' "$module" "$HINT_MODULO" >>"$ALLEGATO"
+    ADDED="$ADDED $module"
+  fi
+done <<<"$SERVICES"
+if [ -n "$ADDED" ]; then echo "  allegato.md: aggiunta la sezione di$ADDED"; fi
+
+# Il testo di una sezione, o il suggerimento fra quadre se e' da scrivere.
+# Va chiamata senza $(...): deve poter aggiornare MISSING.
+MISSING=""
+part_or_hint() { # titolo, suggerimento
+  local text
+  text="$(part_text "$1")"
+  if [ -n "$text" ]; then
+    printf '%s\n' "$text"
+  else
+    printf '%s\n' "$2"
+    MISSING="$MISSING, $1"
+  fi
+}
+
 # --- L'allegato tecnico -------------------------------------------------------
 
 {
@@ -162,15 +235,11 @@ PG_PORT="$(grep -oE '^[[:space:]]+-[[:space:]]*"[0-9]+:5432"' "$DEMO_DIR/docker-
   echo "Candidato: **$NOME**  "
   echo "Data: $(date '+%d/%m/%Y')"
   echo ""
-  echo "> Le parti fra parentesi quadre sono le uniche da scrivere a mano: il"
-  echo "> resto e' stato ricavato dal progetto."
-  echo ""
   echo "---"
   echo ""
   echo "## 1. Analisi del problema e contesto applicativo"
   echo ""
-  echo "[Due o tre paragrafi: cosa chiede la traccia, quali sono gli attori, che"
-  echo "cosa fa il sistema nel suo insieme.]"
+  part_or_hint "Analisi" "$HINT_ANALISI"
   echo ""
   echo "## 2. Architettura della soluzione"
   echo ""
@@ -209,17 +278,15 @@ PG_PORT="$(grep -oE '^[[:space:]]+-[[:space:]]*"[0-9]+:5432"' "$DEMO_DIR/docker-
       echo ""
       echo "Contratti OpenAPI: \`http://localhost:$port/swagger-ui.html\`"
     else
-      echo "Nessun endpoint REST: [descrivi cosa fa questo modulo]."
+      echo "Nessun endpoint REST."
     fi
     echo ""
-    echo "[Una o due righe su cosa fa e su come lo fa.]"
+    part_or_hint "$module" "$HINT_MODULO"
     echo ""
   done <<<"$SERVICES"
   echo "## 5. Descrizione dell'algoritmo"
   echo ""
-  echo "[Se la traccia chiede un algoritmo (calcolo di una distanza, scelta di"
-  echo "un'ubicazione, estrazione casuale...), spiegalo qui a parole e indica la"
-  echo "classe e il metodo che lo implementano.]"
+  part_or_hint "Algoritmo" "$HINT_ALGORITMO"
   echo ""
   echo "## 6. Istruzioni per il test della soluzione"
   echo ""
@@ -234,6 +301,15 @@ PG_PORT="$(grep -oE '^[[:space:]]+-[[:space:]]*"[0-9]+:5432"' "$DEMO_DIR/docker-
     esac
   done <<<"$SERVICES"
   echo ""
+  # Le risposte teoriche ci vanno solo se le hai scritte in allegato.md.
+  qa="$(part_text 'Domanda A')"
+  qb="$(part_text 'Domanda B')"
+  if [ -n "$qa$qb" ]; then
+    echo "## 7. Risposte alle domande teoriche"
+    echo ""
+    if [ -n "$qa" ]; then printf '### Domanda A\n\n%s\n\n' "$qa"; fi
+    if [ -n "$qb" ]; then printf '### Domanda B\n\n%s\n\n' "$qb"; fi
+  fi
 } >"$OUT_DIR/ALLEGATO-TECNICO.md"
 echo "  ALLEGATO-TECNICO.md (moduli, porte, endpoint e schema gia' dentro)"
 
@@ -321,6 +397,11 @@ echo "Consegna pronta in $OUT_DIR"
 echo ""
 echo "  $(basename "$FINAL")   $(( $(wc -c <"$FINAL") / 1024 )) KB   <- questo e' l'archivio da consegnare"
 echo ""
-echo "  Prima di consegnare, apri ALLEGATO-TECNICO.md e riempi le parti fra"
-echo "  parentesi quadre: analisi, algoritmo e descrizione dei moduli."
+if [ -z "$MISSING" ]; then
+  echo "  L'allegato e' completo: le parti scritte da te vengono da allegato.md."
+else
+  echo "  Nell'allegato mancano ancora: ${MISSING#, }."
+  echo "  Scrivile in allegato.md, nella cartella del progetto, e rilancia"
+  echo "  task consegna: l'archivio si rifa' con dentro il testo."
+fi
 echo ""

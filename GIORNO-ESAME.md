@@ -2,15 +2,19 @@
 
 Questa pagina è pensata per essere aperta e seguita, non ricordata. Se hai un
 minuto solo, leggi le **quattro fasi** qui sotto e ignora il resto finché non
-serve.
+serve. Per imparare prima, con calma e col codice di una traccia svolta,
+c'è il corso: `task learn`.
 
 ---
 
-## La sera prima — l'esame senza rete
+## La sera prima — la rete dell'esame
 
-Il giorno dell'esame potresti non avere internet. Non è un dettaglio: Maven
-scarica le dipendenze in `~/.m2`, Docker le immagini di base, e senza rete
-nessuno dei due può farlo. Va preparato **adesso**, con la connessione.
+All'esame la rete c'è, ma filtrata: una whitelist di domini lascia passare
+Maven Central, quindi Maven scarica le dipendenze come a casa. Degli altri
+domini non si sa niente finché non ci provi: Docker Hub (le immagini di base),
+i repository di Ubuntu (`curl` dentro l'immagine, alla prima build), GitHub, le
+estensioni degli editor. Quello che potrebbe non passare va scaricato
+**adesso**, con la connessione di casa.
 
 Un comando solo, e ci mette qualche minuto:
 
@@ -39,17 +43,17 @@ sulla chiavetta:
 | Cosa | Perché |
 | :--- | :--- |
 | la cartella del progetto, `.git` compreso | è il template, e con `.git` puoi tornare indietro con `git checkout .` |
-| la cartella `~/.m2/repository` | le dipendenze Maven: è la parte che senza rete non si recupera |
+| la cartella `~/.m2/repository` | le dipendenze Maven, se Maven Central non dovesse passare |
 | l'installatore di go-task, del JDK e di Docker Desktop | solo se non sei sicuro della macchina d'esame |
 
 Sul portatile d'esame: copi la cartella dove vuoi, copi `.m2` dentro la tua
 home, e sei operativo. Il nome della cartella che contiene tutto non lo guarda
 nessuno script: rinominala pure a mano.
 
-> Se invece la rete c'è, `git clone` resta la strada più veloce. Ma non
-> contarci.
+> Se GitHub passa (`task rete` te lo dice), `git clone` resta la strada più
+> veloce. Ma non contarci.
 
-**Come presentare senza rete**, in ordine di sicurezza:
+**Come presentare se Docker Hub non passa**, in ordine di sicurezza:
 
 1. `task dev` per i servizi e `task run-db` per il solo PostgreSQL: Maven
    lavora offline dalla `~/.m2` e Docker deve solo far partire un'immagine che
@@ -63,9 +67,14 @@ nessuno script: rinominala pure a mano.
 
 ## Fase 0 — Prima di scrivere una riga di codice (10 minuti)
 
-Fallo appena ti siedi, non quando ti serve.
+Fallo appena ti siedi, non quando ti serve. Prima di tutto, che cosa passa
+dalla rete dell'aula:
 
-Se hai la rete:
+```bash
+task rete
+```
+
+Dominio per dominio, dice se risponde e che cosa fare se no. Se GitHub passa:
 
 ```bash
 git clone https://github.com/daubog44/spring-boot-dockerized.git
@@ -75,7 +84,7 @@ git clone https://github.com/daubog44/spring-boot-dockerized.git
 cd spring-boot-dockerized
 ```
 
-Se non ce l'hai, copia dalla chiavetta la cartella del progetto e la cartella
+Altrimenti copia dalla chiavetta la cartella del progetto e la cartella
 `.m2` dentro la tua home (vedi *La sera prima*), poi entra nella cartella e
 controlla di essere a posto:
 
@@ -270,7 +279,7 @@ task compile
 **Non rilanciare `task dev` a ogni modifica.** Ti serve solo quando cambi
 qualcosa che un riavvio a caldo non copre: un `application.yml`, una porta, una
 dipendenza, un modulo nuovo. Per quei casi c'è un comando apposta: vedi
-[Modifiche strutturali](#modifiche-strutturali-dipendenze-porte-moduli-nuovi).
+[Modifiche strutturali](#modifiche-strutturali-dipendenze-porte-moduli).
 Puoi lanciarlo quando vuoi, fa pulizia da solo.
 
 Quando qualcosa non risponde, **prima di formulare ipotesi**:
@@ -578,12 +587,15 @@ apri nell'ordine:
 3. lo Swagger di un servizio — i contratti OpenAPI
 
 Se ti chiedono della **resilienza**, spegni un servizio davanti a loro e
-ricarica la dashboard: resta in piedi con i segnaposto invece di andare in
-errore.
+ricarica la pagina: resta in piedi con i segnaposto invece di andare in
+errore. Dalla cartella dei moduli (quella con `docker-compose.yml`), col nome
+del servizio:
 
 ```bash
-docker stop exam-<nome-servizio>
+docker compose stop <servizio>
 ```
+
+e poi `docker compose start <servizio>` per riaccenderlo.
 
 Alla fine:
 
@@ -619,10 +631,15 @@ nella cartella dove c'è `docker-compose.yml` e lancia
 `docker compose up -d --build`. Prima di consegnare fai tu la stessa prova:
 scompatta `COGNOME_NOME.zip` in una cartella nuova e avvialo da lì.
 
-Prima di consegnare apri `ALLEGATO-TECNICO.md` e riempi le parti fra parentesi
-quadre — analisi, algoritmo, descrizione dei moduli. Il resto (elenco dei
-moduli con porte e nome Eureka, endpoint di ogni controller, schema del
-database) è già dentro, ricavato dal codice.
+Le parti dell'allegato che scrivi tu — analisi, algoritmo, che cosa fa ogni
+modulo, e se servono le risposte teoriche — stanno in `allegato.md`, nella
+cartella del progetto, una sezione `##` per parte. La prima consegna lo crea
+con i titoli pronti; le altre ne prendono il testo e lo mettono al suo posto
+in `ALLEGATO-TECNICO.md` **prima** di fare l'archivio, così l'archivio ha
+sempre dentro l'ultima versione e puoi rilanciare la consegna quante volte
+vuoi. Alla fine ti dice che cosa manca ancora. Il resto (moduli con porte e
+nome Eureka, endpoint di ogni controller, schema del database) è ricavato dal
+progetto.
 
 Lo schema del database lo puoi anche guardare da solo, in qualunque momento:
 
@@ -684,8 +701,10 @@ Funziona a stack spento e senza rete: serve solo Maven.
 | `task seed-data` | Dati di prova: a ogni avvio le tabelle vuote si riempiono, passando da Hibernate |
 | `task db-schema` | Schema concettuale e logico, letto dal database che crea Hibernate |
 | `task consegna` | Prepara la cartella da consegnare (`NOME=COGNOME_NOME`) |
-| `task offline-prep` | **Con la rete**: scarica tutto quello che servirà all'esame |
-| `task offline` | Dice se il progetto partirebbe a rete staccata |
+| `task learn` | Il corso nel browser, dalla traccia alla consegna |
+| `task rete` | Quali domini passano dalla rete dell'aula, e cosa fare se no |
+| `task offline-prep` | **La sera prima, a casa**: scarica tutto quello che servirà all'esame |
+| `task offline` | Dice se il progetto partirebbe anche senza rete |
 | `task check` | Moduli, porte, Docker e liste sono coerenti? |
 | `task test` | Collauda gli strumenti su una copia usa-e-getta |
 | `task help` | Questa guida, dal terminale |

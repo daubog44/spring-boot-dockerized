@@ -581,6 +581,28 @@ Test-Case 'set-package rifiuta un pacchetto non valido' {
     Assert-Fails (Invoke-Tool 'set-package.ps1' @('-Package', 'it.class')) 'ha accettato una parola riservata'
 }
 
+Test-Case 'rete dice quali domini non passano, senza fallire' {
+    $r = Invoke-Tool 'rete.ps1' @('-Url', 'http://127.0.0.1:9/', '-TimeoutSeconds', '3')
+    Assert-Ok $r 'task rete e'' fallito'
+    Assert-Contains $r.Output 'NON risponde' 'non ha visto che l''indirizzo non risponde'
+}
+
+Test-Case 'learn raccoglie lezioni, guide e moduli in contenuti.js' {
+    Assert-Ok (Invoke-Tool 'learn.ps1' @('-NoOpen')) 'task learn e'' fallito'
+    $js = Get-Text 'corso/contenuti.js'
+    $lessons = @(Get-ChildItem (Join-Path $sandbox 'corso/lezioni') -Filter '*.md').Count
+    Assert-That ($lessons -gt 0) 'nessuna lezione in corso/lezioni'
+    Assert-That (([regex]"file: 'corso/lezioni/").Matches($js).Count -eq $lessons) 'non ci sono tutte le lezioni'
+    Assert-Contains $js "file: 'GIORNO-ESAME.md'" 'manca la guida del giorno d''esame'
+    Assert-Contains $js "nome: 'alfa-service'" 'manca un modulo del progetto'
+    # I testi stanno fra apici inversi: dentro, apici inversi e ${ vanno
+    # protetti, altrimenti il JavaScript si rompe e la pagina resta vuota.
+    Assert-Contains $js '\${SERVER_PORT' 'un ${...} non e'' protetto'
+    $protetti = ($js -replace '\\\\', '') -replace '\\`', ''
+    $entries = ([regex]'testo: `').Matches($js).Count
+    Assert-That (([regex]'`').Matches($protetti).Count -eq 2 * $entries) 'un apice inverso non protetto rompe il JavaScript'
+}
+
 Test-Case 'consegna prepara un archivio che parte appena scompattato' {
     Assert-Ok (Invoke-Tool 'consegna.ps1' @('-Nome', 'ROSSI_MARIO')) 'consegna e'' fallita'
     $zip = Join-Path $sandbox 'consegna/ROSSI_MARIO.zip'
@@ -615,6 +637,31 @@ Test-Case 'consegna prepara un archivio che parte appena scompattato' {
     } finally {
         Remove-Item -Recurse -Force $dest -ErrorAction SilentlyContinue
     }
+}
+
+Test-Case 'consegna mette nell''archivio il testo scritto in allegato.md' {
+    # Prima la consegna faceva l'archivio e poi diceva di riempire l'allegato:
+    # l'archivio restava coi segnaposto, e una consegna rifatta cancellava il testo.
+    $allegato = Join-Path $sandbox 'allegato.md'
+    Assert-That (Test-Path $allegato) 'la prima consegna non ha creato allegato.md'
+    Assert-Contains (Read-TextFile $allegato) '## alfa-service' 'allegato.md non ha la sezione dei moduli'
+    Write-TextFile -Path $allegato -Text "# Le mie parti`n`n## Analisi`n`nLa biblioteca di prova presta libri.`n`n## Algoritmo`n`nLa penale di prova.`n"
+    $r = Invoke-Tool 'consegna.ps1' @('-Nome', 'ROSSI_MARIO')
+    Assert-Ok $r 'la seconda consegna e'' fallita'
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $sandbox 'consegna/ROSSI_MARIO.zip'))
+    try {
+        $reader = New-Object System.IO.StreamReader($archive.GetEntry('ALLEGATO-TECNICO.md').Open())
+        $testo = $reader.ReadToEnd()
+        $reader.Close()
+    } finally { $archive.Dispose() }
+    Assert-Contains $testo 'La biblioteca di prova presta libri.' 'l''analisi di allegato.md non e'' nell''archivio'
+    Assert-Contains $testo 'La penale di prova.' 'l''algoritmo di allegato.md non e'' nell''archivio'
+    Assert-NotContains $testo '[Due o tre paragrafi' 'e'' rimasto il segnaposto dell''analisi'
+    Assert-Contains $r.Output 'mancano ancora' 'non dice che mancano le descrizioni dei moduli'
+    $dopo = Read-TextFile $allegato
+    Assert-Contains $dopo '## alfa-service' 'non ha aggiunto ad allegato.md la sezione del modulo'
+    Assert-Contains $dopo 'La biblioteca di prova presta libri.' 'ha perso il testo di allegato.md'
 }
 
 # Questa cambia il nome della cartella dei moduli: va per ultima.

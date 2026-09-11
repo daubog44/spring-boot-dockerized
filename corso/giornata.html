@@ -1,0 +1,723 @@
+<title>Quaderno d'esame</title>
+<meta name="description" content="Il template spring-boot-dockerized imparato seguendo la giornata della prova finale, dalla sera prima alla consegna.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Caveat:wght@600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --paper: #EEF3F6;
+  --grid: #DCE6ED;
+  --ink: #1A2836;
+  --pen: #1E3FA8;
+  --red: #C0282D;
+  --pencil: #56636F;
+  --rule: #C7D5DF;
+  --surface: #F8FAFC;
+  --ok: #2E7D3A;
+  --slate: #17222C;
+  --slate-line: #22303C;
+  --slate-ink: #E2EAF1;
+  --slate-dim: #8FA2B4;
+  --slate-accent: #8DB5FF;
+  --chalk-yellow: #F2D27A;
+  --display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --hand: "Caveat", "Segoe Print", "Comic Sans MS", cursive;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0E151C;
+    --grid: #16212B;
+    --ink: #DCE5ED;
+    --pen: #9DB9FF;
+    --red: #FF8078;
+    --pencil: #97A7B5;
+    --rule: #26343F;
+    --surface: #131D26;
+    --ok: #72CC80;
+    --slate: #0A1117;
+    --slate-line: #1A2631;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0E151C;
+  --grid: #16212B;
+  --ink: #DCE5ED;
+  --pen: #9DB9FF;
+  --red: #FF8078;
+  --pencil: #97A7B5;
+  --rule: #26343F;
+  --surface: #131D26;
+  --ok: #72CC80;
+  --slate: #0A1117;
+  --slate-line: #1A2631;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0;
+  background-color: var(--paper);
+  /* quadretti da 5 mm */
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 19px 19px;
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 var(--body);
+}
+a { color: var(--pen); }
+:focus-visible { outline: 2px solid var(--pen); outline-offset: 2px; border-radius: 2px; }
+code, kbd { font-family: var(--mono); font-size: .9em; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+
+.wrap { max-width: 76rem; margin: 0 auto; padding: 0 1.25rem; }
+
+/* --- Testata --------------------------------------------------------------- */
+header.top { padding: 2.5rem 0 1.5rem; }
+.top-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 2.5rem; align-items: start; }
+.eyebrow { font: 600 .78rem/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--pencil); }
+h1 { font-weight: 800; font-size: clamp(2.6rem, 5.5vw, 4.4rem); line-height: .95; letter-spacing: -.02em; color: var(--pen); margin: .6rem 0 1rem; }
+.lede { font-size: 1.15rem; max-width: 34rem; margin: 0 0 1.25rem; }
+.how { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; max-width: 34rem; color: var(--pencil); }
+.how li { display: grid; grid-template-columns: 1.4rem 1fr; gap: .4rem; }
+.how b { color: var(--ink); }
+.how span.k { font-family: var(--mono); color: var(--pen); }
+
+/* --- La lavagna (lezione guidata) ----------------------------------------- */
+.player { display: grid; gap: .75rem; }
+.stage {
+  container-type: inline-size;
+  aspect-ratio: 16 / 9;
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  color: var(--slate-ink);
+  background-color: var(--slate);
+  background-image:
+    linear-gradient(var(--slate-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--slate-line) 1px, transparent 1px);
+  background-size: 3.2cqw 3.2cqw;
+  box-shadow: 0 1px 0 var(--rule), 0 18px 40px -24px rgba(10, 20, 30, .55);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 4.2cqw 5.2cqw 3.4cqw;
+}
+.stage .s-when { font: 600 1.55cqw/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--slate-accent); display: flex; gap: 2cqw; }
+.stage .s-when .s-dur { color: var(--slate-dim); }
+.stage h2 { font-weight: 800; font-size: 4.7cqw; line-height: 1.02; letter-spacing: -.01em; margin-top: 1.4cqw; max-width: 80cqw; }
+.stage .s-body { align-self: center; }
+.stage .s-goal { font-size: 2.75cqw; line-height: 1.38; max-width: 74cqw; margin: 0; color: var(--slate-ink); }
+.stage .s-goal em { font-style: normal; color: var(--chalk-yellow); }
+.stage .s-cmds { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.25cqw; }
+.stage .s-cmds li { display: grid; grid-template-columns: 38cqw 1fr; gap: 2.4cqw; align-items: baseline; }
+.stage .s-cmds code { font-size: 2.1cqw; line-height: 1.3; color: var(--slate-ink); overflow-wrap: anywhere; }
+.stage .s-cmds code::before { content: "$ "; color: var(--slate-dim); }
+.stage .s-cmds span { font-size: 1.85cqw; line-height: 1.35; color: var(--slate-dim); }
+.stage .s-cmds li.plain { grid-template-columns: 1fr; }
+.stage .s-cmds li.plain span { font-size: 2.1cqw; color: var(--slate-ink); }
+.stage .s-cmds li.plain span::before { content: "— "; color: var(--slate-accent); }
+.stage .s-foot { display: grid; grid-template-columns: 1fr auto; gap: 3cqw; align-items: end; border-top: 1px solid var(--slate-line); padding-top: 1.6cqw; min-height: 7.2cqw; }
+.stage .s-caption { font-size: 1.75cqw; line-height: 1.4; color: var(--slate-dim); margin: 0; }
+.stage .s-dots { display: flex; gap: .8cqw; }
+.stage .s-dots i { width: 1.1cqw; height: 1.1cqw; border-radius: 50%; border: 1px solid var(--slate-dim); }
+.stage .s-dots i.on { background: var(--slate-accent); border-color: var(--slate-accent); }
+.stage .s-brand { position: absolute; right: 5.2cqw; top: 4.2cqw; font: 600 1.4cqw/1 var(--mono); color: var(--slate-dim); }
+
+.controls { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+button { font: inherit; cursor: pointer; }
+.btn { border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 4px; padding: .45rem .8rem; font-size: .95rem; display: inline-flex; gap: .45rem; align-items: center; }
+.btn:hover { border-color: var(--pen); color: var(--pen); }
+.btn.primary { background: var(--pen); border-color: var(--pen); color: var(--paper); font-weight: 700; }
+.btn.primary:hover { color: var(--paper); filter: brightness(1.08); }
+.btn svg { width: 1em; height: 1em; fill: currentColor; }
+.voice-note { font-size: .85rem; color: var(--pencil); }
+.video-slot { display: grid; gap: .4rem; }
+.video-slot video { width: 100%; border-radius: 6px; background: var(--slate); }
+.video-slot p { margin: 0; font-size: .85rem; color: var(--pencil); }
+
+/* --- Orario (navigazione) --------------------------------------------------- */
+nav.orario {
+  position: sticky; top: 0; z-index: 5;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+}
+.orario-in { display: flex; align-items: center; gap: 1rem; }
+.orario ol { list-style: none; margin: 0; padding: .55rem 0; display: flex; gap: .35rem; overflow-x: auto; scrollbar-width: thin; flex: 1; }
+.orario a { display: grid; gap: .1rem; text-decoration: none; padding: .3rem .6rem; border-radius: 4px; color: var(--pencil); white-space: nowrap; border: 1px solid transparent; }
+.orario a b { font: 600 .72rem/1 var(--mono); letter-spacing: .06em; color: var(--pen); }
+.orario a span { font-size: .85rem; line-height: 1.2; }
+.orario a:hover { border-color: var(--rule); color: var(--ink); }
+.orario a.done span { text-decoration: line-through; text-decoration-color: var(--ok); text-decoration-thickness: 2px; }
+.progress { font: 600 .8rem/1.2 var(--mono); color: var(--pencil); white-space: nowrap; text-align: right; }
+.progress strong { color: var(--ok); font-size: 1rem; }
+
+/* --- Le lezioni: quaderno con il margine rosso -------------------------------- */
+main { padding: 2rem 0 4rem; }
+.lesson {
+  display: grid;
+  grid-template-columns: 7.5rem 2px minmax(0, 42rem) minmax(0, 15rem);
+  column-gap: 1.6rem;
+  padding: 2.4rem 0;
+  scroll-margin-top: 4.5rem;
+}
+.lesson + .lesson { border-top: 1px dashed var(--rule); }
+.when { text-align: right; padding-top: .45rem; }
+.when b { display: block; font: 600 1.15rem/1.1 var(--mono); color: var(--pen); font-variant-numeric: tabular-nums; }
+.when span { display: block; font: 400 .78rem/1.3 var(--mono); color: var(--pencil); margin-top: .35rem; }
+.margin { background: var(--red); opacity: .55; }
+.content { display: grid; gap: 1.1rem; align-content: start; min-width: 0; }
+.content h2 { font-size: clamp(1.6rem, 2.6vw, 2.1rem); font-weight: 800; line-height: 1.1; color: var(--ink); }
+.goal { margin: 0; font-size: 1.12rem; color: var(--ink); max-width: 38rem; }
+.label { font: 600 .74rem/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--pencil); margin: .4rem 0 -.3rem; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; counter-reset: passo; }
+.steps li { display: grid; gap: .4rem; }
+.steps li p { margin: 0; }
+.steps.seq li { grid-template-columns: 1.6rem minmax(0, 1fr); column-gap: .6rem; counter-increment: passo; }
+.steps.seq li::before { content: counter(passo); font: 600 .85rem/1.9 var(--mono); color: var(--pen); text-align: right; grid-row: span 2; }
+.steps.seq li > * { grid-column: 2; }
+
+.cmd { display: flex; align-items: stretch; background: var(--slate); color: var(--slate-ink); border-radius: 4px; overflow: hidden; }
+.cmd code { flex: 1; padding: .55rem .8rem; overflow-x: auto; white-space: pre; font-size: .92rem; }
+.cmd code::before { content: "$ "; color: var(--slate-dim); }
+.cmd button { border: 0; border-left: 1px solid var(--slate-line); background: transparent; color: var(--slate-dim); padding: 0 .8rem; font: 600 .72rem/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.cmd button:hover, .cmd button.copied { color: var(--slate-accent); }
+
+pre.out {
+  margin: 0; padding: .8rem 1rem; overflow-x: auto;
+  background: var(--surface); border: 1px solid var(--rule); border-left: 3px solid var(--ok);
+  border-radius: 0 4px 4px 0;
+  font: 400 .84rem/1.55 var(--mono); color: var(--ink);
+}
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+th, td { text-align: left; padding: .5rem .7rem .5rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 600 .74rem/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--pencil); }
+td code { color: var(--pen); white-space: nowrap; }
+
+.exercise { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: .9rem 1rem; background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; }
+.exercise p { margin: 0; }
+.exercise p b { font: 600 .74rem/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--pen); display: block; margin-bottom: .35rem; }
+.tick { display: inline-flex; align-items: center; gap: .5rem; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); border-radius: 4px; padding: .45rem .75rem; font-size: .92rem; white-space: nowrap; }
+.tick .box { width: 1.1rem; height: 1.1rem; border: 2px solid var(--pencil); border-radius: 2px; display: grid; place-items: center; }
+.tick .box svg { width: .8rem; height: .8rem; fill: none; stroke: var(--ok); stroke-width: 3; opacity: 0; }
+.tick[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); }
+.tick[aria-pressed="true"] .box { border-color: var(--ok); }
+.tick[aria-pressed="true"] .box svg { opacity: 1; }
+.listen { justify-self: start; }
+
+/* La penna rossa del docente, a margine */
+.note { padding-top: 3.2rem; }
+.note p {
+  margin: 0; font: 600 1.35rem/1.15 var(--hand); color: var(--red);
+  transform: rotate(-1.5deg); transform-origin: top left;
+  border-left: 2px solid var(--red); padding-left: .7rem;
+}
+
+footer { border-top: 1px solid var(--rule); padding: 1.5rem 0 3rem; color: var(--pencil); font-size: .9rem; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: .5rem 2rem; justify-content: space-between; }
+
+@media (max-width: 1100px) {
+  .top-grid { grid-template-columns: 1fr; }
+  .lesson { grid-template-columns: 6rem 2px minmax(0, 1fr); }
+  .note { grid-column: 3; padding-top: .3rem; }
+}
+@media (max-width: 680px) {
+  .lesson { grid-template-columns: 2px minmax(0, 1fr); column-gap: 1rem; }
+  .when { grid-column: 1 / -1; text-align: left; display: flex; gap: .8rem; align-items: baseline; padding: 0 0 .6rem; }
+  .when span { margin: 0; }
+  .note { grid-column: 2; }
+  .exercise { grid-template-columns: 1fr; }
+  .stage .s-cmds li { grid-template-columns: 1fr; gap: .4cqw; }
+}
+
+/* --- Modalita' video: solo la lavagna, 1280x720, per registrare il corso -- */
+html.video, html.video body { background: #000; margin: 0; overflow: hidden; }
+html.video body > :not(#stage-host) { display: none !important; }
+html.video #stage-host { position: fixed; inset: 0; width: 1280px; height: 720px; }
+html.video .stage { width: 1280px; height: 720px; border-radius: 0; box-shadow: none; aspect-ratio: auto; }
+</style>
+
+<header class="top">
+  <div class="wrap top-grid">
+    <div>
+      <div class="eyebrow">spring-boot-dockerized · prova finale</div>
+      <h1>Quaderno d'esame</h1>
+      <p class="lede">Il template imparato seguendo la giornata della prova, dalla sera prima alla consegna: cosa lanciare, in che ordine, e cosa devi vedere quando va tutto bene.</p>
+      <ul class="how">
+        <li><span class="k">▶</span><span><b>Ascolta</b> la lavagna: una voce legge le lezioni in ordine, i comandi scorrono sotto.</span></li>
+        <li><span class="k">$</span><span><b>Prova</b> ogni comando nel terminale, nella cartella del progetto. Il tasto <i>copia</i> lo porta negli appunti.</span></li>
+        <li><span class="k">✓</span><span><b>Segna</b> l'esercizio di ogni fase: il quaderno si ricorda dove sei arrivato, su questo browser.</span></li>
+      </ul>
+    </div>
+    <div class="player">
+      <div id="stage-host"></div>
+      <div class="controls">
+        <button class="btn primary" id="play"><svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg><span>Ascolta il corso</span></button>
+        <button class="btn" id="prev" aria-label="Scena precedente"><svg viewBox="0 0 16 16"><path d="M11 2.5v11L3 8z"/></svg></button>
+        <button class="btn" id="next" aria-label="Scena successiva"><svg viewBox="0 0 16 16"><path d="M5 2.5v11L13 8z"/></svg></button>
+        <span class="voice-note" id="voice-note"></span>
+      </div>
+      <div class="video-slot" id="video-slot" hidden></div>
+    </div>
+  </div>
+</header>
+
+<nav class="orario" aria-label="Orario della giornata">
+  <div class="wrap orario-in">
+    <ol id="orario"></ol>
+    <div class="progress" id="progress"></div>
+  </div>
+</nav>
+
+<main class="wrap" id="lessons"></main>
+
+<footer>
+  <div class="wrap">
+    <span>Il testo di ogni comando viene da <code>GIORNO-ESAME.md</code> e da <code>task help</code>: se il template cambia, cambia anche qui.</span>
+    <span>Orari indicativi, su una mattina di cinque ore.</span>
+  </div>
+</footer>
+
+<script id="lezioni" type="application/json">
+[
+  {
+    "id": "sera-prima",
+    "ora": "la sera", "durata": "15 min, con la rete",
+    "titolo": "La sera prima: l'esame senza rete",
+    "obiettivo": "Mettere sul disco tutto quello che Maven e Docker andrebbero a scaricare: domani, in laboratorio, internet potrebbe non esserci.",
+    "passi": [
+      {"cmd": "task offline-prep", "testo": "Scarica dipendenze e immagini, e compila in un progetto di prova un servizio con database e un'interfaccia: così anche JPA, H2, PostgreSQL, Feign, Swagger e Thymeleaf sono già in casa."},
+      {"cmd": "task offline", "testo": "La prova vera: compila con Maven a rete staccata, il progetto e un modulo nuovo."},
+      {"testo": "Copia su una chiavetta la cartella del progetto, .git compreso, e la cartella ~/.m2/repository."}
+    ],
+    "output": "  build offline (mvnw -o)   RIESCE\n  modulo nuovo offline      RIESCE (new-service, seed-data, db-schema)\n\nTutto pronto: il progetto parte anche a rete staccata.",
+    "nota": "Apri un file .java nell'editor stasera: Zed scarica jdtls e Lombok al primo file.",
+    "esercizio": "Stacca il Wi-Fi e rilancia task offline: deve dire ancora Tutto pronto.",
+    "scene": [
+      {"mostra": "intro", "dice": "La sera prima dell'esame c'è una cosa sola da fare, e va fatta con internet. Maven e Docker, lasciati a se stessi, scaricano: dipendenze, immagini di base, librerie. Domani in laboratorio la rete potrebbe non esserci."},
+      {"mostra": "passi", "dice": "Lancia task offline-prep: scarica tutto, compresi i pezzi dei microservizi che creerai all'esame. Poi task offline fa la prova vera, e compila con Maven a rete staccata: deve dire tutto pronto. Infine copia su una chiavetta la cartella del progetto e la cache di Maven."}
+    ]
+  },
+  {
+    "id": "appena-seduto",
+    "ora": "08:30", "durata": "10 min",
+    "titolo": "Appena ti siedi",
+    "obiettivo": "Scaldare tutto prima di averne bisogno: se qualcosa non va, lo scopri adesso e non a mezzogiorno.",
+    "passi": [
+      {"cmd": "git clone https://github.com/daubog44/spring-boot-dockerized.git", "testo": "Con la rete. Senza, copia dalla chiavetta la cartella del progetto e .m2 nella tua home."},
+      {"cmd": "task offline", "testo": "Solo se sei senza rete: deve dire Tutto pronto."},
+      {"cmd": "task dev", "testo": "Un giro a vuoto: compila e avvia lo stack in background."},
+      {"cmd": "task dev-down", "testo": "E lo ferma."},
+      {"cmd": "task test", "testo": "Collauda gli strumenti del template su una copia usa-e-getta del progetto."}
+    ],
+    "output": "  OK    il progetto di partenza e' coerente (task check)\n  OK    new-service crea il modulo e lo collega ovunque\n  ...\n  OK    seed-data riempie ogni tabella passando da Hibernate (Maven + H2)\n  OK    db-schema legge tabelle, chiavi e vincoli dal database\n  ...\n48 prove superate, nessun fallimento.",
+    "nota": "Le porte le libera task dev da solo: non devi controllare niente prima.",
+    "esercizio": "Lancia task help e trova il comando che dice chi occupa ogni porta.",
+    "scene": [
+      {"mostra": "intro", "dice": "Appena ti siedi, prima ancora di rileggere la traccia, fai un giro a vuoto. Clona il progetto, oppure copialo dalla chiavetta, ed entra nella cartella."},
+      {"mostra": "passi", "dice": "task dev avvia tutto in background, task dev-down lo ferma. Poi task test collauda gli strumenti del template su una copia usa e getta: se passa, new-service, seed-data e gli altri comandi funzionano su questa macchina, e non dovrai scoprirlo quando ti servono."}
+    ]
+  },
+  {
+    "id": "wizard",
+    "ora": "08:40", "durata": "15 min",
+    "titolo": "Il wizard monta il progetto della traccia",
+    "obiettivo": "Passare dalla traccia letta a un progetto con tutti i microservizi, già collegati a Eureka e al database, rispondendo a qualche domanda.",
+    "passi": [
+      {"cmd": "task wizard", "testo": "Prima allinea Java al JDK di questo PC (task set-java), senza chiederti niente. Poi fa le domande, nell'ordine:"},
+      {"testo": "la cartella dei moduli Maven — di default demo, oppure il nome del progetto;"},
+      {"testo": "il pacchetto Java di base — di default esame, oppure it.cognome se lo vuole il docente;"},
+      {"testo": "se usi PostgreSQL, e con quale database, utente, password e porta;"},
+      {"testo": "i microservizi uno per uno: nome, tipo (REST con database, REST senza, interfaccia Thymeleaf) e porta."},
+      {"cmd": "task wizard SERVICE=spedizioni-service", "testo": "Un servizio in più a metà giornata: stesse domande, per quello solo."}
+    ],
+    "output": "demo/                        (esempio: una traccia con ordini)\n├── naming-server/           Eureka, porta 8761\n├── common-dto/              le classi condivise, e i dati di prova\n├── ordini-service/          REST con database, porta 8081\n└── ordini-ui/               interfaccia Thymeleaf, porta 8082",
+    "nota": "Il docente vuole it.cognome? Si decide qui, alla seconda domanda.",
+    "esercizio": "Monta un progetto con un servizio REST con database e un'interfaccia, poi lancia task check.",
+    "scene": [
+      {"mostra": "intro", "dice": "Letta la traccia, sai quanti microservizi ti servono e che cosa fa ognuno. task wizard li mette in piedi tutti, facendoti le domande giuste. Per prima cosa allinea Java al JDK della macchina, senza chiederti niente."},
+      {"mostra": "passi", "dice": "Poi chiede il nome della cartella, il pacchetto Java, se usi PostgreSQL e con quali credenziali, e infine i microservizi uno per uno. Alla fine lancia task check da solo. Se a metà giornata ti serve un servizio in più: task wizard, con SERVICE uguale al suo nome."}
+    ]
+  },
+  {
+    "id": "dominio",
+    "ora": "09:00", "durata": "45 min",
+    "titolo": "Il dominio: entity, dati di prova, schema",
+    "obiettivo": "Scrivere le classi @Entity della traccia e avere subito le tabelle piene di dati plausibili, e lo schema pronto per l'allegato tecnico.",
+    "passi": [
+      {"testo": "Scrivi le classi @Entity nel servizio: JPA e H2 sono già collegati, Hibernate crea le tabelle all'avvio."},
+      {"cmd": "task seed-data", "testo": "Da ora, a ogni avvio, le tabelle vuote si riempiono da sole, passando da Hibernate: id, relazioni, enum, @Size, @Email, @Pattern rispettati. Anche su PostgreSQL e in Docker."},
+      {"cmd": "task seed-data SERVICE=ordini-service ROWS=10", "testo": "Un servizio solo, dieci righe per tabella. ROWS=0 li spegne."},
+      {"cmd": "task db-schema", "testo": "Lo schema concettuale e logico, letto dal database dopo che Hibernate l'ha creato, con il diagramma ER."}
+    ],
+    "output": "==> Prova su un database H2 usa-e-getta\n  compilo con Maven...\n\n  ordini-service\n    ClienteEntity: 5 righe nuove\n    OrdineEntity: 5 righe nuove\n    RigaOrdineEntity: 5 righe nuove\n    dati di prova: 3 entity riempite\n\nDati di prova pronti.",
+    "nota": "Servono i dati precisi della traccia? Un data.sql tuo vale ancora: quelle tabelle non le tocca.",
+    "esercizio": "Aggiungi a un'entity un campo targa con @Pattern(regexp = \"[A-Z]{2}[0-9]{3}[A-Z]{2}\") e rilancia task seed-data: guarda le targhe inventate.",
+    "scene": [
+      {"mostra": "intro", "dice": "Adesso il cuore della traccia: il dominio. Scrivi le classi entity nel servizio: JPA e il database H2 sono già collegati, e Hibernate crea le tabelle all'avvio."},
+      {"mostra": "passi", "dice": "Poi task seed-data. Da quel momento, a ogni avvio, le tabelle vuote si riempiono da sole con dati plausibili, salvati passando da Hibernate: id, relazioni, enum e validazioni sono rispettati. Il comando prova subito su un database usa e getta e ti dice tabella per tabella com'è andata. task db-schema invece legge lo schema dal database e te lo scrive pronto per l'allegato, con il diagramma."}
+    ]
+  },
+  {
+    "id": "ciclo",
+    "ora": "09:45", "durata": "tutta la mattina",
+    "titolo": "Il ciclo di sviluppo",
+    "obiettivo": "Scrivere codice e vederlo girare in cinque secondi, senza rilanciare niente a mano.",
+    "passi": [
+      {"cmd": "task dev", "testo": "Compila, avvia i servizi in background e ti restituisce il prompt."},
+      {"cmd": "task logs", "testo": "In un secondo terminale: ogni riga col nome del servizio. Ctrl+C chiude solo la vista."},
+      {"cmd": "task compile", "testo": "Dopo ogni modifica: il servizio riparte da solo in circa cinque secondi."},
+      {"cmd": "task status", "testo": "Quando qualcosa non risponde, prima di ogni ipotesi: chi c'è su ogni porta, chi è registrato su Eureka."}
+    ],
+    "tabella": {
+      "titolo": "Quando cambi la struttura",
+      "righe": [
+        ["una dipendenza", "task add-dep SERVICE=ordini-service DEPS=security,mail"],
+        ["una porta", "task set-port SERVICE=ordini-service PORT=9080"],
+        ["un servizio in più", "task new-service NAME=spedizioni-service"],
+        ["da H2 a PostgreSQL", "task use-postgres SERVICE=ordini-service"]
+      ]
+    },
+    "nota": "Non rilanciare task dev a ogni modifica: serve solo per yml, porte, dipendenze, moduli nuovi.",
+    "esercizio": "Cambia la risposta di /api/ping in un servizio, lancia task compile e ricarica la pagina.",
+    "scene": [
+      {"mostra": "intro", "dice": "Il ciclo che ripeterai tutto il giorno è corto. task dev compila e avvia i servizi in background, e ti restituisce il prompt. In un secondo terminale, task logs ti mostra cosa succede."},
+      {"mostra": "passi", "dice": "Scrivi il codice, lancia task compile, e il servizio riparte da solo in circa cinque secondi. Non rilanciare task dev a ogni modifica: serve solo quando cambi configurazione, porte, dipendenze o moduli. E quando qualcosa non risponde, prima di formulare ipotesi: task status."}
+    ]
+  },
+  {
+    "id": "collaudo",
+    "ora": "12:00", "durata": "20 min",
+    "titolo": "Il collaudo, prima di chiamare la commissione",
+    "obiettivo": "Sapere che funziona il flusso che mostrerai, non solo che i servizi sono accesi.",
+    "passi": [
+      {"cmd": "task check", "testo": "Il progetto è coerente: moduli, porte, Docker, lista dei servizi."},
+      {"cmd": "task status", "testo": "Tutti i servizi devono comparire nel registro di Eureka."},
+      {"testo": "Un endpoint per servizio da Swagger UI, su http://localhost:<porta>/swagger-ui.html: mostra lo schema esatto delle richieste."},
+      {"testo": "Il flusso completo dalla tua interfaccia, come lo mostrerai alla commissione."}
+    ],
+    "nota": "L'unico collaudo che conta davvero è il flusso dalla UI.",
+    "esercizio": "Da Swagger crea una riga con una POST, poi ritrovala nella tua interfaccia.",
+    "scene": [
+      {"mostra": "intro", "dice": "Prima di chiamare la commissione, collauda: devi sapere che funziona il flusso che mostrerai, non solo che i servizi sono accesi."},
+      {"mostra": "passi", "dice": "task check dice se il progetto è coerente. task status deve elencare tutti i servizi nel registro di Eureka. Prova un endpoint per servizio da Swagger, poi percorri il flusso completo dalla tua interfaccia, esattamente come lo mostrerai: è l'unico collaudo che conta davvero."}
+    ]
+  },
+  {
+    "id": "demo",
+    "ora": "12:30", "durata": "15 min",
+    "titolo": "La demo",
+    "obiettivo": "Mostrare lo stack completo in container: l'applicazione, il discovery, i contratti, e la resilienza se te la chiedono.",
+    "passi": [
+      {"cmd": "task docker-up", "testo": "Non fermare niente prima: spegne da solo lo stack locale e accende quello in Docker."},
+      {"testo": "Apri la tua interfaccia, poi http://localhost:8761 (la dashboard di Eureka), poi lo Swagger di un servizio."},
+      {"cmd": "docker stop exam-ordini-service", "testo": "La resilienza: spegni un servizio davanti a loro, ricarica, e l'interfaccia resta in piedi con i segnaposto."},
+      {"cmd": "task docker-down", "testo": "Alla fine. I dati del database restano."}
+    ],
+    "nota": "Aspetta che task status mostri i servizi registrati prima di aprire la UI.",
+    "esercizio": "Fai la demo intera a voce alta, cronometro alla mano: sotto i dieci minuti.",
+    "scene": [
+      {"mostra": "intro", "dice": "Per la demo, tutto in container: task docker-up. Spegne da solo lo stack locale e accende quello in Docker. Aspetta che task status mostri i servizi registrati."},
+      {"mostra": "passi", "dice": "Poi apri la tua interfaccia, la dashboard di Eureka sulla porta 8761 per far vedere il discovery, e lo Swagger di un servizio. Se ti chiedono della resilienza, spegni un servizio con docker stop davanti a loro e ricarica: l'interfaccia resta in piedi."}
+    ]
+  },
+  {
+    "id": "consegna",
+    "ora": "13:00", "durata": "20 min",
+    "titolo": "La consegna",
+    "obiettivo": "Un archivio che chi corregge scompatta e fa partire con un comando, con l'allegato tecnico già compilato.",
+    "passi": [
+      {"cmd": "task consegna NOME=ROSSI_MARIO", "testo": "Prepara lo zip: sorgenti senza target/, compose, Dockerfile, allegato tecnico con moduli, porte, endpoint e schema del database."},
+      {"testo": "In ALLEGATO-TECNICO.md riempi le parti fra parentesi quadre: analisi, algoritmo, descrizione dei moduli."},
+      {"cmd": "docker compose up -d --build", "testo": "La prova di chi corregge: scompatta lo zip in una cartella nuova e lancialo da lì."}
+    ],
+    "output": "consegna/\n├── ROSSI_MARIO.zip             è quello da consegnare\n├── <modulo>/                   i sorgenti, senza target/\n├── docker-compose.yml, Dockerfile, pom.xml, mvnw\n├── ALLEGATO-TECNICO.md         moduli, porte, endpoint, schema\n├── SCHEMA-DATABASE.md          letto dal database che crea Hibernate\n└── ISTRUZIONI-ESECUZIONE.md",
+    "nota": "Dentro lo zip non ci sono altri zip: si scompatta e parte.",
+    "esercizio": "Scompatta ROSSI_MARIO.zip con Estrai tutto in una cartella nuova e avvialo: deve partire senza toccare niente.",
+    "scene": [
+      {"mostra": "intro", "dice": "Ultimo passo: task consegna, con il tuo nome. Prepara lo zip da consegnare: i sorgenti di ogni modulo senza le cartelle target, il compose, il Dockerfile, e l'allegato tecnico già compilato con moduli, porte, endpoint e schema del database."},
+      {"mostra": "passi", "dice": "Tu devi solo riempire le parti fra parentesi quadre: analisi, algoritmo, descrizione dei moduli. Poi fai la stessa prova di chi corregge: scompatta lo zip in una cartella nuova e lancia docker compose up. Deve partire senza toccare niente."}
+    ]
+  },
+  {
+    "id": "se-va-storto",
+    "ora": "sempre", "durata": "30 secondi",
+    "titolo": "Se qualcosa va storto",
+    "obiettivo": "Guardare prima di ipotizzare: ogni sintomo ha il suo comando.",
+    "tabella": {
+      "titolo": "Sintomo e comando",
+      "righe": [
+        ["un servizio non risponde", "task status"],
+        ["vuoi vedere il suo errore", "task logs SERVICE=ordini"],
+        ["dopo una modifica non torna niente", "task check"],
+        ["una tabella resta vuota", "task seed-data"],
+        ["sei senza rete", "task offline"]
+      ]
+    },
+    "nota": "task kill-java chiude TUTTI i java, anche l'editor: davvero l'ultima spiaggia.",
+    "esercizio": "Spegni a mano un servizio avviato con task dev e ritrovalo come assente in task status.",
+    "scene": [
+      {"mostra": "passi", "dice": "Se qualcosa va storto, niente panico e niente ipotesi. task status dice chi c'è su ogni porta e cosa è registrato su Eureka; task logs, con il nome del servizio, mostra l'errore; task check dice se il progetto è ancora coerente dopo una modifica. E ricorda: kill java chiude anche il tuo editor. Buon esame."}
+    ]
+  }
+]
+</script>
+
+<script>
+(function () {
+  const LEZIONI = JSON.parse(document.getElementById('lezioni').textContent);
+  const STORE = 'quaderno-esame-fatte';
+
+  // La voce italiana legge male le parole inglesi dei comandi: solo per
+  // l'audio, le scriviamo come si pronunciano. Lo stesso elenco lo usa lo
+  // script che genera il video.
+  const PRONUNCIA = [
+    ["offline-prep", "offlàin prep"], ["offline", "offlàin"], ["seed-data", "sìd data"], ["db-schema", "di bi schema"],
+    ["dev-down", "dev dàun"], ["docker-up", "dòcher ap"], ["docker stop", "dòcher stop"], ["docker compose up", "dòcher compòus ap"],
+    ["Docker", "dòcher"], ["new-service", "niu sèrvis"], ["task check", "task cèk"], ["task compile", "task compàil"],
+    ["task status", "task stàtus"], ["task logs", "task logs"], ["task test", "task test"], ["task wizard", "task uìzard"],
+    ["task dev", "task dev"], ["SERVICE", "sèrvis"], ["Swagger", "suàgger"], ["Eureka", "eurèka"], ["Hibernate", "àibernet"],
+    ["entity", "èntiti"], ["JDK", "i di cappa"], ["Maven", "mèiven"], ["H2", "acca due"], ["PostgreSQL", "pòstgres"],
+    ["kill java", "kill giava"], ["Java", "giava"], ["task", "task"], ["zip", "zip"]
+  ];
+  function speakable(text) {
+    let t = text;
+    for (const [from, to] of PRONUNCIA) {
+      t = t.replace(new RegExp('(^|[^\\w-])' + from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])', 'g'), '$1' + to);
+    }
+    return t;
+  }
+  window.QUADERNO = { LEZIONI, PRONUNCIA, speakable };
+
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+  // --- Stato "fatto", per questo browser ------------------------------------
+  let fatte = [];
+  try { fatte = JSON.parse(localStorage.getItem(STORE) || '[]'); } catch (e) { fatte = []; }
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(fatte)); } catch (e) { /* niente */ } };
+
+  // --- Le scene della lavagna: una sequenza piatta -------------------------
+  const SCENE = [];
+  LEZIONI.forEach((l, li) => l.scene.forEach((s, si) => SCENE.push({ li, si, lezione: l, scena: s })));
+
+  function renderStage(host, index) {
+    const { lezione: l, scena: s, si } = SCENE[index];
+    host.innerHTML = '';
+    const st = el('div', 'stage');
+    st.setAttribute('role', 'img');
+    st.setAttribute('aria-label', l.titolo);
+    const head = el('div');
+    const when = el('div', 's-when');
+    when.append(el('span', null, l.ora), el('span', 's-dur', l.durata));
+    head.append(when, el('h2', null, l.titolo));
+    st.append(head, el('div', 's-brand', 'task help'));
+    const body = el('div', 's-body');
+    if (s.mostra === 'intro') {
+      const g = el('p', 's-goal');
+      g.textContent = l.obiettivo;
+      body.append(g);
+    } else {
+      const ul = el('ul', 's-cmds');
+      const righe = l.passi ? l.passi.filter(p => p.cmd).slice(0, 4).map(p => [p.cmd, p.testo]) : [];
+      const extra = l.tabella ? l.tabella.righe.slice(0, 5 - righe.length).map(r => [r[1], r[0]]) : [];
+      [...righe, ...extra].forEach(([c, t]) => {
+        const li = el('li');
+        li.append(el('code', null, c), el('span', null, shorten(t)));
+        ul.append(li);
+      });
+      if (!ul.children.length) (l.passi || []).slice(0, 4).forEach(p => { const li = el('li', 'plain'); li.append(el('span', null, shorten(p.testo))); ul.append(li); });
+      body.append(ul);
+    }
+    st.append(body);
+    const foot = el('div', 's-foot');
+    foot.append(el('p', 's-caption', s.dice));
+    const dots = el('div', 's-dots');
+    SCENE.forEach((x, i) => { if (x.li === SCENE[index].li) { const d = el('i'); if (i === index) d.className = 'on'; dots.append(d); } });
+    foot.append(dots);
+    st.append(foot);
+    host.append(st);
+  }
+  function shorten(t) {
+    // La prima frase; se finisce con i due punti, la lavagna non la lascia a meta'.
+    const first = t.split(/(?<=[.;])\s/)[0].replace(/:$/, '.');
+    return first.length > 120 ? first.slice(0, first.lastIndexOf(' ', 117)) + '…' : first;
+  }
+
+  // --- Modalita' video: ?video=<scena> -------------------------------------
+  const params = new URLSearchParams(location.search);
+  if (params.has('video')) {
+    document.documentElement.classList.add('video');
+    // La lavagna sta dentro la testata, che in questa modalita' e' nascosta:
+    // la portiamo direttamente sotto body.
+    const stageHost = document.getElementById('stage-host');
+    document.body.appendChild(stageHost);
+    renderStage(stageHost, Math.min(SCENE.length - 1, parseInt(params.get('video'), 10) || 0));
+    document.fonts.ready.then(() => { window.__pronto = true; });
+    return;
+  }
+
+  // --- Le lezioni ---------------------------------------------------------
+  const main = document.getElementById('lessons');
+  const orario = document.getElementById('orario');
+  LEZIONI.forEach((l, li) => {
+    const sec = el('section', 'lesson');
+    sec.id = l.id;
+    const when = el('div', 'when');
+    when.append(el('b', null, l.ora), el('span', null, l.durata));
+    const content = el('div', 'content');
+    content.append(el('h2', null, l.titolo), el('p', 'goal', l.obiettivo));
+
+    const listen = el('button', 'btn listen');
+    listen.innerHTML = '<svg viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z"/></svg><span>Ascolta questa fase</span>';
+    listen.addEventListener('click', () => playFrom(SCENE.findIndex(s => s.li === li), true));
+    content.append(listen);
+
+    if (l.passi) {
+      content.append(el('div', 'label', 'Cosa fare'));
+      const ol = el('ol', 'steps' + (l.passi.filter(p => p.cmd).length > 1 ? ' seq' : ''));
+      l.passi.forEach(p => {
+        const item = el('li');
+        if (p.cmd) item.append(cmdBlock(p.cmd));
+        if (p.testo) item.append(el('p', null, p.testo));
+        ol.append(item);
+      });
+      content.append(ol);
+    }
+    if (l.tabella) {
+      content.append(el('div', 'label', l.tabella.titolo));
+      const wrap = el('div', 'table-wrap');
+      const t = el('table');
+      t.innerHTML = '<thead><tr><th>Cosa</th><th>Comando</th></tr></thead>';
+      const tb = el('tbody');
+      l.tabella.righe.forEach(([a, b]) => { const tr = el('tr'); tr.append(el('td', null, a)); const td = el('td'); td.append(el('code', null, b)); tr.append(td); tb.append(tr); });
+      t.append(tb); wrap.append(t); content.append(wrap);
+    }
+    if (l.output) {
+      content.append(el('div', 'label', 'Cosa devi vedere'));
+      content.append(el('pre', 'out', l.output));
+    }
+    const ex = el('div', 'exercise');
+    const exp = el('p');
+    exp.append(el('b', null, 'Esercizio'), document.createTextNode(l.esercizio));
+    const tick = el('button', 'tick');
+    tick.innerHTML = '<span class="box"><svg viewBox="0 0 12 12"><path d="M2 6.5l2.5 2.5L10 3"/></svg></span><span>Fatto</span>';
+    tick.setAttribute('aria-pressed', fatte.includes(l.id) ? 'true' : 'false');
+    tick.addEventListener('click', () => {
+      const on = !fatte.includes(l.id);
+      fatte = on ? [...fatte, l.id] : fatte.filter(x => x !== l.id);
+      tick.setAttribute('aria-pressed', on ? 'true' : 'false');
+      save(); updateProgress();
+    });
+    ex.append(exp, tick);
+    content.append(ex);
+
+    const note = el('aside', 'note');
+    note.append(el('p', null, l.nota));
+
+    sec.append(when, el('div', 'margin'), content, note);
+    main.append(sec);
+
+    const li2 = el('li');
+    const a = el('a');
+    a.href = '#' + l.id;
+    a.dataset.id = l.id;
+    a.append(el('b', null, l.ora), el('span', null, l.titolo.split(':')[0]));
+    li2.append(a);
+    orario.append(li2);
+  });
+
+  function cmdBlock(text) {
+    const box = el('div', 'cmd');
+    box.append(el('code', null, text));
+    const b = el('button', null, 'copia');
+    b.setAttribute('aria-label', 'Copia: ' + text);
+    b.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(text); b.textContent = 'copiato'; }
+      catch (e) { const r = document.createRange(); r.selectNodeContents(box.firstChild); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = 'ctrl+c'; }
+      b.classList.add('copied');
+      setTimeout(() => { b.textContent = 'copia'; b.classList.remove('copied'); }, 1600);
+    });
+    box.append(b);
+    return box;
+  }
+
+  function updateProgress() {
+    const n = LEZIONI.filter(l => fatte.includes(l.id)).length;
+    document.getElementById('progress').innerHTML = '<strong>' + n + '</strong> / ' + LEZIONI.length + '<br>fasi fatte';
+    orario.querySelectorAll('a').forEach(a => a.classList.toggle('done', fatte.includes(a.dataset.id)));
+  }
+  updateProgress();
+
+  // --- La lavagna parlante --------------------------------------------------
+  const host = document.getElementById('stage-host');
+  const playBtn = document.getElementById('play');
+  const note = document.getElementById('voice-note');
+  let current = 0, playing = false, onlyLesson = null;
+  renderStage(host, 0);
+
+  const synth = window.speechSynthesis;
+  let voice = null;
+  function pickVoice() {
+    if (!synth) return;
+    const vs = synth.getVoices();
+    voice = vs.find(v => /^it(-|_|$)/i.test(v.lang) && /elsa|alice|federica|isabella|google/i.test(v.name)) || vs.find(v => /^it/i.test(v.lang)) || null;
+    note.textContent = !synth ? 'Il browser non ha la sintesi vocale: leggi le didascalie.' : voice ? 'Voce: ' + voice.name : (vs.length ? 'Nessuna voce italiana installata: legge quella predefinita.' : '');
+  }
+  if (synth) { pickVoice(); synth.addEventListener && synth.addEventListener('voiceschanged', pickVoice); }
+  else note.textContent = 'Il browser non ha la sintesi vocale: leggi le didascalie.';
+
+  function setPlaying(on) {
+    playing = on;
+    playBtn.querySelector('span').textContent = on ? 'Pausa' : 'Ascolta il corso';
+    playBtn.querySelector('svg').innerHTML = on ? '<path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/>' : '<path d="M4 2.5v11l9-5.5z"/>';
+  }
+  function speak(index) {
+    current = index;
+    renderStage(host, index);
+    if (!synth) { setPlaying(false); return; }
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(speakable(SCENE[index].scena.dice));
+    u.lang = 'it-IT';
+    if (voice) u.voice = voice;
+    u.rate = 1;
+    u.onend = () => {
+      if (!playing) return;
+      const next = index + 1;
+      if (next >= SCENE.length || (onlyLesson !== null && SCENE[next].li !== onlyLesson)) { setPlaying(false); onlyLesson = null; return; }
+      setTimeout(() => { if (playing) speak(next); }, 450);
+    };
+    synth.speak(u);
+  }
+  function playFrom(index, thisLessonOnly) {
+    onlyLesson = thisLessonOnly ? SCENE[index].li : null;
+    setPlaying(true);
+    speak(index);
+    if (thisLessonOnly) document.querySelector('.player').scrollIntoView({ block: 'center' });
+  }
+  playBtn.addEventListener('click', () => {
+    if (playing) { setPlaying(false); synth && synth.cancel(); }
+    else playFrom(current, false);
+  });
+  const step = d => { const i = Math.max(0, Math.min(SCENE.length - 1, current + d)); if (playing) speak(i); else { current = i; renderStage(host, i); } };
+  document.getElementById('prev').addEventListener('click', () => step(-1));
+  document.getElementById('next').addEventListener('click', () => step(1));
+
+  // Il video registrato dalla macchina, se e' pubblicato accanto alla pagina.
+  const slot = document.getElementById('video-slot');
+  const v = document.createElement('video');
+  v.controls = true; v.preload = 'metadata'; v.src = 'quaderno-esame.mp4';
+  v.addEventListener('loadedmetadata', () => {
+    const min = Math.round(v.duration / 60);
+    slot.append(v, el('p', null, 'Lo stesso corso in video, ' + min + ' minuti: lo ha registrato la macchina, voce sintetica compresa.'));
+    slot.hidden = false;
+  });
+})();
+</script>

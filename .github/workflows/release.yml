@@ -1,4 +1,4 @@
-# Una release a ogni tag v*: tre zip da scaricare dalla pagina di GitHub,
+# Una release a ogni tag v*: quattro zip da scaricare dalla pagina di GitHub,
 # senza .git e senza niente di compilato.
 #
 #   git tag v1.1.0
@@ -7,7 +7,7 @@
 # Il link al template dell'ultima versione non cambia mai:
 #   https://github.com/daubog44/spring-boot-dockerized/releases/latest/download/spring-boot-dockerized.zip
 #
-# Il template viene dal tag; le due soluzioni dalla punta dei loro branch,
+# Il template viene dal tag; le soluzioni dalla punta dei loro branch,
 # cosi' com'e' al momento della release.
 name: release
 
@@ -36,7 +36,7 @@ jobs:
           # Tutta la storia e tutti i branch: servono le due soluzioni.
           fetch-depth: 0
 
-      - name: I tre archivi
+      - name: Gli archivi
         run: |
           set -euo pipefail
           mkdir dist
@@ -48,6 +48,8 @@ jobs:
             -o dist/soluzione-wms.zip origin/solution/wms
           git archive --format=zip --prefix=esempio-tourist-events/ \
             -o dist/esempio-tourist-events.zip origin/example/tourist-events
+          git archive --format=zip --prefix=esempio-biblioteca/ \
+            -o dist/esempio-biblioteca.zip origin/example/biblioteca
           ls -l dist
 
       - name: La release
@@ -56,15 +58,17 @@ jobs:
         run: |
           set -euo pipefail
           cat > notes.md <<'EOF'
-          Tre archivi, pronti da scaricare:
+          Quattro archivi, pronti da scaricare:
 
           | Archivio | Cosa c'è |
           | :--- | :--- |
           | `spring-boot-dockerized.zip` | il **template vuoto**: è da qui che si parte a ogni traccia |
           | `soluzione-wms.zip` | la traccia WMS svolta (branch `solution/wms`) |
           | `esempio-tourist-events.zip` | l'esempio eventi/turismo (branch `example/tourist-events`) |
+          | `esempio-biblioteca.zip` | la traccia Biblioteca svolta, quella del corso (branch `example/biblioteca`) |
 
           Scompatta, apri la cartella nel terminale e lancia `task help`.
+          Il corso, dalla traccia alla consegna, si apre con `task learn`.
           Servono un JDK da 17 in su, Docker e go-task: vedi il README.
           Il wizard (`task wizard`) allinea il progetto al tuo JDK da solo.
 
