@@ -179,19 +179,22 @@ if (-not $NoBuild) {
 if ($usesPostgres) {
     Write-Host ''
     Write-Host '==> Avvio PostgreSQL su Docker...' -ForegroundColor Cyan
-    Push-Location $demoDir
-    try {
-        docker compose up -d postgres
-        if ($LASTEXITCODE -ne 0) {
-            throw 'Avvio di PostgreSQL fallito. Docker Desktop e in esecuzione?'
-        }
-    } finally {
-        Pop-Location
-    }
     # La porta pubblicata sul PC la decide db-config (o il wizard): non e'
     # detto che sia ancora la 5432.
     $pgHit = [regex]::Match((Get-Content -Raw (Join-Path $demoDir 'docker-compose.yml')), '(?m)^\s+-\s*"(\d+):5432"')
     $pgPort = if ($pgHit.Success) { [int]$pgHit.Groups[1].Value } else { 5432 }
+    # Il PostgreSQL di un'altra copia del template (o di questa, col nome di
+    # progetto di prima) terrebbe la porta: "port is already allocated".
+    $null = Stop-ForeignContainers -Port $pgPort -KeepForeign:$KeepForeign
+    Push-Location $demoDir
+    try {
+        docker compose up -d postgres
+        if ($LASTEXITCODE -ne 0) {
+            throw "Avvio di PostgreSQL fallito. Docker Desktop e' acceso? La porta $pgPort e' libera? (task status)"
+        }
+    } finally {
+        Pop-Location
+    }
     if (-not (Wait-ForPort -Port $pgPort -TimeoutSeconds 60 -AnyProcess)) {
         Write-Host "PostgreSQL non risponde sulla porta $pgPort." -ForegroundColor Red
         exit 1
