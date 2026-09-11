@@ -1,0 +1,42 @@
+[
+    {
+        "label": "1. naming-server (:8761)",
+        "adapter": "Java",
+        "request": "launch",
+        "mainClass": "com.example.ttfcloud_esame.namingserver.Main",
+        "projectName": "naming-server",
+        "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    {
+        "label": "2. crm-service (:8082)",
+        "adapter": "Java",
+        "request": "launch",
+        "mainClass": "com.example.ttfcloud_esame.crmservice.Main",
+        "projectName": "crm-service",
+        "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    {
+        "label": "3. product-service (:8081)",
+        "adapter": "Java",
+        "request": "launch",
+        "mainClass": "com.example.ttfcloud_esame.productservice.Main",
+        "projectName": "product-service",
+        "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    {
+        "label": "4. wms-service (:8083)",
+        "adapter": "Java",
+        "request": "launch",
+        "mainClass": "com.example.ttfcloud_esame.wmsservice.Main",
+        "projectName": "wms-service",
+        "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    {
+        "label": "5. wms-ui (:8080)",
+        "adapter": "Java",
+        "request": "launch",
+        "mainClass": "com.example.ttfcloud_esame.wmsui.Main",
+        "projectName": "wms-ui",
+        "cwd": "$ZED_WORKTREE_ROOT"
+    }
+]

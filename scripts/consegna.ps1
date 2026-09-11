@@ -203,9 +203,13 @@ foreach ($service in $services) {
             else { 'Microservizio REST' }
     Add-Line ('| `' + $service.Module + '` | ' + $service.Port + ' | `' + $service.AppName + '` | ' + $role + ' |')
 }
-$hasPostgres = (Read-TextFile (Join-Path $demoDir 'docker-compose.yml')) -match 'image:\s*postgres'
+$composeText = Read-TextFile (Join-Path $demoDir 'docker-compose.yml')
+$hasPostgres = $composeText -match 'image:\s*postgres'
+# La porta pubblicata sul PC, che db-config puo' aver spostato dalla 5432.
+$pgHit = [regex]::Match($composeText, '(?m)^\s+-\s*"(\d+):5432"')
+$pgPort = if ($pgHit.Success) { $pgHit.Groups[1].Value } else { '5432' }
 if ($hasPostgres) {
-    Add-Line '| `postgres` | 5432 | - | Database relazionale (container) |'
+    Add-Line ('| `postgres` | ' + $pgPort + ' | - | Database relazionale (container) |')
 }
 Add-Line ''
 Add-Line 'Il modulo `common-dto` non e'' un servizio: contiene le classi DTO'
@@ -334,10 +338,10 @@ foreach ($service in $services) {
         Add-Run ('| Swagger `' + $service.Module + '` | `http://localhost:' + $service.Port + '/swagger-ui.html` |')
     }
 }
-if ($hasPostgres) { Add-Run '| PostgreSQL | `localhost:5432` |' }
+if ($hasPostgres) { Add-Run ('| PostgreSQL | `localhost:' + $pgPort + '` |') }
 Add-Run ''
-Add-Run 'I servizi impiegano 10-15 secondi a registrarsi su Eureka: le prime'
-Add-Run 'chiamate fra servizi, subito dopo l''avvio, possono fallire.'
+Add-Run 'Dopo l''avvio servono pochi secondi perche'' i servizi si trovino su Eureka:'
+Add-Run 'se la primissima chiamata fra servizi fallisce, riprova.'
 Add-Run ''
 
 Write-TextFile -Path (Join-Path $OutDir 'ISTRUZIONI-ESECUZIONE.md') -Text ($run -join [Environment]::NewLine)

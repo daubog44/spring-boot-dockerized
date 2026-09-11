@@ -214,28 +214,31 @@ Write-Check -Label 'docker-compose' -Errors $errors
 $problems += $errors
 
 # --- La configurazione degli editor -------------------------------------------
-# Un launch.json che elenca servizi spariti manda in errore il tasto Debug, e
-# uno che non li elenca non lo fa partire affatto.
+# Una configurazione di debug che elenca servizi spariti manda in errore il
+# tasto Debug, e una che non li elenca non lo fa partire affatto. Vale per VS
+# Code (launch.json) e per Zed (debug.json): li scrive entrambi ide-sync.
 
 $errors = @()
-$launchPath = Join-Path $repoRoot '.vscode/launch.json'
-if (Test-Path $launchPath) {
-    $launchText = Read-TextFile $launchPath
-    $launched = @([regex]::Matches($launchText, '"projectName"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
-    foreach ($svc in $devServices) {
-        if ($launched -notcontains $svc.Module) {
-            $errors += "$($svc.Module): manca in .vscode/launch.json"
+$editorFiles = @('.vscode/launch.json', '.zed/debug.json' | Where-Object { Test-Path (Join-Path $repoRoot $_) })
+if ($editorFiles.Count -gt 0) {
+    foreach ($relative in $editorFiles) {
+        $editorText = Read-TextFile (Join-Path $repoRoot $relative)
+        $launched = @([regex]::Matches($editorText, '"projectName"\s*:\s*"([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
+        foreach ($svc in $devServices) {
+            if ($launched -notcontains $svc.Module) {
+                $errors += "$($svc.Module): manca in $relative"
+            }
         }
-    }
-    foreach ($name in $launched) {
-        if (-not (Test-Path (Join-Path $demoDir "$name/pom.xml"))) {
-            $errors += "${name}: e' in .vscode/launch.json ma il modulo non esiste"
+        foreach ($name in $launched) {
+            if (-not (Test-Path (Join-Path $demoDir "$name/pom.xml"))) {
+                $errors += "${name}: e' in $relative ma il modulo non esiste"
+            }
         }
     }
     if ($errors.Count -gt 0) { $errors += 'riallinea con: task ide-sync' }
-    Write-Check -Label 'editor (launch.json)' -Errors $errors
+    Write-Check -Label 'editor (debug)' -Errors $errors
 } else {
-    Write-Host ('  {0,-26}{1}' -f 'editor (launch.json)', 'assente: task ide-sync') -ForegroundColor Yellow
+    Write-Host ('  {0,-26}{1}' -f 'editor (debug)', 'assente: task ide-sync') -ForegroundColor Yellow
 }
 $problems += $errors
 

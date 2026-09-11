@@ -137,6 +137,45 @@ else
   done
 fi
 
+# 4. L'editor. Anche lui scarica: l'estensione Java di Zed prende jdtls,
+#    Lombok e il debugger al primo file .java che apri, e senza rete non puo'.
+#    Il progetto parte lo stesso, quindi e' un avviso e non un problema.
+echo ""
+EDITOR_SEEN=0
+ZED_ROOT=""
+WIN_LOCAL=""
+if [ -n "${LOCALAPPDATA:-}" ]; then
+  if command -v cygpath >/dev/null 2>&1; then WIN_LOCAL="$(cygpath -u "$LOCALAPPDATA")"; else WIN_LOCAL="$LOCALAPPDATA"; fi
+fi
+for d in "$WIN_LOCAL/Zed" "$HOME/.local/share/zed" "$HOME/Library/Application Support/Zed"; do
+  if [ -d "$d/extensions" ]; then ZED_ROOT="$d"; break; fi
+done
+if [ -n "$ZED_ROOT" ]; then
+  EDITOR_SEEN=1
+  ZJ="$ZED_ROOT/extensions/work/java"
+  missing=""
+  ls -d "$ZJ"/jdtls/jdt-language-server-* >/dev/null 2>&1 || missing="$missing jdtls"
+  ls "$ZJ"/lombok/*.jar >/dev/null 2>&1 || missing="$missing Lombok"
+  ls "$ZJ"/debugger/*.jar >/dev/null 2>&1 || missing="$missing debugger"
+  if [ ! -d "$ZED_ROOT/extensions/installed/java" ]; then
+    line "Zed (estensione Java)" "non installata: zed: extensions -> Java, con la rete"
+  elif [ -n "$missing" ]; then
+    line "Zed (estensione Java)" "manca$missing: apri un file .java in Zed, con la rete"
+  else
+    line "Zed (estensione Java)" "jdtls, Lombok e debugger gia' scaricati"
+  fi
+fi
+if [ -d "$HOME/.vscode/extensions" ]; then
+  EDITOR_SEEN=1
+  if ls -d "$HOME"/.vscode/extensions/redhat.java-* >/dev/null 2>&1 &&
+     ls -d "$HOME"/.vscode/extensions/vscjava.vscode-java-debug-* >/dev/null 2>&1; then
+    line "VS Code (Java)" "estensioni Java e debugger installate"
+  else
+    line "VS Code (Java)" "manca l'Extension Pack for Java: installalo con la rete"
+  fi
+fi
+[ "$EDITOR_SEEN" -eq 0 ] && line "editor" "ne' VS Code ne' Zed su questo PC"
+
 # --- Il verdetto --------------------------------------------------------------
 
 echo ""

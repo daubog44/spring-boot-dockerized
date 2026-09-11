@@ -87,7 +87,15 @@ assert_ok "new-service" &&
   assert_contains demo/Dockerfile "COPY alfa-service/pom.xml" &&
   assert_contains demo/docker-compose.yml "MODULE: alfa-service" &&
   assert_contains scripts/dev.ps1 "Module = 'alfa-service'" &&
-  assert_contains scripts/dev.sh ":alfa-service:"
+  assert_contains scripts/dev.sh ":alfa-service:" &&
+  # Un nome fisso farebbe scontrare due copie del progetto sulla stessa macchina.
+  { grep -qE '^[[:space:]]+container_name:' "$DEMO/docker-compose.yml" && fail "il compose non deve fissare i nomi dei container"; true; } &&
+  # Ogni dipendenza sulla sua riga: e' un file che si consegna.
+  assert_not_contains demo/alfa-service/pom.xml "</dependency>        <dependency>" "il pom del modulo" &&
+  # Senza queste due, le prime chiamate Feign dopo l'avvio falliscono per
+  # 30-60 secondi ("Load balancer does not contain an instance").
+  assert_contains demo/alfa-service/src/main/resources/application.yml "registry-fetch-interval-seconds: 5" "il registro di Eureka" &&
+  assert_contains demo/alfa-service/src/main/resources/application.yml "ttl: 5s" "la cache del load balancer"
 end_case
 
 start_case "il modulo nuovo e' coerente (task check)"
@@ -288,13 +296,18 @@ assert_contains "$LAUNCH" 'Stack completo' "il compound che li avvia tutti"
 assert_contains "$LAUNCH" 'com.example.ttfcloud_esame.alfaservice.Main' "la classe Main"
 # common-dto e' una libreria: non si avvia.
 assert_not_contains "$LAUNCH" '"projectName": "common-dto"' "una libreria non va fra le configurazioni di avvio"
+# Zed ha il suo file, con l'adattatore della sua estensione Java.
+assert_contains ".zed/debug.json" '"projectName": "alfa-service"' "il debug.json di Zed"
+assert_contains ".zed/debug.json" '"adapter": "Java"' "il debug.json di Zed"
+assert_contains ".zed/debug.json" 'com.example.ttfcloud_esame.alfaservice.Main' "la classe Main nel debug.json"
+assert_not_contains ".zed/debug.json" '"projectName": "common-dto"' "una libreria non va nel debug.json"
 end_case
 
-start_case "launch.json e tasks.json sono JSON validi"
+start_case "i file degli editor sono JSON validi"
 # I file di configurazione degli editor ammettono i commenti //: li togliamo
 # prima di darli al parser.
 if command -v python3 >/dev/null 2>&1; then
-  for f in .vscode/launch.json .vscode/tasks.json .zed/tasks.json; do
+  for f in .vscode/launch.json .vscode/tasks.json .vscode/settings.json .zed/tasks.json .zed/debug.json .zed/settings.json; do
     python3 -c "
 import io, json, re, sys
 t = io.open(sys.argv[1], encoding='utf-8').read()
@@ -313,12 +326,14 @@ assert_contains ".vscode/launch.json" '"projectName": "delta-service"' "il launc
 run_tool remove-service.sh --module delta-service
 assert_ok "remove-service"
 assert_not_contains ".vscode/launch.json" 'delta-service' "il launch.json"
+assert_not_contains ".zed/debug.json" 'delta-service' "il debug.json di Zed"
 end_case
 
 start_case "set-port aggiorna la porta scritta nel launch.json"
 run_tool set-port.sh --module alfa-service --port 8399
 assert_ok "set-port"
 assert_contains ".vscode/launch.json" 'alfa-service (:8399)' "il launch.json"
+assert_contains ".zed/debug.json" 'alfa-service (:8399)' "il debug.json di Zed"
 end_case
 
 start_case "check si accorge se il launch.json e' rimasto indietro"
@@ -361,6 +376,44 @@ end_case
 start_case "db-config rifiuta un valore che PostgreSQL non accetterebbe"
 run_tool db-config.sh --db-name "non valido!"
 assert_fails "db-config con un nome impossibile"
+end_case
+
+# --- Il wizard ----------------------------------------------------------------
+# Le risposte gliele diamo da un file (WIZARD_ANSWERS), una per riga: una riga
+# vuota vale come Invio.
+
+start_case "il wizard senza terminale si rifiuta invece di restare appeso"
+TOOL_OUT="$(bash "$SB_SCRIPTS/wizard.sh" </dev/null 2>&1)"; TOOL_CODE=$?
+assert_fails "il wizard senza terminale"
+assert_out_contains "terminale vero"
+end_case
+
+start_case "il wizard si ferma se le risposte finiscono prima delle domande"
+: >"$SANDBOX/risposte-corte.txt"
+TOOL_OUT="$(WIZARD_ANSWERS="$SANDBOX/risposte-corte.txt" bash "$SB_SCRIPTS/wizard.sh" </dev/null 2>&1)"; TOOL_CODE=$?
+assert_fails "il wizard con le risposte finite"
+assert_out_contains "risposte sono finite"
+end_case
+
+start_case "il wizard monta database e servizi rispondendo alle domande"
+# cartella invariata; PostgreSQL con credenziali e porta; un servizio REST con
+# il database condiviso; un'interfaccia web senza Swagger; Invio per finire.
+printf '%s\n' \
+  '' \
+  s wizdb wiz wizpass 5439 \
+  omega-service 1 '' 2 \
+  sigma-ui 3 '' n \
+  '' >"$SANDBOX/risposte.txt"
+TOOL_OUT="$(WIZARD_ANSWERS="$SANDBOX/risposte.txt" bash "$SB_SCRIPTS/wizard.sh" </dev/null 2>&1)"; TOOL_CODE=$?
+assert_ok "il wizard"
+assert_contains "demo/docker-compose.yml" "POSTGRES_DB: wizdb" "il database scelto"
+assert_contains "demo/docker-compose.yml" '"5439:5432"' "la porta scelta"
+assert_contains "demo/omega-service/src/main/resources/application.yml" "jdbc:postgresql://localhost:5439/wizdb" "il servizio sul database condiviso, sulla porta scelta"
+assert_file "demo/sigma-ui/src/main/resources/templates/index.html"
+assert_contains ".vscode/launch.json" '"projectName": "omega-service"' "il launch.json"
+assert_contains ".zed/debug.json" '"projectName": "sigma-ui"' "il debug.json di Zed"
+run_tool check.sh --project-only
+assert_ok "task check dopo il wizard"
 end_case
 
 # Da qui in poi serve un dominio con delle @Entity: lo scriviamo noi.
@@ -413,11 +466,34 @@ public class ArticoloEntity {
     private Integer quantita;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     private StatoArticolo stato;
 
     @ManyToOne
     @JoinColumn(name = "deposito_id")
     private DepositoEntity deposito;
+}
+JAVA
+
+# Nome e cognome, un anno, un id che punta a un altro servizio: i valori
+# devono sembrare veri, non "nome 1", 10, 20.
+cat >"$ENTITY_DIR/SocioEntity.java" <<'JAVA'
+package com.example.ttfcloud_esame.alfaservice;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+
+@Entity
+public class SocioEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String nome;
+    private String cognome;
+    private Integer annoIscrizione;
+    private Long tesseraId;
 }
 JAVA
 
@@ -430,6 +506,10 @@ SQL="demo/alfa-service/src/main/resources/data.sql"
 assert_contains "$SQL" "INSERT INTO deposito_entity" "la tabella senza @Table"
 assert_contains "$SQL" "INSERT INTO articoli (nome, quantita, stato, deposito_id)" "le colonne (la PK generata non va scritta)"
 assert_contains "$SQL" "DISPONIBILE" "gli enum dal file Java"
+# Ogni riga scatta solo se la tabella non e' ancora piena: un riavvio su
+# PostgreSQL non la duplica e una colonna unique non fa fallire l'avvio.
+assert_contains "$SQL" "WHERE (SELECT COUNT(*) FROM articoli) < 3;" "le INSERT si ripeterebbero a ogni avvio"
+assert_contains "$SQL" "INSERT INTO socio_entity (nome, cognome, anno_iscrizione, tessera_id) SELECT 'Mario', 'Rossi', 2017, 1 WHERE (SELECT COUNT(*) FROM socio_entity) < 1;" "nome, cognome, anno e id verosimili"
 # La tabella padre va riempita prima, o la chiave esterna punterebbe a niente.
 riga_deposito="$(grep -n 'INSERT INTO deposito_entity' "$SANDBOX/$SQL" | head -n 1 | cut -d: -f1)"
 riga_articolo="$(grep -n 'INSERT INTO articoli' "$SANDBOX/$SQL" | head -n 1 | cut -d: -f1)"
@@ -448,7 +528,8 @@ start_case "seed-data non ripete i valori quando le righe superano la tabella"
 run_tool seed-data.sh --module alfa-service --rows 12
 assert_ok "seed-data con 12 righe"
 tot="$(grep -c '^INSERT INTO articoli' "$SANDBOX/$SQL")"
-uniche="$(grep '^INSERT INTO articoli' "$SANDBOX/$SQL" | sort -u | wc -l)"
+# Il conteggio in fondo cambia da riga a riga: confrontiamo solo i valori.
+uniche="$(grep '^INSERT INTO articoli' "$SANDBOX/$SQL" | sed 's/ WHERE .*$//' | sort -u | wc -l)"
 [ "$tot" = "12" ] || fail "righe generate: $tot"
 [ "$uniche" = "12" ] || fail "righe uguali fra loro: $(( tot - uniche ))"
 end_case
@@ -462,16 +543,24 @@ assert_out_contains 'Tabella `articoli`'
 assert_out_contains 'Tabella `deposito_entity`'
 assert_out_contains "erDiagram"
 assert_out_contains "FK"
+assert_out_contains '| `stato` | VARCHAR(20) |'
 end_case
 
 # Questa cambia il nome della cartella dei moduli: va per ultima.
 start_case "rename-project rinomina la cartella e i file che la nominano"
+# Un modulo che comincia con il nome della cartella (biblioteca e
+# biblioteca-ui) non deve essere rinominato insieme a lei.
+OMONIMO="$(basename "$DEMO")-extra"
+run_tool new-service.sh --name "$OMONIMO" --no-db
+assert_ok "new-service del modulo omonimo"
 run_tool rename-project.sh --name collaudo-modules
 assert_ok "rename-project"
 assert_file "collaudo-modules/pom.xml"
 assert_no_file "demo"
 assert_contains "Taskfile.yml" "dir: collaudo-modules" "il Taskfile"
 assert_contains "scripts/check.sh" "/collaudo-modules" "gli script"
+assert_file "collaudo-modules/$OMONIMO/pom.xml"
+assert_contains "scripts/dev.sh" ":$OMONIMO:" "il modulo $OMONIMO rinominato insieme alla cartella"
 run_tool check.sh --project-only
 assert_ok "task check dopo rename-project"
 end_case

@@ -146,8 +146,9 @@ progetto Maven multi-modulo.
 - **VS Code**: `F5` -> **Stack completo** avvia tutti i servizi in debug, Eureka
   per primo. Serve l'*Extension Pack for Java*; le altre estensioni consigliate
   te le propone VS Code stesso (`.vscode/extensions.json`).
-- **Zed**: palette -> *task: Spawn* per i comandi `task`. Per il Java serve
-  l'estensione *Java*; per il debug passa da VS Code o IntelliJ.
+- **Zed**: `F4` → il servizio da avviare in debug (`.zed/debug.json`); palette
+  → *task: Spawn* per i comandi `task`. Serve l'estensione *Java*, che al primo
+  file `.java` scarica jdtls, Lombok e il debugger: la prima volta, con la rete.
 - **IntelliJ IDEA**: niente da configurare, apri il pom aggregatore.
 
 `launch.json` e i due `tasks.json` sono generati: li riscrivono `new-service`,
@@ -228,18 +229,18 @@ il template *e'* la cartella, non serve altro.
 
 ## 🩺 Troubleshooting
 
-### `dependency failed to start: container exam-eureka is unhealthy`
+### `dependency failed to start: container <cartella>-eureka-server-1 is unhealthy`
 
-Sintomo: `task docker-up` fallisce, `exam-eureka` risulta `unhealthy` e nessun microservizio parte, anche se nei log Eureka scrive regolarmente `Started Eureka Server`.
+Sintomo: `task docker-up` fallisce, il container di `eureka-server` risulta `unhealthy` e nessun microservizio parte, anche se nei log Eureka scrive regolarmente `Started Eureka Server`.
 
 Causa: l'healthcheck di `eureka-server` invoca `curl` su `/actuator/health`, ma l'immagine runtime `eclipse-temurin:25-jre` **non include `curl`**. Ogni probe fallisce con `curl: not found`, il container resta `unhealthy` e tutti i servizi con `depends_on: condition: service_healthy` non vengono mai avviati.
 
 Il `demo/Dockerfile` di questo repo installa già `curl` nello stage runtime, quindi il problema non si presenta. Se aggiungi un healthcheck HTTP a un altro servizio, ricordati che vale la stessa regola.
 
-Per capire *perché* un healthcheck non passa, leggi l'output delle probe:
+Per capire *perché* un healthcheck non passa, leggi l'output delle probe (dalla cartella dei moduli, quella con `docker-compose.yml`):
 
 ```bash
-docker inspect exam-eureka --format "{{json .State.Health}}"
+docker inspect $(docker compose ps -q eureka-server) --format "{{json .State.Health}}"
 ```
 
 ### Su `http://localhost:8080` risponde qualcos'altro
@@ -261,11 +262,17 @@ docker compose ps
 ```
 
 ```bash
+<<<<<<< branch
 docker logs exam-wms-service --tail 50
+=======
+docker compose logs eureka-server --tail 50
+>>>>>>> main
 ```
 
 Per verificare quali servizi si sono effettivamente registrati su Eureka:
 
 ```bash
-docker exec exam-eureka curl -s -H "Accept: application/json" http://localhost:8761/eureka/apps
+docker compose exec eureka-server curl -s -H "Accept: application/json" http://localhost:8761/eureka/apps
 ```
+
+I container non hanno un nome fisso: Docker Compose li chiama `<cartella>-<servizio>-1`, così la copia di prova e quella dell'esame non si contendono lo stesso nome. Per questo i comandi qui sopra usano il nome del **servizio** (`eureka-server`, `postgres`), e vanno lanciati dalla cartella dei moduli.

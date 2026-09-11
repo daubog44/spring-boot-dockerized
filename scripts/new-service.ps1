@@ -105,6 +105,7 @@ if ($withDb) {
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+
 '@
 }
 $driverDeps = ''
@@ -120,6 +121,7 @@ if ($withDb) {
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+
 '@
 }
 $viewDep = ''
@@ -129,6 +131,7 @@ if ($Ui) {
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
+
 '@
 }
 
@@ -323,13 +326,25 @@ server:
 spring:
   application:
     name: $appName
+  # Il load balancer di Feign tiene l'elenco delle istanze in cache per 35
+  # secondi: con 5, un servizio appena acceso diventa chiamabile subito.
+  cloud:
+    loadbalancer:
+      cache:
+        ttl: 5s
 $dbBlock
 eureka:
   client:
     service-url:
       defaultZone: `${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    # Il registro si rilegge ogni 5 secondi invece che ogni 30.
+    registry-fetch-interval-seconds: 5
   instance:
     prefer-ip-address: true
+    # Un battito ogni 5 secondi: se il servizio si spegne, dopo 15 Eureka lo
+    # toglie e gli altri smettono di chiamarlo.
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
 
 springdoc:
   api-docs:
@@ -353,7 +368,6 @@ Write-Step "demo/Dockerfile          COPY $module/pom.xml"
 $compose = Join-Path $demoDir 'docker-compose.yml'
 $composeBlock = @(
     "  ${module}:"
-    "    container_name: exam-$module"
     '    build:'
     '      context: .'
     '      args:'

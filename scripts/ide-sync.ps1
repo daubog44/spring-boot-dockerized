@@ -14,6 +14,8 @@
       .vscode/tasks.json    i comandi task, dalla palette (Ctrl+Shift+P,
                             "Run Task")
       .zed/tasks.json       gli stessi comandi per Zed (task: Spawn)
+      .zed/debug.json       le stesse configurazioni di debug, per il
+                            debugger di Zed (F4)
 
     E, solo se mancano, i file che non dipendono dai moduli e che puoi
     modificare a piacere: .vscode/settings.json, .vscode/extensions.json,
@@ -191,6 +193,30 @@ $zedTasks.Add(']')
 Write-TextFile -Path (Join-Path $zedDir 'tasks.json') -Text ($zedTasks -join [Environment]::NewLine)
 Write-Step '.zed/tasks.json'
 
+# --- .zed/debug.json ----------------------------------------------------------
+# Il debugger di Zed usa l'adattatore "Java" dell'estensione: stesse voci del
+# launch.json, un servizio per voce (Zed non ha i compound). Niente commenti in
+# questo file: e' l'unico di Zed per cui la documentazione non li promette.
+
+$debugEntries = @()
+for ($k = 0; $k -lt $targets.Count; $k++) {
+    $debugEntries += @(
+        '    {'
+        ('        "label": "' + $names[$k] + '",')
+        '        "adapter": "Java",'
+        '        "request": "launch",'
+        ('        "mainClass": "' + $targets[$k].MainClass + '",')
+        ('        "projectName": "' + $targets[$k].Module + '",')
+        '        "cwd": "$ZED_WORKTREE_ROOT"'
+        '    }'
+    ) -join [Environment]::NewLine
+}
+$zedDebug = if ($debugEntries.Count -eq 0) { '[]' } else {
+    '[' + [Environment]::NewLine + ($debugEntries -join (',' + [Environment]::NewLine)) + [Environment]::NewLine + ']'
+}
+Write-TextFile -Path (Join-Path $zedDir 'debug.json') -Text $zedDebug
+Write-Step '.zed/debug.json'
+
 # --- I file che non dipendono dai moduli: solo se mancano --------------------
 # Questi puoi modificarli a piacere: ide-sync non ci torna sopra.
 
@@ -246,14 +272,29 @@ Write-IfMissing -Path (Join-Path $vscodeDir 'extensions.json') -Label '.vscode/e
 )
 
 Write-IfMissing -Path (Join-Path $zedDir 'settings.json') -Label '.zed/settings.json' -Lines @(
-    '// Zed legge il Java dall''estensione "Java" (jdtls): installala da'
-    '// "zed: extensions". Il progetto e'' Maven multi-modulo, quindi apri la'
-    '// cartella del repository, non quella di un singolo servizio.'
+    '// Zed legge il Java dall''estensione "Java" (jdtls, Lombok e debugger):'
+    '// se manca, palette -> "zed: extensions" -> Java. Il progetto e'' Maven'
+    '// multi-modulo, quindi apri la cartella del repository, non quella di un'
+    '// singolo servizio.'
     '{'
-    '    "format_on_save": "on",'
+    '    // Il Java lo formatta jdtls, che gira in locale. Gli altri file Zed li'
+    '    // darebbe a prettier, che la prima volta si scarica da npm: a rete'
+    '    // staccata sarebbero solo errori.'
+    '    "format_on_save": "off",'
     '    "languages": {'
-    '        "Java": { "tab_size": 4 },'
+    '        "Java": { "tab_size": 4, "format_on_save": "on" },'
     '        "YAML": { "tab_size": 2 }'
+    '    },'
+    '    "lsp": {'
+    '        "jdtls": {'
+    '            "settings": {'
+    '                // "once": jdtls, Lombok e il debugger si scaricano solo se'
+    '                // non ci sono ancora. Il default ("always") li ricontrolla'
+    '                // ogni 24 ore, e il giorno dell''esame la rete non c''e''.'
+    '                "check_updates": "once",'
+    '                "lombok_support": true'
+    '            }'
+    '        }'
     '    },'
     '    "file_scan_exclusions": ['
     '        "**/target",'
@@ -295,11 +336,11 @@ Write-Host 'Editor riallineati.' -ForegroundColor Green
 Write-Host ''
 if ($targets.Count -gt 0) {
     Write-Host '  VS Code: F5 -> "Stack completo" avvia tutti i servizi in debug.'
-    Write-Host '  Zed:     palette "task: Spawn" per i comandi task.'
+    Write-Host '  Zed:     F4 -> un servizio in debug; palette "task: Spawn" per i comandi.'
 } else {
     Write-Host '  Nessun servizio avviabile: crea un modulo con task new-service.'
 }
 Write-Host ''
-Write-Host '  Per il debug in VS Code serve l''estensione Extension Pack for Java;' -ForegroundColor DarkGray
+Write-Host '  VS Code vuole l''Extension Pack for Java, Zed l''estensione Java;' -ForegroundColor DarkGray
 Write-Host '  IntelliJ non ha bisogno di niente: apri il pom aggregatore.' -ForegroundColor DarkGray
 Write-Host ''

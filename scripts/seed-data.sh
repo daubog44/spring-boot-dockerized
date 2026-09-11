@@ -31,6 +31,10 @@ CITTA=('Bolzano' 'Trento' 'Verona' 'Milano' 'Bologna' 'Padova' 'Brescia' 'Modena
 PERSONE=('Mario Rossi' 'Anna Bianchi' 'Luca Verdi' 'Giulia Neri' 'Paolo Gialli' 'Sara Azzurri' 'Marco Ferrari' 'Elena Moretti')
 DESCRIZIONI=('Prima consegna del mese' 'Ordine urgente' 'Riassortimento magazzino' 'Reso da cliente' 'Fornitura periodica' 'Campione gratuito' 'Ordine ricorrente' 'Spedizione parziale')
 PRODOTTI=('Vite M6' 'Dado esagonale' 'Cuscinetto 6203' 'Guarnizione 40mm' 'Molla a trazione' 'Rondella piana' 'Perno filettato' 'Boccola in ottone')
+NOMI_PROPRI=('Mario' 'Anna' 'Luca' 'Giulia' 'Paolo' 'Sara' 'Marco' 'Elena')
+COGNOMI=('Rossi' 'Bianchi' 'Verdi' 'Neri' 'Gialli' 'Azzurri' 'Ferrari' 'Moretti')
+TITOLI=('La casa sul lago' 'Il viaggio di Marta' 'Ombre sul fiume' 'Le stagioni del grano' 'Lettere da Trieste' 'Il silenzio del bosco' 'Cronache di provincia' "L'ultima estate")
+NAZIONALITA=('Italiana' 'Francese' 'Inglese' 'Tedesca' 'Spagnola' 'Americana' 'Austriaca' 'Svizzera')
 
 # Un valore dalla tabella, con il numero di riga appeso quando la tabella
 # finisce: cosi' anche con ROWS=50 non nascono due righe uguali, che su una
@@ -47,13 +51,20 @@ string_value() {
   local col="$1" idx="$2"
   case "$col" in
     *email*)                                        printf 'utente%s@esempio.it' "$idx" ;;
+    *telefono*|*cellulare*|*phone*)                 printf '+39 347 %s' "$(( 1000000 + idx * 1357 ))" ;;
+    *isbn*)                                         printf '978-88-%s-%s' "$(( 1000 + idx * 37 ))" "$(( idx % 10 ))" ;;
     *citta*|*city*|*comune*|*luogo*)                pick "$idx" "${CITTA[@]}" ;;
+    *nazionalita*|*nazione*|*paese*)                pick "$idx" "${NAZIONALITA[@]}" ;;
     *indirizzo*|*via*|*address*)                    printf 'Via Roma %s' "$(( idx * 3 ))" ;;
     *codice*|*sigla*|*targa*|*cod*)                 printf 'COD-%03d' "$idx" ;;
+    *titolo*|*title*)                               pick "$idx" "${TITOLI[@]}" ;;
     *descrizione*|*note*|*testo*)                   pick "$idx" "${DESCRIZIONI[@]}" ;;
     *prodotto*|*articolo*|*item*)                   pick "$idx" "${PRODOTTI[@]}" ;;
     *cliente*|*fornitore*|*ragione*|*azienda*|*societa*) pick "$idx" "${NOMI[@]}" ;;
-    *nome*|*cognome*|*utente*|*referente*|*responsabile*) pick "$idx" "${PERSONE[@]}" ;;
+    # Prima il cognome: "cognome" contiene "nome".
+    *cognome*|*surname*)                            pick "$idx" "${COGNOMI[@]}" ;;
+    nome)                                           pick "$idx" "${NOMI_PROPRI[@]}" ;;
+    *nome*|*utente*|*referente*|*responsabile*)     pick "$idx" "${PERSONE[@]}" ;;
     *stato*|*status*|*tipo*)                        printf 'VALORE_%s' "$idx" ;;
     *)                                              printf '%s %s' "${col//_/ }" "$idx" ;;
   esac
@@ -79,6 +90,11 @@ gen_value() {
     Long|long|Integer|int|Short|short)
       case "$col" in
         *quantita*|*pezzi*|*numero*|*qta*|*scorta*) printf '%s' "$(( (idx * 7) % 50 + 1 ))" ;;
+        # Un anno deve sembrare un anno, non 10, 20, 30.
+        anno|anno_*|*_anno|*_anno_*|year|year_*|*_year) printf '%s' "$(( 2024 - (idx * 7) % 60 ))" ;;
+        # Un id senza chiave esterna punta di solito a una riga di un altro
+        # servizio (libro_id in prestiti-service): gli id veri partono da 1.
+        *_id) printf '%s' "$idx" ;;
         *) printf '%s' "$(( idx * 10 ))" ;;
       esac ;;
     Double|double|Float|float|BigDecimal)
@@ -86,7 +102,13 @@ gen_value() {
     Boolean|boolean)
       if [ $(( idx % 2 )) -eq 0 ]; then printf 'true'; else printf 'false'; fi ;;
     LocalDate)
-      printf "'%s'" "$(date -d "-$idx days" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)" ;;
+      # Le scadenze un po' passate e un po' future: cosi' i ritardi si vedono.
+      local off
+      case "$col" in
+        *scadenza*|*termine*|*fine*|*consegna*) off=$(( 7 - 3 * idx )) ;;
+        *) off=$(( -idx )) ;;
+      esac
+      printf "'%s'" "$(date -d "$off days" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)" ;;
     LocalDateTime|Instant)
       printf "'%s'" "$(date -d "-$idx hours" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')" ;;
     LocalTime)
@@ -264,9 +286,12 @@ for target in $TARGETS; do
   sql="$(mktemp)"
   {
     echo "-- Dati di prova generati da task seed-data."
-    echo "-- Spring Boot esegue questo file all'avvio, dopo che Hibernate ha"
-    echo "-- creato le tabelle. Modificalo pure: non viene sovrascritto se non"
-    echo "-- rilanci il comando."
+    echo "-- Spring Boot esegue questo file a ogni avvio, dopo che Hibernate ha"
+    echo "-- creato le tabelle. Ogni INSERT scatta solo se la tabella ha meno righe"
+    echo "-- del suo numero d'ordine: al primo avvio la riempie, poi non la tocca"
+    echo "-- piu'. Cosi' un riavvio (o un hot reload) non duplica niente, e una"
+    echo "-- colonna unique non fa fallire l'avvio."
+    echo "-- Modificalo pure: non viene sovrascritto se non rilanci il comando."
     echo ""
   } >"$sql"
 
@@ -294,7 +319,9 @@ for target in $TARGETS; do
           values="$values, $(gen_value "$col" "$type" "$enums" "$idx")"
         fi
       done <<<"$cols"
-      echo "INSERT INTO $table (${names#, }) VALUES (${values#, });" >>"$sql"
+      # INSERT ... SELECT invece di VALUES: la condizione sul conteggio
+      # funziona uguale su H2 e su PostgreSQL.
+      echo "INSERT INTO $table (${names#, }) SELECT ${values#, } WHERE (SELECT COUNT(*) FROM $table) < $idx;" >>"$sql"
     done
     echo "" >>"$sql"
   done
@@ -342,7 +369,7 @@ echo ""
 echo "  task dev          riavvia: le tabelle si riempiono da sole"
 echo "  task db-schema    lo schema che questi dati rispettano"
 echo ""
-echo "  Su PostgreSQL le INSERT vengono rieseguite a ogni avvio: se ti trovi"
-echo "  righe doppie, svuota con task docker-reset. Con H2 in memoria non"
-echo "  succede, perche' il database riparte vuoto ogni volta."
+echo "  Le INSERT scattano solo su tabelle ancora da riempire: riavvii e hot"
+echo "  reload non duplicano niente. Per ripartire dai soli dati di prova su"
+echo "  PostgreSQL: task docker-reset (cancella anche quello che hai inserito)."
 echo ""

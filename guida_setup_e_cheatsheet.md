@@ -231,10 +231,10 @@ task dev KEEPFOREIGN=1 UI_PORT=9080
 ```
 Ricordati di passare la stessa porta al collaudo: `task test-e2e UI_PORT=9080`.
 
-### 🚨 Emergenza 1-bis: "container exam-eureka is unhealthy"
-`task docker-up` si interrompe con `dependency failed to start: container exam-eureka is unhealthy`, ma nei log Eureka scrive `Started Eureka Server`. L'healthcheck usa `curl`, che l'immagine `eclipse-temurin:25-jre` non contiene. Il `demo/Dockerfile` di questo repo lo installa già; se aggiungi un healthcheck HTTP a un altro servizio vale la stessa regola. Per leggere l'esito delle probe:
+### 🚨 Emergenza 1-bis: "container ...-eureka-server-1 is unhealthy"
+`task docker-up` si interrompe con `dependency failed to start: container <cartella>-eureka-server-1 is unhealthy`, ma nei log Eureka scrive `Started Eureka Server`. L'healthcheck usa `curl`, che l'immagine `eclipse-temurin:25-jre` non contiene. Il `demo/Dockerfile` di questo repo lo installa già; se aggiungi un healthcheck HTTP a un altro servizio vale la stessa regola. Per leggere l'esito delle probe, dalla cartella dei moduli:
 ```bash
-docker inspect exam-eureka --format "{{json .State.Health}}"
+docker inspect $(docker compose ps -q eureka-server) --format "{{json .State.Health}}"
 ```
 
 ### 🚨 Emergenza 1-ter: "porta occupata da processo sconosciuto"
@@ -285,7 +285,7 @@ task docker-up
 > ℹ️ Il volume è montato su `/var/lib/postgresql`, non sul percorso legacy `/var/lib/postgresql/data`: dalla versione 18 l'immagine tiene i dati in `/var/lib/postgresql/<versione>/docker`, e col mount vecchio il volume restava vuoto e il container non partiva.
 
 ### 🚨 Emergenza 4: "Eureka registra i servizi ma i Feign Client danno 500"
-I client Eureka richiedono qualche secondo per aggiornare il registro locale delle istanze (cache heartbeat). Attendi 10-15 secondi dall'avvio completo del cluster prima di effettuare la prima richiesta HTTP.
+Ogni servizio tiene una copia locale del registro di Eureka, e il load balancer di Feign una copia di quella. Con i valori di Spring le due cache insieme fanno anche 30-60 secondi di "Load balancer does not contain an instance for the service ...". I moduli creati da `task new-service` le accorciano a 5 secondi (`registry-fetch-interval-seconds` e `spring.cloud.loadbalancer.cache.ttl` nell'`application.yml`), e Eureka rinfresca le sue risposte ogni 5: dopo l'avvio bastano pochi secondi. Se un modulo scritto a mano ha ancora il problema, copia quelle righe da un modulo generato.
 
 
 ---
@@ -302,14 +302,15 @@ ordine), `.vscode/tasks.json` (i comandi `task` dalla palette),
 **Extension Pack for Java**: senza, il tasto Debug non esiste. `F5` ->
 *Stack completo* e hai tutti i servizi con i breakpoint attivi.
 
-**Zed** ha `.zed/tasks.json` (palette -> *task: Spawn*) e `.zed/settings.json`.
-Per il Java serve l'estensione *Java* (jdtls); per il debug passa da VS Code o
-IntelliJ.
+**Zed** ha `.zed/debug.json` (`F4` -> un servizio in debug, con i breakpoint),
+`.zed/tasks.json` (palette -> *task: Spawn*) e `.zed/settings.json`. Serve
+l'estensione *Java*: al primo file `.java` scarica jdtls, Lombok e il debugger,
+quindi aprilo una volta con la rete (`task offline` controlla che ci siano).
 
 **IntelliJ IDEA** non ha bisogno di niente: *File -> Open* sulla cartella del
 repository.
 
-`launch.json` e i due `tasks.json` sono **generati**: li riscrivono
+`launch.json`, `debug.json` e i due `tasks.json` sono **generati**: li riscrivono
 `new-service`, `remove-service` e `set-port`. Se li hai scavalcati modificando
 i moduli a mano:
 

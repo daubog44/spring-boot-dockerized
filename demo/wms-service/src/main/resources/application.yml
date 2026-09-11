@@ -4,6 +4,12 @@ server:
 spring:
   application:
     name: WMS-SERVICE
+  # Il load balancer di Feign tiene l'elenco delle istanze in cache per 35
+  # secondi: con 5, un servizio appena acceso diventa chiamabile subito.
+  cloud:
+    loadbalancer:
+      cache:
+        ttl: 5s
 
   datasource:
     url: ${WMS_DB_URL:jdbc:h2:mem:wmsdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
@@ -23,8 +29,14 @@ eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    # Il registro si rilegge ogni 5 secondi invece che ogni 30.
+    registry-fetch-interval-seconds: 5
   instance:
     prefer-ip-address: true
+    # Un battito ogni 5 secondi: se il servizio si spegne, dopo 15 Eureka lo
+    # toglie e gli altri smettono di chiamarlo.
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
 
 springdoc:
   api-docs:

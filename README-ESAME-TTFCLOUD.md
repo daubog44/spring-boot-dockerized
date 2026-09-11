@@ -202,7 +202,7 @@ Entrambi hanno il driver PostgreSQL a classpath e l'URL parametrico, quindi si p
 
 L'URL del registro è configurabile con `EUREKA_SERVER_URL`, impostato nel compose a `http://eureka-server:8761/eureka/`; in locale usa il default `http://localhost:8761/eureka/`.
 
-I client Eureka aggiornano la loro cache del registro ogni 30 secondi: dopo l'avvio dello stack, attendi 10-15 secondi prima della prima richiesta, altrimenti i Feign client possono rispondere 500 perché non conoscono ancora le istanze.
+Ogni client tiene una copia del registro, e il load balancer di Feign una copia di quella: con i valori di Spring passano anche 30-60 secondi prima che un servizio appena acceso sia chiamabile, e nel frattempo i Feign client rispondono 500. Qui entrambe si rinfrescano ogni 5 secondi (`registry-fetch-interval-seconds` e `spring.cloud.loadbalancer.cache.ttl` negli `application.yml`), quindi dopo l'avvio bastano pochi secondi.
 
 ## Porte e URL
 

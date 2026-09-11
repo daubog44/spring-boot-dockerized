@@ -194,25 +194,29 @@ else
 fi
 
 # --- La configurazione degli editor -------------------------------------------
-# Un launch.json che elenca servizi spariti manda in errore il tasto Debug, e
-# uno che non li elenca non lo fa partire affatto.
+# Una configurazione di debug che elenca servizi spariti manda in errore il
+# tasto Debug, e una che non li elenca non lo fa partire affatto. Vale per VS
+# Code (launch.json) e per Zed (debug.json): li scrive entrambi ide-sync.
 
-LAUNCH="$REPO_ROOT/.vscode/launch.json"
-if [ -f "$LAUNCH" ]; then
-  LAUNCHED="$(grep -oE '"projectName"[[:space:]]*:[[:space:]]*"[^"]+"' "$LAUNCH" | sed -E 's/.*"([^"]+)"$/\1/')"
-  while read -r _name module _port; do
-    [ -z "$module" ] && continue
-    printf '%s
-' "$LAUNCHED" | grep -qx "$module" || add_error "$module: manca in .vscode/launch.json"
-  done <<<"$DEV_PS"
-  for name in $LAUNCHED; do
-    [ -f "$DEMO_DIR/$name/pom.xml" ] || add_error "$name: e' in .vscode/launch.json ma il modulo non esiste"
+EDITOR_FILES=""
+for f in .vscode/launch.json .zed/debug.json; do
+  [ -f "$REPO_ROOT/$f" ] && EDITOR_FILES="$EDITOR_FILES $f"
+done
+if [ -n "$EDITOR_FILES" ]; then
+  for f in $EDITOR_FILES; do
+    LAUNCHED="$(grep -oE '"projectName"[[:space:]]*:[[:space:]]*"[^"]+"' "$REPO_ROOT/$f" | sed -E 's/.*"([^"]+)"$/\1/')"
+    while read -r _name module _port; do
+      [ -z "$module" ] && continue
+      printf '%s\n' "$LAUNCHED" | grep -qx "$module" || add_error "$module: manca in $f"
+    done <<<"$DEV_PS"
+    for name in $LAUNCHED; do
+      [ -f "$DEMO_DIR/$name/pom.xml" ] || add_error "$name: e' in $f ma il modulo non esiste"
+    done
   done
   [ -n "$ERRORS" ] && add_error "riallinea con: task ide-sync"
-  report "editor (launch.json)"
+  report "editor (debug)"
 else
-  printf '  %-26s%s
-' "editor (launch.json)" "assente: task ide-sync"
+  printf '  %-26s%s\n' "editor (debug)" "assente: task ide-sync"
 fi
 
 # --- Esito --------------------------------------------------------------------
