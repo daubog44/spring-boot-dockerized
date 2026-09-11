@@ -1107,6 +1107,442 @@ public String crea(@Valid @ModelAttribute("nuovo") OrdineDTO nuovo,
 
 ---
 
+### 6.7 Thymeleaf: il cheat sheet delle pagine
+
+Thymeleaf è il motore delle pagine della UI (`<nome>-ui`, quella che crei con
+`task new-service NAME=ordini-ui UI=1`). Un template è HTML normale, che si
+apre anche nel browser come file; gli attributi `th:*` dicono a Thymeleaf cosa
+sostituire con i dati che il controller ha messo nel `Model`.
+
+Tutto quello che c'è qui sotto è stato provato su questo template (Spring Boot
+4.0.5, Thymeleaf 3.1): gli esempi sono copiati da pagine che girano, e dove
+Thymeleaf si comporta in modo inatteso c'è scritto.
+
+#### Come si aggancia a Spring Boot
+
+| Cosa | Dove / come |
+| :--- | :--- |
+| La libreria | `spring-boot-starter-thymeleaf` nel pom del modulo UI (la mette `new-service ... UI=1`). Nient'altro da configurare. |
+| Le pagine | `src/main/resources/templates/`. Il controller restituisce il percorso da lì, **senza** `.html` e **senza** barra iniziale: `return "ordini/elenco";` apre `templates/ordini/elenco.html`. |
+| CSS, JS, immagini | `src/main/resources/static/`: `static/css/app.css` si carica come `/css/app.css`. |
+| I testi | `src/main/resources/messages.properties`, letto da solo: `#{chiave}` nelle pagine. |
+| Le pagine d'errore | `templates/error/404.html`, `error/500.html` (o `error.html` per tutte): Spring Boot le usa da solo, con `${status}`, `${error}`, `${path}`. |
+| La cache | Con devtools (ereditato dal pom padre) è già spenta: dopo `task compile` la pagina nuova si vede col refresh. |
+
+Il giro di una pagina:
+
+```text
+browser  GET /ordini?q=ros
+   │
+   ▼
+@Controller  @GetMapping("/ordini")        prende i dati (dal Feign client)
+   │         model.addAttribute("ordini", ...)
+   │         return "ordini/elenco";
+   ▼
+Thymeleaf   templates/ordini/elenco.html   sostituisce i th:* con i dati del Model
+   │
+   ▼
+browser     riceve HTML normale: di Thymeleaf non resta traccia
+```
+
+#### Le cinque espressioni
+
+| Sintassi | Cosa legge | Esempio | Risultato |
+| :--- | :--- | :--- | :--- |
+| `${...}` | una variabile del `Model` (dentro c'è SpEL) | `${ordine.cliente}` | chiama `getCliente()`, o `cliente()` se è un record |
+| `*{...}` | un campo dell'oggetto scelto con `th:object` | `<div th:object="${ordine}">` … `*{cliente}` | come `${ordine.cliente}`, più corto |
+| `@{...}` | un link, con parametri già codificati | `@{/ordini/{id}(id=${o.id})}` | `/ordini/2` |
+| | | `@{/ordini(q=${q}, pagina=2)}` | `/ordini?q=ros&pagina=2` |
+| `#{...}` | un testo di `messages.properties` | `#{ordini.titolo}` | `Ordini in corso` |
+| | | `#{ordini.saluto('Rossi', 3)}` con `ordini.saluto=Ciao {0}, hai {1} ordini` | `Ciao Rossi, hai 3 ordini` |
+| `~{...}` | un frammento di un altro template | `~{fragments/layout :: menu}` | il `<nav>` del layout |
+
+#### Gli attributi
+
+| Attributo | Cosa fa | Esempio |
+| :--- | :--- | :--- |
+| `th:text` | sostituisce il contenuto del tag; l'HTML nei dati viene **escapato** (`<b>` diventa testo) | `<td th:text="${o.cliente}">Rossi</td>` |
+| `th:utext` | come `th:text` ma **senza** escape: l'HTML passa com'è. Mai con testo scritto dagli utenti | `<p th:utext="${avviso}"></p>` |
+| `th:each` | ripete il tag per ogni elemento | `<tr th:each="o, st : ${ordini}">` |
+| `th:if` / `th:unless` | tiene il tag se la condizione è vera / falsa (vedi sotto cosa conta come vero) | `<p th:if="${#lists.isEmpty(ordini)}">Nessun ordine.</p>` |
+| `th:switch` / `th:case` | uno fra tanti; `th:case="*"` è il resto | `<td th:switch="${o.stato.name()}"><span th:case="'NUOVO'">…` |
+| `th:href` `th:src` `th:action` | link, immagini, destinazione dei form: sempre con `@{...}` | `<form th:action="@{/ordini}" method="post">` |
+| `th:object` | sceglie l'oggetto per le `*{...}` (un form, o un blocco di pagina) | `<form th:object="${ordine}">` |
+| `th:field` | lega un campo del form all'oggetto: scrive `id`, `name` e `value` (e `selected`/`checked`); alla POST Spring rimette il valore nell'oggetto | `<input type="text" th:field="*{cliente}">` |
+| `th:errors` | i messaggi di validazione di un campo; se non ci sono errori il tag sparisce | `<span th:errors="*{cliente}"></span>` |
+| `th:errorclass` | aggiunge una classe CSS al campo solo quando è sbagliato | `<input th:field="*{cliente}" th:errorclass="campo-errato">` |
+| `th:value` | solo il `value`, senza legare niente (per un campo fuori da `th:object`) | `<input name="q" th:value="${q}">` |
+| `th:classappend` | aggiunge una classe a quelle che il tag ha già | `<tr th:classappend="${o.urgente} ? 'urgente'">` |
+| `th:disabled` `th:checked` `th:selected` `th:readonly` | attributi booleani: presenti se vero, spariscono se falso | `th:disabled="*{stato.name() == 'CONSEGNATO'}"` |
+| `th:data-*` (e qualsiasi `th:<attributo>`) | scrive l'attributo con quel nome | `<button th:data-id="*{id}">` → `data-id="2"` |
+| `th:with` | una variabile locale al tag | `<p th:with="totale=*{quantita * prezzo}">` |
+| `th:fragment` | dà un nome a un pezzo di pagina, anche con parametri | `<head th:fragment="head(titolo)">` |
+| `th:replace` / `th:insert` | mette il frammento **al posto** del tag / **dentro** il tag | `<nav th:replace="~{fragments/layout :: menu}"></nav>` |
+| `th:block` | un contenitore che non finisce nell'HTML: per ripetere più tag insieme | `<th:block th:each="o : ${ordini}">…</th:block>` |
+| `th:remove="all"` | toglie il tag: righe finte che servono solo aprendo il file nel browser | `<tr th:remove="all"><td>Riga finta</td></tr>` |
+| `th:inline="javascript"` | dati Java dentro uno `<script>`, già trasformati in JSON | `const ordini = /*[[${ordini}]]*/ [];` |
+| `[[...]]` / `[(...)]` | un'espressione dentro il testo, con / senza escape | `<p>Ciao [[${nome}]]</p>` |
+
+#### Operatori e scorciatoie
+
+| Cosa | Come si scrive | Nota |
+| :--- | :--- | :--- |
+| Concatenare | `${o.quantita} + ' pezzi'` | |
+| Sostituzione letterale | `\|Ordine n. ${o.id}\|` | fra due barre verticali: più leggibile del `+` |
+| Condizione | `${o.urgente} ? 'sì' : 'no'` | senza la parte `: …`, se è falso non scrive niente: comodo con `th:classappend` |
+| Valore di riserva (Elvis) | `${o.note} ?: 'nessuna'` | scatta solo con `null`: una stringa vuota resta vuota |
+| Navigazione sicura | `${o.note?.toUpperCase()}` | se `note` è `null` non esplode, scrive vuoto |
+| Confronti | `gt` `lt` `ge` `le` `eq` `ne` (oppure `>` `<` `>=` `<=` `==` `!=`) | dentro un attributo HTML il `<` può rompere il tag: usa `lt` |
+| Logici | `and` `or` `not` | |
+| Metodi | `${o.stato.name()}`, `${ordini.size()}` | SpEL chiama qualsiasi metodo pubblico |
+| Classi ed enum | `${T(com.example.ttfcloud_esame.commondto.Stato).values()}` | funziona, ma un `@ModelAttribute` nel controller è più leggibile |
+| Bean di Spring | `${@environment.getProperty('spring.application.name')}` | `@nomeDelBean` |
+| Proiezione | `${ordini.![quantita]}` | la lista dei soli `quantita`: si passa a `#aggregates` e `#lists` |
+| Parametri della richiesta | `${param.q}` per scriverlo, `${param.q[0]}` per confrontarlo | `param.q` è l'elenco dei valori di `?q=`; meglio ancora: rimettilo nel `Model` |
+| Sessione | `${session.utente}` | gli attributi messi con `session.setAttribute(...)` |
+
+#### Gli oggetti di utilità (`#...`)
+
+| Oggetto | Esempio | Risultato |
+| :--- | :--- | :--- |
+| `#strings` | `${#strings.abbreviate(o.note, 20)}` | `Consegnare al por...` |
+| | `isEmpty(s)`, `toUpperCase(s)`, `contains(s, 'x')`, `replace(s, '-', '+')`, `substring(s, 1, 3)` | |
+| `#numbers` | `${#numbers.formatDecimal(o.prezzo, 1, 'POINT', 2, 'COMMA')}` | `1.234,50` |
+| | `${#numbers.formatDecimal(x, 1, 2)}` | due decimali, separatore della lingua del browser |
+| | `${#numbers.formatInteger(1234567, 1, 'POINT')}` | `1.234.567` |
+| `#temporals` | `${#temporals.format(o.consegna, 'dd/MM/yyyy')}` | `20/09/2026` (per `LocalDate`, `LocalDateTime`) |
+| | `#temporals.createToday()`, `#temporals.day(data)` | |
+| `#dates` | `${#dates.format(data, 'dd/MM/yyyy')}` | lo stesso, per il vecchio `java.util.Date` |
+| `#lists` | `isEmpty(l)`, `size(l)`, `contains(l, x)`, `sort(l)` | |
+| `#aggregates` | `${#aggregates.sum(ordini.![quantita])}`, `avg(...)` | su una lista **vuota** restituisce `null`: usalo dentro un `th:unless="${#lists.isEmpty(...)}"` |
+| `#fields` | `${#fields.hasErrors('cliente')}`, `${#fields.hasAnyErrors()}` | solo dentro un `th:object` |
+| `#objects` | `${#objects.nullSafe(x, 'riserva')}` | come Elvis |
+
+#### Il ciclo: la variabile di stato
+
+`th:each="o, st : ${ordini}"` dà, oltre all'elemento `o`, lo stato `st` (se
+non lo dichiari si chiama `oStat` da solo):
+
+| `st.` | Valore |
+| :--- | :--- |
+| `index` | posizione contando da 0 |
+| `count` | posizione contando da 1 |
+| `size` | quanti sono in tutto |
+| `first` / `last` | è il primo / l'ultimo |
+| `even` / `odd` | pari / dispari, contando da 1 |
+| `current` | l'elemento corrente |
+
+#### Cosa conta come vero in `th:if`
+
+| Valore | `th:if` |
+| :--- | :--- |
+| `null` | falso |
+| `false`, e le stringhe `"false"`, `"off"`, `"no"` | falso |
+| il numero `0` | falso |
+| una stringa vuota `""` | **vero** |
+| una lista vuota | **vero** |
+| qualsiasi altra cosa | vero |
+
+Quindi `th:if="${ordini}"` è sempre vero, anche senza ordini: per le liste si
+scrive `th:if="${#lists.isEmpty(ordini)}"`, per le stringhe
+`th:unless="${#strings.isEmpty(s)}"`.
+
+#### Esempio completo — elenco, dettaglio e form con validazione
+
+Tutto nel modulo **UI** (`ordini-ui`). I dati arrivano da `ordini-service`
+attraverso il `@FeignClient` `OrdiniClient` (vedi 6.3); qui conta cosa succede
+fra controller e pagine.
+
+```java
+// demo/ordini-ui/src/main/java/.../OrdineForm.java
+// L'oggetto del form: un campo per ogni <input>, coi vincoli di validazione.
+package com.example.ttfcloud_esame.ordiniui;
+
+import com.example.ttfcloud_esame.commondto.Stato;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDate;
+
+@Data                                   // getter e setter: th:field li usa entrambi
+public class OrdineForm {
+
+    @NotBlank(message = "Il cliente è obbligatorio")
+    private String cliente;
+
+    @NotNull(message = "Quanti pezzi?")
+    @Min(value = 1, message = "Almeno un pezzo")
+    private Integer quantita;
+
+    private Stato stato = Stato.NUOVO;  // il valore iniziale della <select>
+    private boolean urgente;            // una checkbox
+
+    // <input type="date"> manda 2026-10-01: senza questa riga Spring non sa leggerla.
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate consegna;
+}
+```
+
+> Anche un **record** va bene come oggetto del form: `th:field` lo legge e alla
+> POST Spring lo costruisce col costruttore (provato con testo e numeri). Così
+> puoi usare direttamente il DTO di `common-dto`, per esempio
+> `new OrdineDTO(null, null)` nel metodo GET.
+
+```java
+// demo/ordini-ui/src/main/java/.../OrdiniWebController.java
+package com.example.ttfcloud_esame.ordiniui;
+
+import com.example.ttfcloud_esame.commondto.Stato;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+@Controller                        // pagine, non JSON: niente @RestController qui
+@RequestMapping("/ordini")
+@RequiredArgsConstructor
+public class OrdiniWebController {
+
+    private final OrdiniClient ordini;   // il @FeignClient verso ordini-service
+
+    // Un metodo @ModelAttribute gira prima di ogni pagina di questo controller:
+    // la <select> degli stati ce l'ha sempre, anche quando il form torna con errori.
+    @ModelAttribute("stati")
+    public Stato[] stati() {
+        return Stato.values();
+    }
+
+    // GET /ordini  e  GET /ordini?q=ros
+    @GetMapping
+    public String elenco(@RequestParam(required = false) String q, Model model) {
+        model.addAttribute("ordini", ordini.cerca(q));
+        model.addAttribute("q", q);             // per rimetterlo nella casella di ricerca
+        return "ordini/elenco";                 // templates/ordini/elenco.html
+    }
+
+    // GET /ordini/2
+    @GetMapping("/{id}")
+    public String dettaglio(@PathVariable Long id, Model model) {
+        model.addAttribute("ordine", ordini.uno(id));
+        return "ordini/dettaglio";
+    }
+
+    // Il form parte da un oggetto vuoto: senza, th:object non ha niente da
+    // legare e la pagina va in errore.
+    @GetMapping("/nuovo")
+    public String nuovo(Model model) {
+        model.addAttribute("ordine", new OrdineForm());
+        return "ordini/form";
+    }
+
+    @PostMapping
+    public String salva(@Valid @ModelAttribute("ordine") OrdineForm ordine,
+                        BindingResult errori,        // SUBITO dopo l'oggetto validato
+                        RedirectAttributes redirect) {
+        if (errori.hasErrors()) {
+            return "ordini/form";    // la stessa pagina: i dati inseriti e gli errori restano
+        }
+        ordini.crea(ordine);
+        // Un attributo "flash" sopravvive al redirect e sparisce alla pagina dopo.
+        redirect.addFlashAttribute("messaggio", "Ordine salvato");
+        return "redirect:/ordini";   // dopo una POST: il refresh non rimanda il form
+    }
+
+    // I form HTML conoscono solo GET e POST: si cancella con una POST, e la
+    // DELETE vera la fa il Feign client verso il servizio.
+    @PostMapping("/{id}/elimina")
+    public String elimina(@PathVariable Long id, RedirectAttributes redirect) {
+        ordini.elimina(id);
+        redirect.addFlashAttribute("messaggio", "Ordine eliminato");
+        return "redirect:/ordini";
+    }
+}
+```
+
+I pezzi comuni a tutte le pagine stanno in un file di frammenti:
+
+```html
+<!-- demo/ordini-ui/src/main/resources/templates/fragments/layout.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="it">
+<head th:fragment="head(titolo)">
+    <meta charset="UTF-8">
+    <title th:text="${titolo}">Titolo</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+    <nav th:fragment="menu">
+        <a th:href="@{/ordini}">Ordini</a> |
+        <a th:href="@{/ordini/nuovo}">Nuovo ordine</a>
+    </nav>
+
+    <!-- Il messaggio flash: c'è solo subito dopo un redirect. -->
+    <p th:fragment="flash" th:if="${messaggio}" class="flash" th:text="${messaggio}">Salvato</p>
+</body>
+</html>
+```
+
+L'elenco, con ricerca, tabella, formati e cancellazione:
+
+```html
+<!-- demo/ordini-ui/src/main/resources/templates/ordini/elenco.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="it">
+<head th:replace="~{fragments/layout :: head(titolo='Ordini')}"></head>
+<body>
+    <nav th:replace="~{fragments/layout :: menu}"></nav>
+    <p th:replace="~{fragments/layout :: flash}"></p>
+
+    <h1 th:text="#{ordini.titolo}">Ordini</h1>
+
+    <!-- GET: i campi finiscono nella query, ?q=... -->
+    <form th:action="@{/ordini}" method="get">
+        <input type="text" name="q" th:value="${q}" placeholder="Cliente">
+        <button type="submit">Cerca</button>
+    </form>
+
+    <p th:if="${#lists.isEmpty(ordini)}">Nessun ordine.</p>
+
+    <table th:unless="${#lists.isEmpty(ordini)}">
+        <tr>
+            <th>#</th><th>Cliente</th><th>Pezzi</th><th>Stato</th><th>Consegna</th><th>Prezzo</th><th></th>
+        </tr>
+        <tr th:each="o, st : ${ordini}" th:classappend="${o.urgente} ? 'urgente'">
+            <td th:text="${st.count}">1</td>
+            <td><a th:href="@{/ordini/{id}(id=${o.id})}" th:text="${o.cliente}">Rossi</a></td>
+            <td th:text="${o.quantita}">3</td>
+            <td th:switch="${o.stato.name()}">
+                <span th:case="'NUOVO'">da spedire</span>
+                <span th:case="'SPEDITO'">in viaggio</span>
+                <span th:case="*" th:text="${o.stato}">altro</span>
+            </td>
+            <td th:text="${o.consegna != null} ? ${#temporals.format(o.consegna, 'dd/MM/yyyy')} : '-'">20/09/2026</td>
+            <td th:text="${#numbers.formatDecimal(o.prezzo, 1, 'POINT', 2, 'COMMA')} + ' €'">12,50 €</td>
+            <td>
+                <form th:action="@{/ordini/{id}/elimina(id=${o.id})}" method="post"
+                      onsubmit="return confirm('Eliminare l\'ordine?')">
+                    <button type="submit">Elimina</button>
+                </form>
+            </td>
+        </tr>
+        <tr th:remove="all"><td>2</td><td>Riga finta, solo per l'anteprima</td></tr>
+    </table>
+
+    <p th:unless="${#lists.isEmpty(ordini)}"
+       th:text="|Ordini: ${#lists.size(ordini)}, pezzi in tutto: ${#aggregates.sum(ordini.![quantita])}|">Totale</p>
+</body>
+</html>
+```
+
+Il dettaglio, con `th:object` e le espressioni `*{...}`:
+
+```html
+<!-- demo/ordini-ui/src/main/resources/templates/ordini/dettaglio.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="it">
+<head th:replace="~{fragments/layout :: head(titolo='Dettaglio ordine')}"></head>
+<body>
+    <nav th:replace="~{fragments/layout :: menu}"></nav>
+
+    <div th:object="${ordine}">
+        <h1 th:text="|Ordine n. *{id}|">Ordine n. 1</h1>
+        <p>Cliente: <strong th:text="*{cliente}">Rossi</strong></p>
+        <p th:with="totale=*{quantita * prezzo}">
+            Totale: <span th:text="${#numbers.formatDecimal(totale, 1, 2)}">37,50</span>
+        </p>
+        <p th:if="*{urgente}" class="urgente">Urgente!</p>
+        <p>Note: <span th:text="*{note} ?: 'nessuna'">nessuna</span></p>
+        <button type="button" th:data-id="*{id}"
+                th:disabled="*{stato.name() == 'CONSEGNATO'}">Spedisci</button>
+    </div>
+</body>
+</html>
+```
+
+Il form, che serve sia la prima volta sia quando torna con gli errori:
+
+```html
+<!-- demo/ordini-ui/src/main/resources/templates/ordini/form.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="it">
+<head th:replace="~{fragments/layout :: head(titolo='Nuovo ordine')}"></head>
+<body>
+    <nav th:replace="~{fragments/layout :: menu}"></nav>
+
+    <form th:action="@{/ordini}" th:object="${ordine}" method="post">
+        <p th:if="${#fields.hasAnyErrors()}" class="errore">Correggi i campi segnati.</p>
+
+        <label>Cliente
+            <input type="text" th:field="*{cliente}" th:errorclass="campo-errato">
+        </label>
+        <span class="errore" th:if="${#fields.hasErrors('cliente')}" th:errors="*{cliente}">obbligatorio</span>
+
+        <label>Pezzi <input type="number" th:field="*{quantita}"></label>
+        <span class="errore" th:errors="*{quantita}"></span>
+
+        <label>Stato
+            <select th:field="*{stato}">
+                <option th:each="s : ${stati}" th:value="${s}" th:text="${s}">NUOVO</option>
+            </select>
+        </label>
+
+        <label><input type="checkbox" th:field="*{urgente}"> Urgente</label>
+
+        <label>Consegna <input type="date" th:field="*{consegna}"></label>
+
+        <button type="submit">Salva</button>
+    </form>
+</body>
+</html>
+```
+
+```properties
+# demo/ordini-ui/src/main/resources/messages.properties
+ordini.titolo=Ordini in corso
+ordini.saluto=Ciao {0}, hai {1} ordini
+```
+
+Cosa esce, per capire cosa fa ogni pezzo:
+
+- `th:field="*{cliente}"` diventa `<input type="text" id="cliente" name="cliente" value="">`;
+  dopo una POST con errori, `value` è quello scritto dall'utente e la classe
+  `campo-errato` è aggiunta.
+- La `<select>` marca da sola come `selected` l'opzione uguale a `stato`.
+- La checkbox diventa `<input type="checkbox" id="urgente1" name="urgente" value="true">`
+  più un `<input type="hidden" name="_urgente">`: è quello che fa arrivare
+  `false` quando la casella è vuota. Nota l'`id` con l'`1`, se ci attacchi una
+  `<label for=...>`.
+- `th:errors` scrive il `message` del vincolo (`Il cliente è obbligatorio`);
+  senza errori il tag sparisce.
+- Il messaggio flash compare alla prima pagina dopo il redirect, e al refresh
+  successivo non c'è più.
+
+#### Gli errori che fanno perdere tempo
+
+| Cosa vedi | Perché | Rimedio |
+| :--- | :--- | :--- |
+| `Neither BindingResult nor plain target object for bean name 'ordine'` | il metodo GET non ha messo l'oggetto del form nel `Model` | `model.addAttribute("ordine", new OrdineForm());` |
+| `Error resolving template [/ordini/elenco]` | barra all'inizio del nome (in IntelliJ va, nel jar e in Docker no), oppure file fuori da `templates/`, oppure nome scritto diverso | `return "ordini/elenco";` e controlla il percorso del file |
+| Il browser mostra la scritta `ordini/elenco` | la classe è `@RestController` | `@Controller` |
+| Gli errori di validazione non compaiono | manca `@Valid`, o `BindingResult` non è il parametro subito dopo, o dopo gli errori fai `redirect:` | vedi il metodo `salva` qui sopra |
+| Il messaggio non arriva dopo il redirect | `model.addAttribute` invece di `redirect.addFlashAttribute` | `RedirectAttributes` |
+| `EL1007E: Property or field 'cliente' cannot be found on null` | l'oggetto è `null` | `${ordine?.cliente}`, oppure un `th:if` prima |
+| `EL1008E: Property or field 'nome' cannot be found on object of type ...` | il campo si chiama diversamente (in un record: il nome del componente) | guarda la classe o il record |
+| `th:if="${lista}"` è vero anche senza elementi | una lista vuota conta come vera | `th:if="${#lists.isEmpty(lista)}"` |
+| `pezzi in tutto: null` | `#aggregates.sum` su una lista vuota | dentro un `th:unless="${#lists.isEmpty(...)}"` |
+| `Only variable expressions returning numbers or booleans are allowed in this context` | Thymeleaf 3.1 non accetta testo dei dati dentro `th:onclick` e gli altri `th:on*` (per sicurezza) | l'`onclick` scritto normale, e i dati in un `th:data-*` |
+| La pagina modificata non cambia | Spring legge i template da `target/classes` | `task compile` |
+| Nella pagina d'errore `${message}` è vuoto | Spring Boot nasconde il messaggio delle eccezioni | `server.error.include-message: always` in `application.yml` |
+| Il servizio risponde 404 e la UI mostra una pagina 500 | il Feign client trasforma il 404 in `FeignException.NotFound` | `try { … } catch (FeignException.NotFound e) { … }` e mostra un messaggio |
+
+---
+
 ## 7. Risoluzione Guidata delle 3 Tracce d'Esame
 
 ### Traccia 1: WMS Magazzino ("Spostati S.r.l.")
