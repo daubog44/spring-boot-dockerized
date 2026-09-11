@@ -93,7 +93,8 @@ start_case "ogni copia del progetto ha il suo progetto Docker Compose"
 NOME_COMPOSE="$(unset COMPOSE_PROJECT_NAME; . "$SB_SCRIPTS/dev-lib.sh"; printf '%s' "$COMPOSE_PROJECT_NAME")"
 ATTESO_COMPOSE="$(basename "$SANDBOX" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9_-]+/-/g; s/^[^a-z0-9]+//')"
 { [ "$NOME_COMPOSE" = "$ATTESO_COMPOSE" ] || fail "progetto Compose '$NOME_COMPOSE' invece di '$ATTESO_COMPOSE'"; } &&
-  assert_contains Taskfile.yml "COMPOSE_PROJECT_NAME:" "il Taskfile"
+  assert_contains Taskfile.yml "COMPOSE_PROJECT_NAME:" "il Taskfile" &&
+  assert_contains demo/.env "COMPOSE_PROJECT_NAME=$ATTESO_COMPOSE" "demo/.env"
 end_case
 
 start_case "new-service crea il modulo e lo collega ovunque"
@@ -128,7 +129,8 @@ assert_ok "new-service --ui" &&
   assert_contains demo/beta-ui/pom.xml "spring-boot-starter-thymeleaf" &&
   assert_not_contains demo/beta-ui/pom.xml "spring-boot-starter-data-jpa" &&
   assert_file demo/beta-ui/src/main/resources/templates/index.html &&
-  assert_not_contains demo/beta-ui/src/main/resources/application.yml "datasource"
+  assert_not_contains demo/beta-ui/src/main/resources/application.yml "datasource" &&
+  assert_contains demo/beta-ui/src/main/resources/application.yml "tracking-modes: cookie" "la sessione solo nel cookie"
 end_case
 
 start_case "new-service NODB=1 lascia fuori database e driver"

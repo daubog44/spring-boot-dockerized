@@ -1528,6 +1528,7 @@ Cosa esce, per capire cosa fa ogni pezzo:
 | Cosa vedi | Perché | Rimedio |
 | :--- | :--- | :--- |
 | `Neither BindingResult nor plain target object for bean name 'ordine'` | il metodo GET non ha messo l'oggetto del form nel `Model` | `model.addAttribute("ordine", new OrdineForm());` |
+| La stessa eccezione (o un 404) solo al primo invio del form, con l'indirizzo che finisce in `;jsessionid=...` | il browser non ha ancora il cookie di sessione: Tomcat mette la sessione nell'URL del redirect, e Spring non lo riconosce più come `/` | nell'`application.yml` della UI: `server.servlet.session.tracking-modes: cookie` (`task new-service UI=1` lo mette già) |
 | `Error resolving template [/ordini/elenco]` | barra all'inizio del nome (in IntelliJ va, nel jar e in Docker no), oppure file fuori da `templates/`, oppure nome scritto diverso | `return "ordini/elenco";` e controlla il percorso del file |
 | Il browser mostra la scritta `ordini/elenco` | la classe è `@RestController` | `@Controller` |
 | Gli errori di validazione non compaiono | manca `@Valid`, o `BindingResult` non è il parametro subito dopo, o dopo gli errori fai `redirect:` | vedi il metodo `salva` qui sopra |
