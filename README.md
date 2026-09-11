@@ -270,21 +270,13 @@ docker compose ps
 ```
 
 ```bash
-<<<<<<< branch
-docker logs exam-store-service --tail 50
-=======
-docker compose logs eureka-server --tail 50
->>>>>>> main
+docker compose logs store-service --tail 50
 ```
 
 Per verificare quali servizi si sono effettivamente registrati su Eureka, apri `http://localhost:8761` nel browser oppure, dall'host:
 
 ```bash
-<<<<<<< branch
 curl -s -H "Accept: application/json" http://localhost:8761/eureka/apps
-=======
-docker compose exec eureka-server curl -s -H "Accept: application/json" http://localhost:8761/eureka/apps
->>>>>>> main
 ```
 
 I container non hanno un nome fisso: Docker Compose li chiama `<cartella>-<servizio>-1`, così la copia di prova e quella dell'esame non si contendono lo stesso nome. Per questo i comandi qui sopra usano il nome del **servizio** (`eureka-server`, `postgres`), e vanno lanciati dalla cartella dei moduli.
