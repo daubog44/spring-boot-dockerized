@@ -419,25 +419,54 @@ task db-config PORT=5433
 
 ### Riempire il database di dati di prova
 
-Scritte le entity, questo comando le legge e scrive un `data.sql` per modulo:
+Scritte le entity:
 
 ```bash
 task seed-data
 ```
 
-Spring Boot lo esegue all'avvio, dopo che Hibernate ha creato le tabelle. I
-valori sono inventati ma plausibili — le stringhe seguono il nome della colonna
-(un campo `citta` prende nomi di città, un `email` degli indirizzi), gli `enum`
-vengono presi davvero dai valori dichiarati nel file Java, e le tabelle con
-chiave esterna vengono riempite **dopo** quelle a cui puntano, così i
-riferimenti esistono.
+Scrive due righe nell'`application.yml` di ogni modulo con delle `@Entity`:
+
+```yaml
+dev-data:
+  rows: 5
+```
+
+e da lì in poi, a ogni avvio, le tabelle ancora vuote si riempiono da sole. Lo
+fa il pacchetto `devdata` di `common-dto`, dentro l'applicazione, **dopo** che
+Hibernate ha creato le tabelle: costruisce oggetti delle tue classi `@Entity`
+con valori inventati e li salva con `persist()`, come farebbe il tuo codice.
+Per questo rispetta tutto quello che rispetta la tua applicazione:
+
+- gli id li genera chi deve (IDENTITY, sequenze, UUID); chiavi composte e
+  `@MapsId` compresi;
+- le relazioni puntano a righe che esistono (prima si riempiono le tabelle a
+  cui le altre puntano), e le tabelle di collegamento dei molti a molti si
+  riempiono anche loro;
+- gli `enum` sono i tuoi, salvati come stringa o come numero;
+- lunghezza delle colonne, `@NotNull`, `@Size`, `@Min`/`@Max`, `@Email`,
+  `@Past`/`@Future` e perfino `@Pattern`: una targa `[A-Z]{2}[0-9]{3}[A-Z]{2}`
+  diventa `AB123CD`;
+- i valori seguono il nome del campo e dell'entity: il `nome` di un Articolo è
+  un prodotto, quello di una Categoria una categoria, una `citta` una città.
+
+Una riga rifiutata viene rifatta con valori diversi; se proprio non entra si
+passa oltre e il log dice perché: l'avvio non fallisce mai per i dati di
+prova. Vale su H2, su PostgreSQL e dentro Docker, e un riavvio non duplica
+niente, perché si riempiono solo le tabelle vuote.
+
+Il comando poi fa la prova: compila, avvia ogni modulo su un H2 usa-e-getta e
+ti dice tabella per tabella quante righe sono entrate — o perché no, adesso e
+non davanti al docente.
 
 ```bash
 task seed-data SERVICE=ordini-service ROWS=10
+task seed-data ROWS=0      # spenti
 ```
 
-Aggiunge da solo all'`application.yml` le due proprietà senza cui il file non
-verrebbe eseguito, o verrebbe eseguito prima che le tabelle esistano:
+Servono dati precisi, quelli della traccia? Scrivili in un `data.sql` tuo:
+le tabelle che riempie lui non vengono toccate. Perché venga eseguito dopo
+Hibernate, anche su PostgreSQL, nell'`application.yml` servono:
 
 ```yaml
 spring:
@@ -447,12 +476,6 @@ spring:
     init:
       mode: always
 ```
-
-Il `data.sql` è tuo: modificalo pure, non viene riscritto se non rilanci il
-comando. Spring Boot lo esegue a **ogni** avvio, ma ogni INSERT scatta solo se
-la tabella non è ancora piena: su PostgreSQL, che i dati li conserva, un
-riavvio o un hot reload non duplicano niente, e una colonna `unique` non fa
-fallire l'avvio. Per ripartire dai soli dati di prova: `task docker-reset`.
 
 I dati di prova valgono punti: una demo su tabelle vuote non si vede.
 
@@ -607,10 +630,13 @@ Lo schema del database lo puoi anche guardare da solo, in qualunque momento:
 task db-schema
 ```
 
-Legge le classi `@Entity` e ne ricava tabelle, colonne, tipi SQL, chiavi e
-relazioni, più un diagramma ER in mermaid che GitHub e VS Code disegnano da
-soli. Non si collega a nessun database: funziona anche a stack spento, e dice
-la verità su quello che Hibernate creerà.
+Avvia ogni modulo con delle `@Entity` su un database H2 usa-e-getta, lascia
+che Hibernate crei le tabelle e le interroga: entità e relazioni (modello
+concettuale), tabelle, colonne, tipi SQL, chiavi e vincoli (modello logico),
+più un diagramma ER in mermaid che GitHub e VS Code disegnano da soli. Le
+tabelle di collegamento, le colonne delle relazioni e i valori ammessi degli
+enum sono quelli che Hibernate crea davvero, non quelli che ci si aspetta.
+Funziona a stack spento e senza rete: serve solo Maven.
 
 ---
 
@@ -655,8 +681,8 @@ la verità su quello che Hibernate creerà.
 | `task db-config` | Stampa o cambia database, utente, password e porta di PostgreSQL |
 | `task ide-sync` | Riallinea VS Code e Zed ai moduli veri (lo chiamano da soli new-service, remove-service, set-port) |
 | `task rename-project` | Rinomina la cartella dei moduli Maven, ovunque sia nominata |
-| `task seed-data` | Dati di prova ricavati dalle `@Entity` (`data.sql`) |
-| `task db-schema` | Schema concettuale e logico ricavato dalle `@Entity` |
+| `task seed-data` | Dati di prova: a ogni avvio le tabelle vuote si riempiono, passando da Hibernate |
+| `task db-schema` | Schema concettuale e logico, letto dal database che crea Hibernate |
 | `task consegna` | Prepara la cartella da consegnare (`NOME=COGNOME_NOME`) |
 | `task offline-prep` | **Con la rete**: scarica tutto quello che servirà all'esame |
 | `task offline` | Dice se il progetto partirebbe a rete staccata |

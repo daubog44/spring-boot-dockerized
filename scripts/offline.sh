@@ -11,9 +11,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEMO_DIR="$REPO_ROOT/demo"
 
 PREP=0
+ALL=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -Prep|--prep) PREP=1; shift ;;
+    -All|--all) ALL=1; shift ;;
     *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
   esac
 done
@@ -26,6 +28,26 @@ IMAGES="$( { grep -E '^FROM[[:space:]]+' "$DEMO_DIR/Dockerfile" | awk '{print $2
            } | sort -u )"
 
 PROBLEMS=0
+
+# Un progetto di prova, fuori dal tuo, con i moduli che new-service genera
+# all'esame: un servizio REST con database e un'interfaccia web. Le loro
+# dipendenze (JPA, H2, PostgreSQL, Feign, Swagger, Thymeleaf) nel progetto di
+# oggi magari non ci sono ancora, e senza rete non si scaricherebbero piu'.
+PROBE_MODULES="prova-offline-service,prova-offline-ui"
+new_probe() {
+  local probe deps
+  probe="$(mktemp -d)"
+  tar -cf - -C "$REPO_ROOT" \
+    --exclude=target --exclude=.git --exclude=.dev-logs \
+    --exclude=node_modules --exclude=.task --exclude=consegna . | tar -xf - -C "$probe"
+  bash "$probe/scripts/new-service.sh" --name prova-offline-service >/dev/null 2>&1
+  bash "$probe/scripts/new-service.sh" --name prova-offline-ui --ui >/dev/null 2>&1
+  if [ "$ALL" = "1" ]; then
+    deps="$(sed -n "s/^[[:space:]]*'\([a-z0-9-]*\)'[[:space:]]*=[[:space:]]*New-Dep.*/\1/p" "$probe/scripts/add-dep.ps1" | paste -sd, -)"
+    bash "$probe/scripts/add-dep.sh" --module prova-offline-service --deps "$deps" >/dev/null 2>&1
+  fi
+  printf '%s\n' "$probe"
+}
 
 if [ "$PREP" -eq 1 ]; then
   echo ""
@@ -41,6 +63,19 @@ if [ "$PREP" -eq 1 ]; then
     line "maven" "scaricate e compilate"
   else
     line "maven" "qualcosa non ha funzionato: guarda l'output sopra"
+    PROBLEMS=$(( PROBLEMS + 1 ))
+  fi
+
+  # 1-bis. Le dipendenze dei moduli che creerai all'esame.
+  echo ""
+  echo "==> Dipendenze dei moduli che creerai (new-service, seed-data, db-schema)"
+  [ "$ALL" = "1" ] && echo "  ... piu' tutto il catalogo di add-dep: ci vuole un po'."
+  PROBE="$(new_probe)"
+  # Con la fase dei test, anche se non ce ne sono: scarica il plugin che li esegue.
+  if ( cd "$PROBE/demo" && ./mvnw -B -q dependency:go-offline && ./mvnw -B -q package -pl "$PROBE_MODULES" -am ); then
+    line "moduli nuovi" "JPA, H2, PostgreSQL, Feign, Swagger, Thymeleaf scaricati"
+  else
+    line "moduli nuovi" "qualcosa non ha funzionato: guarda l'output sopra"
     PROBLEMS=$(( PROBLEMS + 1 ))
   fi
 
@@ -66,6 +101,18 @@ if [ "$PREP" -eq 1 ]; then
     line "docker compose build" "fallita"
     PROBLEMS=$(( PROBLEMS + 1 ))
   fi
+
+  # Anche dentro Docker: la build di un modulo nuovo scarica le sue dipendenze
+  # nella cache di Maven delle build (--mount=type=cache nel Dockerfile), che
+  # cosi' il giorno dell'esame le ha gia'. Le immagini di prova poi si tolgono.
+  if ( cd "$PROBE/demo" && docker compose build prova-offline-service >/dev/null 2>&1 ); then
+    line "build di un modulo nuovo" "fatta (cache Maven di Docker piena)"
+  else
+    line "build di un modulo nuovo" "fallita"
+    PROBLEMS=$(( PROBLEMS + 1 ))
+  fi
+  ( cd "$PROBE/demo" && docker compose down --rmi local >/dev/null 2>&1 )
+  rm -rf "$PROBE"
 
   echo ""
   if [ "$PROBLEMS" -eq 0 ]; then
@@ -117,6 +164,18 @@ else
   line "build offline (mvnw -o)" "FALLISCE: lancia task offline-prep con la rete"
   PROBLEMS=$(( PROBLEMS + 1 ))
 fi
+
+# E un modulo nuovo, come quelli che creerai all'esame? Stessa prova, su un
+# progetto usa-e-getta con un servizio con database e un'interfaccia.
+echo "  Provo a compilare offline anche un modulo nuovo (servizio con database + interfaccia)..."
+PROBE="$(new_probe)"
+if ( cd "$PROBE/demo" && ./mvnw -B -q -o package -Dmaven.test.skip=true -pl "$PROBE_MODULES" -am >/dev/null 2>&1 ); then
+  line "modulo nuovo offline" "RIESCE (new-service, seed-data, db-schema)"
+else
+  line "modulo nuovo offline" "FALLISCE: lancia task offline-prep con la rete"
+  PROBLEMS=$(( PROBLEMS + 1 ))
+fi
+rm -rf "$PROBE"
 
 # 3. Docker.
 echo ""

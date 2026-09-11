@@ -1,0 +1,16 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+@Inheritance(strategy = InheritanceType.JOINED)
+public class PagamentoEntity {
+    @Id @GeneratedValue
+    private Long id;
+    private BigDecimal importo;
+}

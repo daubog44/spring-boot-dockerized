@@ -19,11 +19,16 @@
 .PARAMETER Prep
     Scarica invece di limitarsi a controllare.
 
+.PARAMETER All
+    Con -Prep: scarica anche tutto il catalogo di add-dep (security, kafka,
+    mongodb...), non solo quello che genera new-service. Ci mette di piu'.
+
 .EXAMPLE
     task offline-prep
+    task offline-prep ALL=1
     task offline
 #>
-param([switch]$Prep)
+param([switch]$Prep, [switch]$All)
 
 $ErrorActionPreference = 'Continue'
 . (Join-Path $PSScriptRoot 'scaffold-lib.ps1')
@@ -50,6 +55,25 @@ $images = @($images | Select-Object -Unique)
 
 $problems = 0
 
+# Un progetto di prova, fuori dal tuo, con i moduli che new-service genera
+# all'esame: un servizio REST con database e un'interfaccia web. Le loro
+# dipendenze (JPA, H2, PostgreSQL, Feign, Swagger, Thymeleaf) nel progetto di
+# oggi magari non ci sono ancora, e senza rete non si scaricherebbero piu'.
+$probeModules = @('prova-offline-service', 'prova-offline-ui')
+function New-OfflineProbe {
+    $probe = Join-Path ([System.IO.Path]::GetTempPath()) ('esame-offline-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+    # /XF .git: in un worktree .git e' un file che punta al repository vero.
+    $null = robocopy $repoRoot $probe /E /XD target .git .dev-logs node_modules .task consegna /XF .git /NFL /NDL /NJH /NJS /NP
+    $scripts = Join-Path $probe 'scripts'
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scripts 'new-service.ps1') -Name $probeModules[0] | Out-Null
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scripts 'new-service.ps1') -Name $probeModules[1] -Ui | Out-Null
+    if ($All) {
+        $catalog = @([regex]::Matches((Read-TextFile (Join-Path $scripts 'add-dep.ps1')), "(?m)^\s+'([a-z0-9-]+)'\s+=\s+New-Dep") | ForEach-Object { $_.Groups[1].Value })
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scripts 'add-dep.ps1') -Module $probeModules[0] -Deps ($catalog -join ',') | Out-Null
+    }
+    return $probe
+}
+
 if ($Prep) {
     Write-Host ''
     Write-Host 'PREPARAZIONE PER L''ESAME SENZA RETE' -ForegroundColor Cyan
@@ -73,6 +97,27 @@ if ($Prep) {
         $problems++
     }
 
+    # 1-bis. Le dipendenze dei moduli che creerai all'esame.
+    Write-Host ''
+    Write-Host '==> Dipendenze dei moduli che creerai (new-service, seed-data, db-schema)' -ForegroundColor Cyan
+    if ($All) { Write-Host '  ... piu'' tutto il catalogo di add-dep: ci vuole un po''.' -ForegroundColor DarkGray }
+    $probe = New-OfflineProbe
+    $probeDemo = Join-Path $probe (Get-AggregatorName -RepoRoot $probe)
+    Push-Location $probeDemo
+    try {
+        cmd /c "set JAVA_HOME=$javaHome&& .\mvnw.cmd -B -q dependency:go-offline"
+        $probeOffline = $LASTEXITCODE
+        # Con la fase dei test, anche se non ce ne sono: scarica il plugin che li esegue.
+        cmd /c "set JAVA_HOME=$javaHome&& .\mvnw.cmd -B -q package -pl $($probeModules -join ',') -am"
+        $probePackage = $LASTEXITCODE
+    } finally { Pop-Location }
+    if ($probeOffline -eq 0 -and $probePackage -eq 0) {
+        Write-Line 'moduli nuovi' 'JPA, H2, PostgreSQL, Feign, Swagger, Thymeleaf scaricati'
+    } else {
+        Write-Line 'moduli nuovi' 'qualcosa non ha funzionato: guarda l''output sopra' 'Yellow'
+        $problems++
+    }
+
     # 2. Le immagini di base, che Docker altrimenti va a prendere al volo.
     Write-Host ''
     Write-Host '==> Immagini Docker' -ForegroundColor Cyan
@@ -93,6 +138,20 @@ if ($Prep) {
     } finally { Pop-Location }
     if ($built -eq 0) { Write-Line 'docker compose build' 'fatta' }
     else { Write-Line 'docker compose build' 'fallita' 'Yellow'; $problems++ }
+
+    # Anche dentro Docker: la build di un modulo nuovo scarica le sue
+    # dipendenze nella cache di Maven delle build (--mount=type=cache nel
+    # Dockerfile), che cosi' il giorno dell'esame le ha gia'.
+    Push-Location $probeDemo
+    try {
+        & docker compose build $probeModules[0] 2>&1 | Out-Null
+        $probeBuilt = $LASTEXITCODE
+        # Le immagini di prova non servono: resta solo la cache.
+        & docker compose down --rmi local 2>&1 | Out-Null
+    } finally { Pop-Location }
+    if ($probeBuilt -eq 0) { Write-Line 'build di un modulo nuovo' 'fatta (cache Maven di Docker piena)' }
+    else { Write-Line 'build di un modulo nuovo' 'fallita' 'Yellow'; $problems++ }
+    Remove-Item -Recurse -Force $probe -ErrorAction SilentlyContinue
 
     Write-Host ''
     if ($problems -eq 0) {
@@ -151,6 +210,23 @@ if ($offlineBuild -eq 0) {
     Write-Line 'build offline (mvnw -o)' 'RIESCE'
 } else {
     Write-Line 'build offline (mvnw -o)' 'FALLISCE: lancia task offline-prep con la rete' 'Red'
+    $problems++
+}
+
+# E un modulo nuovo, come quelli che creerai all'esame? Stessa prova, su un
+# progetto usa-e-getta con un servizio con database e un'interfaccia.
+Write-Host '  Provo a compilare offline anche un modulo nuovo (servizio con database + interfaccia)...' -ForegroundColor DarkGray
+$probe = New-OfflineProbe
+Push-Location (Join-Path $probe (Get-AggregatorName -RepoRoot $probe))
+try {
+    cmd /c "set JAVA_HOME=$javaHome&& .\mvnw.cmd -B -q -o package -Dmaven.test.skip=true -pl $($probeModules -join ',') -am > `"$env:TEMP\offline-probe.log`" 2>&1"
+    $probeBuild = $LASTEXITCODE
+} finally { Pop-Location }
+Remove-Item -Recurse -Force $probe -ErrorAction SilentlyContinue
+if ($probeBuild -eq 0) {
+    Write-Line 'modulo nuovo offline' 'RIESCE (new-service, seed-data, db-schema)'
+} else {
+    Write-Line 'modulo nuovo offline' 'FALLISCE: lancia task offline-prep con la rete' 'Red'
     $problems++
 }
 

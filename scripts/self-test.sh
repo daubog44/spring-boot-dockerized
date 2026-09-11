@@ -459,138 +459,53 @@ run_tool check.sh --project-only
 assert_ok "task check dopo il wizard"
 end_case
 
-# Da qui in poi serve un dominio con delle @Entity: lo scriviamo noi.
+# Da qui in poi serve un dominio con delle @Entity: il "serraglio" di
+# scripts/self-test-entities, con i casi che rompevano i generatori a regex
+# (sequenze, UUID, chiavi composte, ereditarieta', @MapsId, @Pattern...).
 ALFA_PATH="$(sb_package_path alfa-service)"
 ENTITY_DIR="$DEMO/alfa-service/src/main/java/$ALFA_PATH"
-cat >"$ENTITY_DIR/DepositoEntity.java" <<'JAVA'
-package __PKG__;
+ALFA_PKG="$(printf '%s' "$ALFA_PATH" | tr '/' '.')"
+ENTITY_COUNT=0
+for fixture in "$SB_SCRIPTS"/self-test-entities/*.java.txt; do
+  sed "s/__PKG__/$ALFA_PKG/" "$fixture" >"$ENTITY_DIR/$(basename "$fixture" .txt)"
+  # Le entity concrete: quante devono riempirsi.
+  if grep -q '^@Entity' "$fixture" && ! grep -q 'abstract class' "$fixture"; then ENTITY_COUNT=$((ENTITY_COUNT + 1)); fi
+done
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-
-@Entity
-public class DepositoEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String citta;
-}
-JAVA
-cat >"$ENTITY_DIR/StatoArticolo.java" <<'JAVA'
-package __PKG__;
-
-public enum StatoArticolo { DISPONIBILE, ESAURITO }
-JAVA
-cat >"$ENTITY_DIR/ArticoloEntity.java" <<'JAVA'
-package __PKG__;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "articoli")
-public class ArticoloEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, length = 80)
-    private String nome;
-
-    private Integer quantita;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20)
-    private StatoArticolo stato;
-
-    @ManyToOne
-    @JoinColumn(name = "deposito_id")
-    private DepositoEntity deposito;
-}
-JAVA
-
-# Nome e cognome, un anno, un id che punta a un altro servizio: i valori
-# devono sembrare veri, non "nome 1", 10, 20.
-cat >"$ENTITY_DIR/SocioEntity.java" <<'JAVA'
-package __PKG__;
-
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-
-@Entity
-public class SocioEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String nome;
-    private String cognome;
-    private Integer annoIscrizione;
-    private Long tesseraId;
-}
-JAVA
-
-# I file qui sopra dicono __PKG__: al suo posto va il pacchetto del modulo.
-sed -i "s/__PKG__/$(printf '%s' "$ALFA_PATH" | tr '/' '.')/" "$ENTITY_DIR"/*.java
-
-start_case "seed-data ricava le INSERT dalle @Entity"
-run_tool seed-data.sh --module alfa-service --rows 3
-assert_ok "seed-data"
-SQL="demo/alfa-service/src/main/resources/data.sql"
-# Senza @Table il nome della tabella e' quello della classe, suffisso compreso:
-# e' cosi' che la chiama Hibernate.
-assert_contains "$SQL" "INSERT INTO deposito_entity" "la tabella senza @Table"
-assert_contains "$SQL" "INSERT INTO articoli (nome, quantita, stato, deposito_id)" "le colonne (la PK generata non va scritta)"
-assert_contains "$SQL" "DISPONIBILE" "gli enum dal file Java"
-# Ogni riga scatta solo se la tabella non e' ancora piena: un riavvio su
-# PostgreSQL non la duplica e una colonna unique non fa fallire l'avvio.
-assert_contains "$SQL" "WHERE (SELECT COUNT(*) FROM articoli) < 3;" "le INSERT si ripeterebbero a ogni avvio"
-assert_contains "$SQL" "INSERT INTO socio_entity (nome, cognome, anno_iscrizione, tessera_id) SELECT 'Mario', 'Rossi', 2017, 1 WHERE (SELECT COUNT(*) FROM socio_entity) < 1;" "nome, cognome, anno e id verosimili"
-# La tabella padre va riempita prima, o la chiave esterna punterebbe a niente.
-riga_deposito="$(grep -n 'INSERT INTO deposito_entity' "$SANDBOX/$SQL" | head -n 1 | cut -d: -f1)"
-riga_articolo="$(grep -n 'INSERT INTO articoli' "$SANDBOX/$SQL" | head -n 1 | cut -d: -f1)"
-[ -n "$riga_deposito" ] && [ -n "$riga_articolo" ] && [ "$riga_deposito" -lt "$riga_articolo" ] ||
-  fail "le righe figlie vengono prima di quelle padre"
-righe="$(grep -c 'INSERT INTO articoli' "$SANDBOX/$SQL")"
-[ "$righe" = "3" ] || fail "ROWS=3 ha prodotto $righe righe"
-# Senza queste due proprieta' il file non verrebbe eseguito.
-assert_contains "demo/alfa-service/src/main/resources/application.yml" "defer-datasource-initialization: true" "application.yml"
-assert_contains "demo/alfa-service/src/main/resources/application.yml" "mode: always" "application.yml"
+start_case "seed-data scrive dev-data.rows e toglie il vecchio data.sql"
+OLD_SQL="$DEMO/alfa-service/src/main/resources/data.sql"
+printf '%s\n' '-- Dati di prova generati da task seed-data.' 'INSERT INTO x VALUES (1);' >"$OLD_SQL"
+run_tool seed-data.sh --module alfa-service --rows 3 --no-check
+assert_ok "seed-data --no-check"
+[ ! -f "$OLD_SQL" ] || fail "il data.sql della versione vecchia e' rimasto"
+run_tool seed-data.sh --module alfa-service --rows 4 --no-check
+assert_ok "seed-data rilanciato"
+[ "$(grep -c '^dev-data:' "$DEMO/alfa-service/src/main/resources/application.yml")" = "1" ] || fail "dev-data compare piu' di una volta"
+assert_contains "demo/alfa-service/src/main/resources/application.yml" "  rows: 4" "il numero di righe aggiornato"
 end_case
 
-start_case "seed-data non ripete i valori quando le righe superano la tabella"
-# Le tabelle di valori hanno otto voci: oltre l'ottava riga il valore deve
-# portarsi dietro il numero, o una colonna unique = true farebbe fallire l'avvio.
+start_case "seed-data riempie ogni tabella passando da Hibernate (Maven + H2)"
 run_tool seed-data.sh --module alfa-service --rows 12
-assert_ok "seed-data con 12 righe"
-tot="$(grep -c '^INSERT INTO articoli' "$SANDBOX/$SQL")"
-# Il conteggio in fondo cambia da riga a riga: confrontiamo solo i valori.
-uniche="$(grep '^INSERT INTO articoli' "$SANDBOX/$SQL" | sed 's/ WHERE .*$//' | sort -u | wc -l)"
-[ "$tot" = "12" ] || fail "righe generate: $tot"
-[ "$uniche" = "12" ] || fail "righe uguali fra loro: $(( tot - uniche ))"
+assert_ok "seed-data con la prova"
+case "$TOOL_OUT" in *ERRORE*) fail "una entity non si e' riempita" ;; esac
+assert_out_contains "$ENTITY_COUNT entity riempite"
+# Le righe che puntano ad altre arrivano dopo: la tabella di collegamento del
+# molti a molti e l'elenco di valori non restano vuoti.
+printf '%s' "$TOOL_OUT" | grep -qE 'studente_entity_corsi [1-9]' || fail "la tabella di collegamento e' vuota"
+printf '%s' "$TOOL_OUT" | grep -qE 'ordine_entity_etichette [1-9]' || fail "l'@ElementCollection e' vuota"
+assert_out_contains "veicolo_entity 24"
 end_case
 
-start_case "db-schema ricava tabelle e relazioni dalle @Entity"
-run_tool db-schema.sh
+start_case "db-schema legge tabelle, chiavi e vincoli dal database"
+run_tool db-schema.sh --no-build
 assert_ok "db-schema"
-assert_out_contains "Modello concettuale"
-assert_out_contains "Modello logico"
-assert_out_contains 'Tabella `articoli`'
-assert_out_contains 'Tabella `deposito_entity`'
-assert_out_contains "erDiagram"
-assert_out_contains "FK"
-assert_out_contains '| `stato` | VARCHAR(20) |'
+for needle in '## Modulo `alfa-service`' 'Modello concettuale' 'Modello logico' 'erDiagram' \
+  'Tabella `articoli`' 'Tabella `deposito_entity`' '| `stato` | VARCHAR(20) |' 'valori ammessi: DISPONIBILE' \
+  'generato da Hibernate con una sequenza' 'enum salvato come numero' 'Tabella `studente_entity_corsi`' \
+  'Chiave primaria composta' 'una sola tabella per tutta la gerarchia' '**Studente** <-> **Corso**: molti a molti' \
+  'riferimento a `deposito_entity`(`id`)' 'DEPOSITO_ENTITY |o--o{ ARTICOLI'; do
+  assert_out_contains "$needle"
+done
 end_case
 
 start_case "set-package sposta i sorgenti e riscrive package, import e mainClass"

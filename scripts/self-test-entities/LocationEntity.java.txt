@@ -1,0 +1,23 @@
+package __PKG__;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+
+@Entity
+@Table(name = "locations")
+@lombok.Data
+@lombok.Builder
+@lombok.NoArgsConstructor
+@lombok.AllArgsConstructor
+public class LocationEntity {
+    @Id
+    private Long id;
+    private Long cabinetId;
+    private Integer maxIngombro;
+    private Long productId;
+    private Integer quantity;
+}
