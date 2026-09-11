@@ -167,8 +167,11 @@ if ($Prep) {
 
 # --- Controllo ----------------------------------------------------------------
 
-Write-Host ''
-Write-Host 'PRONTI PER UN ESAME SENZA RETE?' -ForegroundColor Cyan
+# 0. La rete di adesso: all'esame e' filtrata, e quello che passa oggi
+#    decide che cosa deve essere gia' sul disco.
+& (Join-Path $PSScriptRoot 'rete.ps1')
+
+Write-Host 'E SE UN DOMINIO NON PASSA, C''E'' GIA'' TUTTO?' -ForegroundColor Cyan
 Write-Host ''
 
 # 1. Gli attrezzi.

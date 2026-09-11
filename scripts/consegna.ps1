@@ -177,26 +177,93 @@ foreach ($m in ([regex]"Name\s*=\s*'([^']+)';\s*Module\s*=\s*'([^']+)';\s*Port\s
     }
 }
 
+# --- Le parti scritte a mano: allegato.md -------------------------------------
+# L'analisi, l'algoritmo e la descrizione dei moduli li scrivi tu, in
+# allegato.md nella cartella del progetto: sta li' e non in consegna/, che a
+# ogni giro si rifa' da zero. Qui si prendono le sue sezioni per titolo e si
+# mettono al loro posto nell'allegato, PRIMA di fare l'archivio: cosi'
+# l'archivio ha sempre dentro il testo, e una consegna rifatta non lo perde.
+
+$allegatoFile = Join-Path $repoRoot 'allegato.md'
+$hint = @{
+    Analisi = '[Due o tre paragrafi: cosa chiede la traccia, quali sono gli attori, che cosa fa il sistema nel suo insieme.]'
+    Algoritmo = '[Se la traccia chiede un algoritmo (calcolo di una distanza, scelta di un''ubicazione, estrazione casuale...), spiegalo qui a parole e indica la classe e il metodo che lo implementano.]'
+    Modulo = '[Una o due righe su cosa fa e su come lo fa.]'
+    Domanda = '[Facoltativa: la risposta alla domanda teorica, se la traccia la vuole nell''allegato.]'
+}
+if (-not (Test-Path $allegatoFile)) {
+    $lines = @(
+        '# Allegato tecnico: le parti scritte da te'
+        ''
+        'task consegna prende ogni sezione di questo file e la mette al suo posto in'
+        'ALLEGATO-TECNICO.md, accanto a quello che ricava dal progetto (moduli, porte,'
+        'endpoint, schema del database). Scrivi sotto ogni titolo e lascia i titoli'
+        'come sono: una sezione ancora fra parentesi quadre conta come da scrivere, e'
+        'la consegna te lo ricorda.'
+        ''
+        '## Analisi', '', $hint.Analisi, ''
+        '## Algoritmo', '', $hint.Algoritmo, ''
+    )
+    foreach ($service in $services) { $lines += @("## $($service.Module)", '', $hint.Modulo, '') }
+    $lines += @('## Domanda A', '', $hint.Domanda, '', '## Domanda B', '', $hint.Domanda)
+    Write-TextFile -Path $allegatoFile -Text (($lines -join "`n") + "`n")
+    Write-Step 'allegato.md creato: e'' li'' che scrivi analisi, algoritmo e moduli'
+}
+
+function Read-AllegatoParts {
+    $found = @{}
+    $current = $null
+    $buffer = New-Object System.Collections.Generic.List[string]
+    foreach ($line in (Split-TextLines (Read-TextFile $allegatoFile))) {
+        if ($line -match '^##\s+(.+?)\s*$') {
+            if ($current) { $found[$current] = ($buffer -join "`n").Trim() }
+            $current = ($Matches[1] -replace '`', '').Trim().ToLowerInvariant()
+            $buffer.Clear()
+        } elseif ($current) {
+            $buffer.Add($line)
+        }
+    }
+    if ($current) { $found[$current] = ($buffer -join "`n").Trim() }
+    return $found
+}
+$parts = Read-AllegatoParts
+
+# Un modulo nato dopo l'ultima consegna: la sua sezione si aggiunge in fondo.
+$added = @($services | Where-Object { -not $parts.ContainsKey($_.Module.ToLowerInvariant()) } | ForEach-Object { $_.Module })
+if ($added.Count -gt 0) {
+    $extra = ($added | ForEach-Object { "`n## $_`n`n$($hint.Modulo)" }) -join "`n"
+    Write-TextFile -Path $allegatoFile -Text ((Read-TextFile $allegatoFile).TrimEnd() + "`n" + $extra + "`n")
+    Write-Step ('allegato.md: aggiunta la sezione di ' + ($added -join ', '))
+    $parts = Read-AllegatoParts
+}
+
+# Il testo di una sezione, o il suggerimento fra quadre se e' ancora da scrivere.
+$missing = New-Object System.Collections.Generic.List[string]
+function Get-Part {
+    param([string]$Title, [string]$Hint, [switch]$Optional)
+    $text = $parts[$Title.ToLowerInvariant()]
+    if ($text -and -not $text.StartsWith('[')) { return $text }
+    if (-not $Optional) { $missing.Add($Title) }
+    return $Hint
+}
+
 # --- L'allegato tecnico, con dentro quello che si puo' ricavare --------------
 
 $today = Get-Date -Format 'dd/MM/yyyy'
 $doc = New-Object System.Collections.Generic.List[string]
 function Add-Line { param([string]$Line = '') ; $doc.Add($Line) }
+function Add-Text { param([string]$Text) ; foreach ($l in (Split-TextLines $Text)) { $doc.Add($l) } }
 
 Add-Line '# Allegato tecnico di progetto'
 Add-Line ''
 Add-Line "Candidato: **$Nome**  "
 Add-Line "Data: $today"
 Add-Line ''
-Add-Line '> Le parti fra parentesi quadre sono le uniche da scrivere a mano: il'
-Add-Line '> resto e'' stato ricavato dal progetto.'
-Add-Line ''
 Add-Line '---'
 Add-Line ''
 Add-Line '## 1. Analisi del problema e contesto applicativo'
 Add-Line ''
-Add-Line '[Due o tre paragrafi: cosa chiede la traccia, quali sono gli attori, che'
-Add-Line 'cosa fa il sistema nel suo insieme.]'
+Add-Text (Get-Part 'Analisi' $hint.Analisi)
 Add-Line ''
 Add-Line '## 2. Architettura della soluzione'
 Add-Line ''
@@ -245,17 +312,15 @@ foreach ($service in $services) {
         Add-Line ''
         Add-Line ('Contratti OpenAPI: `http://localhost:' + $service.Port + '/swagger-ui.html`')
     } else {
-        Add-Line 'Nessun endpoint REST: [descrivi cosa fa questo modulo].'
+        Add-Line 'Nessun endpoint REST.'
     }
     Add-Line ''
-    Add-Line '[Una o due righe su cosa fa e su come lo fa.]'
+    Add-Text (Get-Part $service.Module $hint.Modulo)
     Add-Line ''
 }
 Add-Line '## 5. Descrizione dell''algoritmo'
 Add-Line ''
-Add-Line '[Se la traccia chiede un algoritmo (calcolo di una distanza, scelta di'
-Add-Line 'un''ubicazione, estrazione casuale...), spiegalo qui a parole e indica la'
-Add-Line 'classe e il metodo che lo implementano.]'
+Add-Text (Get-Part 'Algoritmo' $hint.Algoritmo)
 Add-Line ''
 Add-Line '## 6. Istruzioni per il test della soluzione'
 Add-Line ''
@@ -274,6 +339,15 @@ foreach ($service in $services) {
     }
 }
 Add-Line ''
+# Le risposte teoriche ci vanno solo se le hai scritte in allegato.md.
+$domandaA = Get-Part 'Domanda A' '' -Optional
+$domandaB = Get-Part 'Domanda B' '' -Optional
+if ($domandaA -or $domandaB) {
+    Add-Line '## 7. Risposte alle domande teoriche'
+    Add-Line ''
+    if ($domandaA) { Add-Line '### Domanda A'; Add-Line ''; Add-Text $domandaA; Add-Line '' }
+    if ($domandaB) { Add-Line '### Domanda B'; Add-Line ''; Add-Text $domandaB; Add-Line '' }
+}
 
 Write-TextFile -Path (Join-Path $OutDir 'ALLEGATO-TECNICO.md') -Text ($doc -join [Environment]::NewLine)
 Write-Step 'ALLEGATO-TECNICO.md (moduli, porte, endpoint e schema gia'' dentro)'
@@ -374,6 +448,11 @@ Write-Host "Consegna pronta in $OutDir" -ForegroundColor Green
 Write-Host ''
 Write-Host ("  {0}.zip   {1} KB   <- questo e' l'archivio da consegnare" -f $Nome, $totalKB)
 Write-Host ''
-Write-Host '  Prima di consegnare, apri ALLEGATO-TECNICO.md e riempi le parti fra' -ForegroundColor Yellow
-Write-Host '  parentesi quadre: analisi, algoritmo e descrizione dei moduli.' -ForegroundColor Yellow
+if ($missing.Count -eq 0) {
+    Write-Host '  L''allegato e'' completo: le parti scritte da te vengono da allegato.md.' -ForegroundColor Green
+} else {
+    Write-Host ('  Nell''allegato mancano ancora: ' + ($missing -join ', ') + '.') -ForegroundColor Yellow
+    Write-Host '  Scrivile in allegato.md, nella cartella del progetto, e rilancia' -ForegroundColor Yellow
+    Write-Host '  task consegna: l''archivio si rifa'' con dentro il testo.' -ForegroundColor Yellow
+}
 Write-Host ''

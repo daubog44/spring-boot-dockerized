@@ -6,3 +6,6 @@ consegna/
 
 # il video del corso lo rigenera corso/genera-video.ps1: sta nella release, non nel repository
 corso/*.mp4
+
+# il testo del corso lo raccoglie task learn dalle lezioni e dalle guide
+corso/contenuti.js

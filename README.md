@@ -19,7 +19,8 @@ posti.
 ## Documentazione
 
 - **[Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. **Parti da qui.**
-- **[Il corso: Quaderno d'esame](./corso/index.html)** — la stessa giornata in nove fasi, con i comandi da provare, quello che devi vedere, un esercizio per fase e una lavagna che legge le lezioni ad alta voce. Aprilo nel browser (doppio clic sul file). Il video, voce sintetica compresa, lo registra la macchina: `powershell -File corso/genera-video.ps1` (servono la voce italiana di Windows, Edge e ffmpeg) scrive `corso/quaderno-esame.mp4`, che resta fuori dal repository: è il file da allegare a una release.
+- **[Il corso: Dalla traccia alla consegna](./corso/index.html)** — diciassette lezioni dalla A alla Z: com'è fatto il template, come si parlano i servizi, `common-dto`, la rete dell'esame, e poi la traccia **Biblioteca** svolta pezzo per pezzo col suo codice (entity, controller, Feign, algoritmo con i test, Thymeleaf), fino al collaudo, a Docker e alla consegna. Dentro ci sono anche tutte le guide, con la ricerca, e la mappa dei moduli del tuo progetto. Si apre con **`task learn`**: pagina statica, senza server e senza rete.
+- [La giornata alla lavagna](./corso/giornata.html) — la stessa giornata in nove fasi, con l'orologio dell'esame e una lavagna che legge le fasi ad alta voce. Il video lo registra la macchina: `powershell -File corso/genera-video.ps1` (voce italiana di Windows, Edge e ffmpeg) scrive `corso/quaderno-esame.mp4`, che resta fuori dal repository.
 - [Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
 - [Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — c'è anche **come funziona il tutto insieme**: il giro di una richiesta da browser a database, chi accende cosa (Lombok, Swagger, Feign, JPA/Hibernate) e come si usa `common-dto`, più il **cheat sheet di Thymeleaf** (§ 6.7: espressioni, attributi, form con validazione, frammenti, errori tipici)
 - [Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
@@ -35,22 +36,24 @@ dettaglio di un comando singolo, con le sue variabili, è
 - **`main`** (questo): il template vuoto. È da qui che si parte a ogni traccia.
 - **[`solution/wms`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: soluzione completa della traccia **WMS magazzino** (product, crm, wms, wms-ui, calcolo distanza Manhattan, DTO condivisi, collaudo end-to-end).
 - **[`example/tourist-events`](https://github.com/daubog44/spring-boot-dockerized/tree/example/tourist-events)**: esempio svolto della traccia **eventi/turismo** (wrapper OpenFeign di OpenDataHub, estrazione casuale, storico su PostgreSQL).
+- **[`example/biblioteca`](https://github.com/daubog44/spring-boot-dockerized/tree/example/biblioteca)**: la traccia **Biblioteca di quartiere** svolta per intero, ed è il filo del corso (catalogo e prestiti con due database, Feign nei due sensi, penale per ritardo con i suoi test, interfaccia con form e restituzioni, collaudo end-to-end).
 
-I due branch svolti servono da riferimento: non serve copiarli, serve
-guardarli quando non ricordi come si fa una cosa.
+I branch svolti servono da riferimento: non serve copiarli, serve guardarli
+quando non ricordi come si fa una cosa.
 
 ---
 
 ## Scaricarlo senza git
 
 Ogni versione è una [release](https://github.com/daubog44/spring-boot-dockerized/releases/latest)
-con tre zip, pronti da scaricare e da passare a chi ti pare:
+con quattro zip, pronti da scaricare e da passare a chi ti pare:
 
 | Archivio | Cosa c'è |
 | :--- | :--- |
 | `spring-boot-dockerized.zip` | il template vuoto: è da qui che si parte a ogni traccia |
 | `soluzione-wms.zip` | la traccia WMS svolta (branch `solution/wms`) |
 | `esempio-tourist-events.zip` | l'esempio eventi/turismo (branch `example/tourist-events`) |
+| `esempio-biblioteca.zip` | la traccia Biblioteca svolta, quella del corso (branch `example/biblioteca`) |
 
 Il link al template dell'ultima versione non cambia mai, si può condividere
 così com'è:
@@ -64,7 +67,7 @@ in su), Docker e go-task, come col clone. Il template nasce su Java 25: se il
 tuo è un altro, `task wizard` (o `task set-java`) allinea il progetto al JDK
 che trova in `JAVA_HOME` o, se manca, nel `PATH`.
 
-**Pubblicare una versione nuova** (dopo il push di `main` e dei due branch):
+**Pubblicare una versione nuova** (dopo il push di `main` e dei branch):
 
 ```bash
 git tag v1.1.0
@@ -72,7 +75,7 @@ git push origin v1.1.0
 ```
 
 Il resto lo fa la GitHub Action [`release.yml`](./.github/workflows/release.yml):
-prepara i tre zip dai branch e crea la release col tag.
+prepara i quattro zip dai branch e crea la release col tag.
 
 ---
 
@@ -250,19 +253,26 @@ Prepara `consegna/`: il progetto pronto da eseguire (i moduli senza `target/`,
 accanto a pom e compose), l'allegato tecnico già compilato con moduli, porte,
 endpoint e schema, le istruzioni di esecuzione, e un archivio unico da
 consegnare. Chi lo corregge lo scompatta e lancia `docker compose up --build`.
+Le parti da scrivere a mano (analisi, algoritmo, che cosa fa ogni modulo)
+stanno in `allegato.md`: la consegna le mette nell'allegato prima di fare
+l'archivio, e si può rilanciare quante volte si vuole.
 
-### Esame senza rete
+### La rete all'esame
 
-La sera prima, con la connessione:
+All'esame la rete passa da una whitelist di domini: Maven Central sì, il
+resto non si sa.
 
 ```bash
-task offline-prep
+task rete
 ```
 
-Scarica le dipendenze Maven in `~/.m2`, le immagini Docker di base e fa una
-prima build dei container. Poi `task offline` dice se il progetto partirebbe a
-rete staccata. Portati la cartella del progetto e la `~/.m2` su una chiavetta:
-il template *è* la cartella, non serve altro.
+Dice, dominio per dominio (Maven Central, Docker Hub, Ubuntu, GitHub, le
+estensioni di VS Code), se risponde e che cosa fare se no. La sera prima, con
+la connessione di casa, `task offline-prep` scarica quello che potrebbe non
+passare: le dipendenze Maven, anche quelle dei moduli che creerai, le immagini
+Docker e una prima build dei container. `task offline` verifica. Portati la
+cartella del progetto e la `~/.m2` su una chiavetta: il template *è* la
+cartella, non serve altro.
 
 ### Per la demo
 
