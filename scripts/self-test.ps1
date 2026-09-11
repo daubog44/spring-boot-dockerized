@@ -25,6 +25,11 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Get-ScaffoldRepoRoot
 $sandbox = Join-Path ([System.IO.Path]::GetTempPath()) ('esame-selftest-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+# La copia di prova ha il suo progetto Docker Compose: il nome del progetto
+# vero (lo passano task test e scaffold-lib) non deve arrivarle, se no un suo
+# docker compose toccherebbe i tuoi container. Gli script lo ricavano dalla
+# cartella della copia.
+Remove-Item Env:COMPOSE_PROJECT_NAME -ErrorAction SilentlyContinue
 
 Write-Host ''
 Write-Host 'COLLAUDO DEGLI STRUMENTI' -ForegroundColor Cyan
@@ -138,6 +143,16 @@ function Test-Case {
 
 Test-Case 'il progetto di partenza e'' coerente (task check)' {
     Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'task check non passa sul progetto cosi'' com''e'''
+}
+
+Test-Case 'ogni copia del progetto ha il suo progetto Docker Compose' {
+    # Col nome di default (demo) la copia di prova e quella dell'esame si
+    # prendevano container e volume del database: con credenziali diverse
+    # PostgreSQL rifiutava la seconda ("password authentication failed").
+    $atteso = (Split-Path -Leaf $sandbox).ToLowerInvariant() -replace '[^a-z0-9_-]+', '-' -replace '^[^a-z0-9]+', ''
+    $nome = ("" + (& powershell -NoProfile -ExecutionPolicy Bypass -Command ". '$(Join-Path $sandboxScripts 'dev-lib.ps1')'; `$env:COMPOSE_PROJECT_NAME")).Trim()
+    Assert-That ($nome -eq $atteso) "progetto Compose '$nome' invece di '$atteso'"
+    Assert-Contains (Get-Text 'Taskfile.yml') 'COMPOSE_PROJECT_NAME:' 'il Taskfile non passa il nome del progetto a docker compose'
 }
 
 Test-Case 'new-service crea il modulo e lo collega ovunque' {

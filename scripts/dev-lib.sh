@@ -14,6 +14,14 @@ dev_log_dir() {
   echo "$(dev_repo_root)/.dev-logs"
 }
 
+# Un progetto Docker Compose per copia del template, col nome della cartella
+# del repository (come fa il Taskfile): con quello di default, demo, due copie
+# si prendevano container e volume del database a vicenda.
+if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
+  COMPOSE_PROJECT_NAME="$(basename "$(dev_repo_root)" | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9_-]+/-/g; s/^[^a-z0-9]+//')"
+  export COMPOSE_PROJECT_NAME
+fi
+
 # Tutte le porte da controllare: le fisse piu' quelle dell'ultimo avvio
 # (che possono differire se e' stato passato --ui-port).
 dev_ports() {
@@ -91,8 +99,9 @@ stop_dev_stack() {
   # Tutto quello che e' rimasto in ascolto sulle porte dello stack: i nostri java
   # di un avvio precedente, i container dell'esame, le applicazioni estranee.
   # L'obiettivo e' che dopo questa funzione le porte siano libere.
-  local docker_holds_ports=0 pname
-  for port in $(printf '%s\n%s\n' "$(dev_ports "$log_dir")" "$(echo "$extra_ports" | tr ' ' '\n')" | grep -E '^[0-9]+$' | sort -u); do
+  local docker_holds_ports=0 pname all_ports
+  all_ports="$(printf '%s\n%s\n' "$(dev_ports "$log_dir")" "$(echo "$extra_ports" | tr ' ' '\n')" | grep -E '^[0-9]+$' | sort -u)"
+  for port in $all_ports; do
     for pid in $(port_pids "$port"); do
       pname="$(process_name "$pid")"
       case "$pname" in
@@ -127,6 +136,21 @@ stop_dev_stack() {
     (cd "$repo_root/demo" && docker compose down --remove-orphans >/dev/null 2>&1) || \
       echo "  (docker compose non raggiungibile)" >&2
     stopped=$((stopped + 1))
+    # Un container di un'altra copia del template, o di prima che ogni copia
+    # avesse il suo progetto Compose, puo' tenere ancora le porte: si ferma come
+    # un'applicazione estranea (fermato, non cancellato).
+    local cid cname
+    for port in $all_ports; do
+      while read -r cid cname; do
+        [ -z "${cid:-}" ] && continue
+        if [ -n "$keep_foreign" ]; then
+          echo "  porta $port tenuta dal container $cname: lasciato acceso." >&2
+        else
+          echo "  fermo il container $cname, che teneva la porta $port" >&2
+          docker stop "$cid" >/dev/null 2>&1 || true
+        fi
+      done < <(docker ps --filter "publish=$port" --format '{{.ID}} {{.Names}}' 2>/dev/null)
+    done
   fi
 
   # Le porte in chiusura restano qualche istante in TIME_WAIT.
