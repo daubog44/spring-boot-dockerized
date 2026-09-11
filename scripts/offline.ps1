@@ -30,7 +30,9 @@ $ErrorActionPreference = 'Continue'
 
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
-$javaHome = 'C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot'
+# Il JDK lo sceglie il Taskfile (JAVA_HOME_PATH). Se manca, o non esiste,
+# JAVA_HOME resta vuoto e il wrapper Maven usa il java del PATH.
+$javaHome = if ($env:JAVA_HOME -and (Test-Path $env:JAVA_HOME)) { $env:JAVA_HOME } else { '' }
 
 function Write-Line {
     param([string]$Label, [string]$Value, [string]$Color = 'Green')

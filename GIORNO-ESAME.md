@@ -545,15 +545,20 @@ niente di quello che non serve:
 
 | File | Cos'è |
 | :--- | :--- |
-| `moduli/<modulo>.zip` | i sorgenti di ogni microservizio, **senza** `target/` |
+| `<modulo>/` | i sorgenti di ogni microservizio, **senza** `target/` |
+| `docker-compose.yml` + `Dockerfile` + pom + wrapper | accanto ai moduli, come nel progetto: lo stack riparte dai sorgenti |
 | `ALLEGATO-TECNICO.md` | già compilato con moduli, porte, endpoint e schema del database |
 | `SCHEMA-DATABASE.md` | lo schema concettuale e logico da solo, comodo da copiare |
 | `ISTRUZIONI-ESECUZIONE.md` | come far girare il progetto, con e senza Docker |
-| `docker-compose.yml` + `Dockerfile` + pom + wrapper | bastano a rimettere in piedi lo stack dai sorgenti |
 | `COGNOME_NOME.zip` | tutto quanto sopra in un archivio solo: **è quello da consegnare** |
 
 Le cartelle `target/` restano fuori apposta: sono megabyte di roba
 ricompilabile.
+
+Dentro l'archivio non ci sono altri archivi: chi corregge lo scompatta, entra
+nella cartella dove c'è `docker-compose.yml` e lancia
+`docker compose up -d --build`. Prima di consegnare fai tu la stessa prova:
+scompatta `COGNOME_NOME.zip` in una cartella nuova e avvialo da lì.
 
 Prima di consegnare apri `ALLEGATO-TECNICO.md` e riempi le parti fra parentesi
 quadre — analisi, algoritmo, descrizione dei moduli. Il resto (elenco dei

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Prepara la cartella di consegna: i moduli zippati (senza target/), l'allegato
-# tecnico gia' compilato, lo schema del database e le istruzioni per eseguire.
+# Prepara la cartella di consegna: il progetto pronto da eseguire (moduli senza
+# target/ accanto a pom e compose), l'allegato tecnico gia' compilato, lo
+# schema del database e le istruzioni per eseguire.
 # Equivalente POSIX di scripts/consegna.ps1.
 #
 #   task consegna NOME=ROSSI_MARIO
@@ -37,39 +38,54 @@ echo "  il progetto e' coerente (task check)"
 # --- La cartella di consegna, da zero ----------------------------------------
 
 rm -rf "$OUT_DIR"
-mkdir -p "$OUT_DIR/moduli"
+mkdir -p "$OUT_DIR"
 
-# zip se c'e', altrimenti tar.gz: l'importante e' che si apra sulla macchina di
-# chi corregge.
-have_zip=0
-command -v zip >/dev/null 2>&1 && have_zip=1
-
-pack() { # cartella-sorgente, nome-archivio-senza-estensione
-  local src="$1" out="$2" base parent
-  parent="$(dirname "$src")"
-  base="$(basename "$src")"
-  if [ "$have_zip" -eq 1 ]; then
-    (cd "$parent" && zip -qr "$out.zip" "$base")
-    echo "$out.zip"
-  else
-    tar -czf "$out.tar.gz" -C "$parent" "$base"
-    echo "$out.tar.gz"
+# Un zip col contenuto di una cartella: percorsi relativi a lei, niente
+# cartella in cima ("Estrai tutto" di Windows ne crea gia' una col nome
+# dell'archivio) e i file nascosti compresi (senza .mvn/ il wrapper Maven non
+# parte). La traccia chiede un .zip, e zip non c'e' dappertutto (su Git Bash
+# manca): allora Python, allora jar, che col JDK c'e' sempre.
+zip_dir() { # cartella, archivio.zip
+  local src="$1" out="$2" py
+  rm -f "$out"
+  if command -v zip >/dev/null 2>&1; then
+    (cd "$src" && zip -qr "$out" .)
+    return
   fi
+  for py in python3 python; do
+    command -v "$py" >/dev/null 2>&1 && "$py" -c 'import zipfile' >/dev/null 2>&1 || continue
+    "$py" - "$src" "$out" <<'PY'
+import os, sys, zipfile
+src, out = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+    for root, dirs, files in os.walk(src):
+        dirs.sort()
+        for name in sorted(files):
+            full = os.path.join(root, name)
+            z.write(full, os.path.relpath(full, src).replace(os.sep, '/'))
+PY
+    return
+  done
+  if command -v jar >/dev/null 2>&1; then
+    jar --create --no-manifest --file "$out" -C "$src" .
+    return
+  fi
+  echo "Non trovo niente per fare uno zip (zip, python o jar)." >&2
+  return 1
 }
 
-# --- Un pacchetto per microservizio, senza roba compilata --------------------
+# --- I moduli, senza roba compilata ------------------------------------------
+# Ognuno nella sua cartella accanto al pom aggregatore, come nel progetto: e'
+# li' che il Dockerfile e Maven li cercano.
 
-STAGING="$(mktemp -d)"
 MODULES=""
 for dir in "$DEMO_DIR"/*/; do
   [ -f "$dir/pom.xml" ] || continue
   name="$(basename "$dir")"
   MODULES="$MODULES $name"
   # Le cartelle target/ non si consegnano: si ricompilano.
-  tar -cf - -C "$DEMO_DIR" --exclude='target' "$name" | tar -xf - -C "$STAGING"
-  archive="$(pack "$STAGING/$name" "$OUT_DIR/moduli/$name")"
-  size="$(( $(wc -c <"$archive") / 1024 ))"
-  echo "  moduli/$(basename "$archive")  (${size} KB)"
+  tar -cf - -C "$DEMO_DIR" --exclude='target' "$name" | tar -xf - -C "$OUT_DIR"
+  echo "  $name/  ($(du -sk "$OUT_DIR/$name" | cut -f1) KB)"
 done
 
 # --- Quello che serve a farlo girare -----------------------------------------
@@ -220,27 +236,21 @@ echo "  ALLEGATO-TECNICO.md (moduli, porte, endpoint e schema gia' dentro)"
 {
   echo "# Come eseguire il progetto"
   echo ""
-  echo "Nella cartella trovi:"
-  echo ""
-  echo "- \`moduli/*\` - i sorgenti di ogni microservizio (senza le cartelle \`target/\`);"
-  echo "- \`docker-compose.yml\`, \`Dockerfile\`, \`pom.xml\` e il wrapper Maven - l'infrastruttura;"
-  echo "- \`ALLEGATO-TECNICO.md\` e \`SCHEMA-DATABASE.md\` - la documentazione."
-  echo ""
-  echo "## 1. Ricostruire il progetto"
-  echo ""
-  echo "Scompatta ogni archivio di \`moduli/\` **nella stessa cartella** dove si"
-  echo "trovano \`pom.xml\` e \`docker-compose.yml\`. Il risultato:"
+  echo "L'archivio contiene il progetto gia' pronto: non c'e' niente da ricomporre."
   echo ""
   echo '```'
-  echo "progetto/"
-  echo "+-- pom.xml"
-  echo "+-- mvnw, mvnw.cmd, .mvn/"
-  echo "+-- Dockerfile"
-  echo "+-- docker-compose.yml"
+  echo "$NOME/"
+  echo "+-- docker-compose.yml, Dockerfile   lo stack, un'immagine per servizio"
+  echo "+-- pom.xml, mvnw, mvnw.cmd, .mvn/   il progetto Maven e il suo wrapper"
   for module in $MODULES; do echo "+-- $module/"; done
+  echo "+-- ALLEGATO-TECNICO.md, SCHEMA-DATABASE.md"
   echo '```'
   echo ""
-  echo "## 2. Con Docker (consigliato)"
+  echo "I comandi qui sotto si lanciano **dalla cartella che contiene"
+  echo "\`docker-compose.yml\`**. Se il programma di decompressione ha creato una"
+  echo "cartella dentro l'altra con lo stesso nome, entra in quella interna."
+  echo ""
+  echo "## 1. Con Docker (consigliato)"
   echo ""
   echo '```bash'
   echo "docker compose up -d --build"
@@ -252,7 +262,7 @@ echo "  ALLEGATO-TECNICO.md (moduli, porte, endpoint e schema gia' dentro)"
   echo "Per fermare tutto: \`docker compose down\` (i dati del database restano),"
   echo "oppure \`docker compose down -v\` per cancellare anche il volume."
   echo ""
-  echo "## 3. Senza Docker"
+  echo "## 2. Senza Docker"
   echo ""
   echo '```bash'
   echo "./mvnw clean package -Dmaven.test.skip=true"
@@ -271,7 +281,7 @@ echo "  ALLEGATO-TECNICO.md (moduli, porte, endpoint e schema gia' dentro)"
     echo "Se i servizi usano PostgreSQL, avvialo prima: \`docker compose up -d postgres\`."
     echo ""
   fi
-  echo "## 4. Indirizzi"
+  echo "## 3. Indirizzi"
   echo ""
   echo "| Cosa | Indirizzo |"
   echo "| :--- | :--- |"
@@ -293,9 +303,11 @@ echo "  ISTRUZIONI-ESECUZIONE.md"
 
 # --- L'archivio unico ---------------------------------------------------------
 
-FINAL="$(cd "$OUT_DIR/.." && pack "$OUT_DIR" "$(cd "$OUT_DIR/.." && pwd)/$NOME")"
-mv "$FINAL" "$OUT_DIR/$(basename "$FINAL")"
-FINAL="$OUT_DIR/$(basename "$FINAL")"
+# Lo scriviamo fuori da consegna/, perche' non finisca dentro se stesso.
+STAGING="$(mktemp -d)"
+zip_dir "$OUT_DIR" "$STAGING/$NOME.zip"
+mv "$STAGING/$NOME.zip" "$OUT_DIR/$NOME.zip"
+FINAL="$OUT_DIR/$NOME.zip"
 rm -rf "$STAGING"
 
 echo ""

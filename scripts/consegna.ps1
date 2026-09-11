@@ -1,21 +1,28 @@
 <#
 .SYNOPSIS
-    Prepara la cartella di consegna: i moduli zippati, l'allegato tecnico, le
-    istruzioni per eseguire il progetto.
+    Prepara la cartella di consegna: il progetto pronto da eseguire, l'allegato
+    tecnico, le istruzioni.
 
 .DESCRIPTION
     Mette in consegna/ tutto quello che va consegnato, e niente di quello che
     non serve:
 
-      moduli/<modulo>.zip        i sorgenti di ogni microservizio, senza target/
+      <modulo>/                  i sorgenti di ogni microservizio, senza target/
+      docker-compose.yml         + Dockerfile, pom aggregatore, wrapper Maven e
+                                 script di init: accanto ai moduli, come nel
+                                 progetto, cosi' si parte subito
       ALLEGATO-TECNICO.md        gia' compilato con moduli, porte, endpoint e
                                  schema del database; restano da scrivere le
                                  parti che solo tu puoi scrivere
       SCHEMA-DATABASE.md         lo schema da solo, comodo da copiare
       ISTRUZIONI-ESECUZIONE.md   come far girare il progetto, con e senza Docker
-      docker-compose.yml         + Dockerfile e script di init: bastano a
-                                 rimettere in piedi lo stack dai sorgenti
       <COGNOME_NOME>.zip         tutto quanto sopra, in un archivio solo
+
+    Chi lo corregge scompatta l'archivio e lancia `docker compose up --build`:
+    niente altri archivi da aprire dentro l'archivio. Un zip per modulo
+    obbligava a scompattarli uno per uno nel posto giusto, e "Estrai tutto" di
+    Windows li mette ognuno in una cartella in piu': la build non trovava i
+    pom dei moduli.
 
     Le cartelle target/ restano fuori: sono megabyte di roba ricompilabile.
 
@@ -80,23 +87,19 @@ function New-PortableZip {
 
 if (Test-Path $OutDir) { Remove-Item -Recurse -Force $OutDir }
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $OutDir 'moduli') -Force | Out-Null
 
-# --- Un pacchetto per microservizio, senza roba compilata --------------------
-
-$staging = Join-Path ([System.IO.Path]::GetTempPath()) ('consegna-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
-New-Item -ItemType Directory -Path $staging -Force | Out-Null
+# --- I moduli, senza roba compilata ------------------------------------------
+# Ognuno nella sua cartella accanto al pom aggregatore, come nel progetto: e'
+# li' che il Dockerfile e Maven li cercano.
 
 $modules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'pom.xml') })
 foreach ($module in $modules) {
-    $dest = Join-Path $staging $module.Name
+    $dest = Join-Path $OutDir $module.Name
     # /XD target: i jar e le classi si ricompilano, non si consegnano.
     $null = robocopy $module.FullName $dest /E /XD target /NFL /NDL /NJH /NJS /NP
     if ($LASTEXITCODE -ge 8) { throw "Copia di $($module.Name) fallita (robocopy $LASTEXITCODE)." }
-    $zip = Join-Path $OutDir ('moduli/' + $module.Name + '.zip')
-    New-PortableZip -SourceDir $dest -Destination $zip -Prefix $module.Name
-    $size = [math]::Round((Get-Item $zip).Length / 1KB)
-    Write-Step ("moduli/" + $module.Name + ".zip  ($size KB)")
+    $size = [math]::Round(((Get-ChildItem -Path $dest -Recurse -File -Force | Measure-Object -Property Length -Sum).Sum) / 1KB)
+    Write-Step ($module.Name + "/  ($size KB)")
 }
 
 # --- Quello che serve a farlo girare -----------------------------------------
@@ -275,27 +278,21 @@ function Add-Run { param([string]$Line = '') ; $run.Add($Line) }
 
 Add-Run '# Come eseguire il progetto'
 Add-Run ''
-Add-Run 'Nella cartella trovi:'
-Add-Run ''
-Add-Run '- `moduli/*.zip` - i sorgenti di ogni microservizio (senza le cartelle `target/`);'
-Add-Run '- `docker-compose.yml`, `Dockerfile`, `pom.xml` e il wrapper Maven - l''infrastruttura;'
-Add-Run '- `ALLEGATO-TECNICO.md` e `SCHEMA-DATABASE.md` - la documentazione.'
-Add-Run ''
-Add-Run '## 1. Ricostruire il progetto'
-Add-Run ''
-Add-Run 'Scompatta ogni archivio di `moduli/` **nella stessa cartella** dove si'
-Add-Run 'trovano `pom.xml` e `docker-compose.yml`. Il risultato:'
+Add-Run 'L''archivio contiene il progetto gia'' pronto: non c''e'' niente da ricomporre.'
 Add-Run ''
 Add-Run '```'
-Add-Run 'progetto/'
-Add-Run '+-- pom.xml'
-Add-Run '+-- mvnw, mvnw.cmd, .mvn/'
-Add-Run '+-- Dockerfile'
-Add-Run '+-- docker-compose.yml'
+Add-Run ($Nome + '/')
+Add-Run '+-- docker-compose.yml, Dockerfile   lo stack, un''immagine per servizio'
+Add-Run '+-- pom.xml, mvnw, mvnw.cmd, .mvn/   il progetto Maven e il suo wrapper'
 foreach ($module in $modules) { Add-Run ('+-- ' + $module.Name + '/') }
+Add-Run '+-- ALLEGATO-TECNICO.md, SCHEMA-DATABASE.md'
 Add-Run '```'
 Add-Run ''
-Add-Run '## 2. Con Docker (consigliato)'
+Add-Run 'I comandi qui sotto si lanciano **dalla cartella che contiene'
+Add-Run '`docker-compose.yml`**. Se il programma di decompressione ha creato una'
+Add-Run 'cartella dentro l''altra con lo stesso nome, entra in quella interna.'
+Add-Run ''
+Add-Run '## 1. Con Docker (consigliato)'
 Add-Run ''
 Add-Run '```bash'
 Add-Run 'docker compose up -d --build'
@@ -307,7 +304,7 @@ Add-Run ''
 Add-Run 'Per fermare tutto: `docker compose down` (i dati del database restano),'
 Add-Run 'oppure `docker compose down -v` per cancellare anche il volume.'
 Add-Run ''
-Add-Run '## 3. Senza Docker'
+Add-Run '## 2. Senza Docker'
 Add-Run ''
 Add-Run '```bash'
 Add-Run './mvnw clean package -Dmaven.test.skip=true'
@@ -325,7 +322,7 @@ if ($hasPostgres) {
     Add-Run 'Se i servizi usano PostgreSQL, avvialo prima: `docker compose up -d postgres`.'
     Add-Run ''
 }
-Add-Run '## 4. Indirizzi'
+Add-Run '## 3. Indirizzi'
 Add-Run ''
 Add-Run '| Cosa | Indirizzo |'
 Add-Run '| :--- | :--- |'
@@ -353,7 +350,12 @@ Write-Step 'ISTRUZIONI-ESECUZIONE.md'
 # Compress-Archive salta le cartelle nascoste (e senza .mvn/ il wrapper Maven
 # non parte su un'altra macchina), e CreateFromDirectory scrive i percorsi con
 # le barre rovesciate, che su Linux diventano nomi di file assurdi.
-$finalZip = Join-Path $repoRoot ($Nome + '.zip')
+# Niente cartella in cima: "Estrai tutto" di Windows ne crea gia' una col nome
+# dell'archivio, e con un'altra dentro ci si ritroverebbe con due cartelle.
+# Lo scriviamo fuori da consegna/, perche' non finisca dentro se stesso.
+$staging = Join-Path ([System.IO.Path]::GetTempPath()) ('consegna-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path $staging -Force | Out-Null
+$finalZip = Join-Path $staging ($Nome + '.zip')
 New-PortableZip -SourceDir $OutDir -Destination $finalZip
 Move-Item $finalZip (Join-Path $OutDir ($Nome + '.zip')) -Force
 $finalZip = Join-Path $OutDir ($Nome + '.zip')
