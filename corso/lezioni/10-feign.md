@@ -43,9 +43,15 @@ Puoi generare l'interfaccia `@FeignClient` collegata al servizio target direttam
 task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto
 ```
 
-Crea `CatalogoClient.java` sotto `prestiti-service/.../client/`, già annotato con
-`@FeignClient(name = "CATALOGO-SERVICE")` e con i metodi HTTP (`GET`, `POST`, `PUT`, `DELETE`)
-predisposti per scambiare `LibroDto`.
+Oppure, se il DTO non esiste ancora in `common-dto`, puoi specificare anche i campi:
+
+```bash
+task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto FIELDS=id:long,titolo:string:required,disponibile:bool
+```
+
+Questo comando:
+1. Crea `CatalogoClient.java` sotto `prestiti-service/.../client/`, annotato con `@FeignClient(name = "CATALOGO-SERVICE")` e con i metodi HTTP (`GET`, `POST`, `PUT`, `DELETE`) predisposti per scambiare `LibroDto`.
+2. Se specifichi `FIELDS=...` e il DTO non esiste, genera in contemporanea il record `LibroDto.java` dentro `common-dto/src/main/java/esame/common/dto/` con campi e validazioni Jakarta!
 
 ## Usarlo
 

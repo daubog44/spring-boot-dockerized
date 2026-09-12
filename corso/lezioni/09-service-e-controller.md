@@ -17,6 +17,8 @@ HTTP.
 Un controller sottile e un service che non sa niente di HTTP: così le regole
 stanno in un posto solo, e si provano senza avviare un server.
 
+> 💡 **Scorciatoia d'esame**: Ricorda che eseguendo `task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=...` hai già ottenuto sia il `Service` che il `Controller` REST con le operazioni CRUD complete, la validazione e la documentazione Swagger! Qui vediamo come sono composti per personalizzarli.
+
 ## Il service
 
 ```java demo/catalogo-service/src/main/java/esame/catalogoservice/service/CatalogoService.java
@@ -177,6 +179,22 @@ public class PrestitoController {
 `@RequestBody` trasforma il JSON in un `NuovoPrestitoRequest`; `@Valid` fa
 controllare i vincoli scritti sul record (`@NotNull`, `@Email`, `@Min`,
 `@Max`) prima di chiamare il metodo.
+
+## Gestione globale degli errori con `task new-handler`
+
+Quando un client invia dati errati (es. email non valida o campi obbligatori mancanti), Spring lancia un'eccezione di validazione (`MethodArgumentNotValidException`). Senza un gestore globale, rischieresti di restituire status non chiari o stack trace grezzi.
+
+Per generare automaticamente un gestore `@RestControllerAdvice` centralizzato per il servizio:
+
+```bash
+task new-handler SERVICE=catalogo-service
+```
+
+Questo comando genera `exception/GlobalExceptionHandler.java` pronto all'uso, che:
+- Intercetta gli errori di validazione dei campi (`@Valid`) e risponde con **400 Bad Request** e una lista dettagliata di ogni campo errato con il relativo messaggio;
+- Intercetta `ResponseStatusException` mantenendo lo status HTTP specificato (es. 404, 409);
+- Intercetta `EntityNotFoundException` / `NoSuchElementException` rispondendo con **404 Not Found**;
+- Intercetta qualsiasi altro errore imprevisto rispondendo con un JSON pulito in formato standard.
 
 ## Provarlo: Swagger
 

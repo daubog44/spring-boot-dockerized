@@ -1,6 +1,6 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 12:57',
+  generato: '2026-09-12 13:02',
   progetto: {
     cartella: 'demo',
     pacchetto: 'esame',
@@ -79,15 +79,16 @@ arriviamo nella [lezione sulla consegna](16-consegna-e-allegato.md).
 
 ## Che cosa fa il template, e che cosa fai tu
 
-| Già fatto, e collaudato | Tocca a te |
+| Già fatto, e collaudato con i task | Tocca a te |
 | :--- | :--- |
 | Eureka configurato sulla porta 8761 | leggere la traccia e decidere i moduli |
-| un comando che crea un modulo e lo collega a pom, Dockerfile, compose e avvio | le \`@Entity\` e i repository |
-| Feign, Swagger, Lombok, validation e actuator in ogni modulo nuovo | le regole della traccia, nei service |
-| PostgreSQL nel compose, collegato a un modulo con un comando | le chiamate fra servizi (le interfacce Feign) |
-| avvio in locale con hot reload, i log in un terminale solo | l'algoritmo |
-| dati di prova e schema del database ricavati dalle tue entity | le pagine Thymeleaf |
-| la cartella da consegnare, con l'allegato scritto per metà | le parti dell'allegato fra parentesi quadre e le due risposte teoriche |
+| \`task wizard\` / \`task new-service\` per creare e collegare i moduli a pom, Dockerfile, compose e avvio | personalizzare i campi e i nomi |
+| \`task new-entity\` che genera in blocco Entity JPA, Repository, Service e Controller REST | le regole di business specifiche e le relazioni JPA |
+| \`task new-client\` per generare le chiamate Feign e i DTO condivisi | invocare i client nei service |
+| \`task new-view\` per generare le schermate Thymeleaf con form e tabelle | personalizzare layout e flussi della UI |
+| \`task new-auth\` e \`task new-handler\` per sicurezza e gestione eccezioni | definire credenziali e ruoli |
+| \`task seed-data\` e \`task db-schema\` per dati di prova e schema database | verificare i flussi |
+| \`task consegna\` per impacchettare l'archivio d'esame e l'allegato tecnico pronto | le risposte alle due domande teoriche |
 
 La lezione dopo apre il template cartella per cartella. Se vuoi prima vedere
 tutta la giornata con l'orologio in mano, c'è [la procedura del giorno
@@ -133,11 +134,12 @@ Tutto quello che tocca più file passa da un comando \`task\`, scritto nel
 trattini:
 
 \`\`\`bash
-task new-service NAME=catalogo-service
-\`\`\`
-
-\`\`\`bash
-task add-dep SERVICE=catalogo-service DEPS=security
+task wizard                                                              # configura l'intera architettura
+task new-service NAME=catalogo-service                                   # crea un singolo modulo
+task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=...           # genera Entity, Repo, Service, Controller
+task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto   # genera Feign client (+ DTO)
+task new-view SERVICE=biblioteca-ui NAME=Libri FIELDS=...                # genera pagina Thymeleaf e controller UI
+task add-dep SERVICE=catalogo-service DEPS=security                      # aggiunge dipendenze
 \`\`\`
 
 \`task help\` li elenca con una riga di spiegazione; \`task --summary new-service\`
@@ -744,6 +746,14 @@ numeri (diventano regole):
 | «ognuno il proprio database» | \`task use-postgres\`, con \`DBNAME=prestiti\` per il secondo |
 | Eureka, Docker Compose | già nel template |
 
+> 💡 **La catena dei comandi che trasforma questi pezzi in codice**:
+> 1. \`task wizard\`: crea l'infrastruttura, \`catalogo-service\`, \`prestiti-service\` e \`biblioteca-ui\`;
+> 2. \`task new-entity\`: genera \`LibroEntity\` e \`PrestitoEntity\` con repository, service e controller REST in un colpo solo;
+> 3. \`task new-client\`: genera \`CatalogoClient\` per chiamare il catalogo da \`prestiti-service\` e \`biblioteca-ui\`;
+> 4. \`task new-view\`: genera le pagine HTML Thymeleaf con form e tabelle;
+> 5. \`task new-handler\` e \`task new-auth\`: mettono al sicuro errori di validazione e autenticazione;
+> 6. \`task seed-data\` e \`task dev\`: popolano il database e avviano tutto lo stack a caldo!
+
 ## Chi possiede quali dati
 
 La regola dei microservizi è semplice: **ogni servizio possiede le sue
@@ -1019,6 +1029,39 @@ demo/catalogo-service/src/main/java/esame/catalogoservice/
 
 Spring trova da solo tutto quello che sta sotto il pacchetto di \`Main\`: i
 sottopacchetti sono un ordine per te, non una configurazione.
+
+## Generare tutto in 5 secondi: \`task new-entity\`
+
+Invece di creare a mano classi, costruttori, annotazioni e interfacce, hai a disposizione il task di scaffolding completo:
+
+\`\`\`bash
+task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):required:unique,annoPubblicazione:int,disponibile:bool
+\`\`\`
+
+In un solo colpo questo comando genera quattro file sincronizzati:
+1. **\`entity/LibroEntity.java\`**: classe \`@Entity\` con \`@Table(name = "libri")\`, chiave \`@Id @GeneratedValue\`, campi con annotazioni di validazione (\`@NotBlank\`, \`@NotNull\`, ecc.) e getter/setter Lombok.
+2. **\`repository/LibroRepository.java\`**: interfaccia \`JpaRepository<LibroEntity, Long>\` pronta con tutti i metodi CRUD.
+3. **\`service/LibroService.java\`**: classe \`@Service\` con metodi operativi completi (\`tutti()\`, \`perId()\`, \`crea()\`, \`aggiorna()\`, \`elimina()\`).
+4. **\`controller/LibroController.java\`**: \`@RestController\` mappato su \`/api/libri\` con documentazione OpenAPI Swagger (\`@Tag\`, \`@Operation\`), \`@GetMapping\`, \`@PostMapping\`, \`@PutMapping\`, \`@DeleteMapping\` e validazione \`@Valid\`.
+
+### I tipi e i modificatori ammessi in \`FIELDS=\`
+
+| Sintassi | Tipo Java | Colonna DB / Validazione |
+| :--- | :--- | :--- |
+| \`nome:string\` | \`String\` | \`VARCHAR(255)\` |
+| \`nome:string(150)\` | \`String\` | \`VARCHAR(150)\` + \`@Size(max=150)\` |
+| \`nome:int\` o \`nome:integer\` | \`Integer\` | \`INTEGER\` |
+| \`nome:long\` | \`Long\` | \`BIGINT\` |
+| \`nome:decimal\` | \`BigDecimal\` | \`NUMERIC(12,2)\` |
+| \`nome:bool\` o \`nome:boolean\` | \`Boolean\` | \`BOOLEAN\` |
+| \`nome:date\` | \`LocalDate\` | \`DATE\` |
+| \`nome:datetime\` | \`LocalDateTime\` | \`TIMESTAMP\` |
+| \`nome:email\` | \`String\` | \`@Email\` + \`VARCHAR(255)\` |
+| \`nome:text\` | \`String\` | \`@Lob\` (\`TEXT\`) |
+| \`:required\` | vincolo | \`@NotNull\` / \`@NotBlank\` + \`nullable = false\` |
+| \`:unique\` | vincolo | \`unique = true\` sul database |
+
+Dopo aver lanciato il comando, puoi aprire i file per aggiungere relazioni (\`@ManyToOne\`, \`@OneToMany\`), campi speciali (enum) o metodi di ricerca nel repository come vediamo qui sotto.
 
 ## Un'entity
 
@@ -1504,6 +1547,8 @@ HTTP.
 Un controller sottile e un service che non sa niente di HTTP: così le regole
 stanno in un posto solo, e si provano senza avviare un server.
 
+> 💡 **Scorciatoia d'esame**: Ricorda che eseguendo \`task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=...\` hai già ottenuto sia il \`Service\` che il \`Controller\` REST con le operazioni CRUD complete, la validazione e la documentazione Swagger! Qui vediamo come sono composti per personalizzarli.
+
 ## Il service
 
 \`\`\`java demo/catalogo-service/src/main/java/esame/catalogoservice/service/CatalogoService.java
@@ -1665,6 +1710,22 @@ public class PrestitoController {
 controllare i vincoli scritti sul record (\`@NotNull\`, \`@Email\`, \`@Min\`,
 \`@Max\`) prima di chiamare il metodo.
 
+## Gestione globale degli errori con \`task new-handler\`
+
+Quando un client invia dati errati (es. email non valida o campi obbligatori mancanti), Spring lancia un'eccezione di validazione (\`MethodArgumentNotValidException\`). Senza un gestore globale, rischieresti di restituire status non chiari o stack trace grezzi.
+
+Per generare automaticamente un gestore \`@RestControllerAdvice\` centralizzato per il servizio:
+
+\`\`\`bash
+task new-handler SERVICE=catalogo-service
+\`\`\`
+
+Questo comando genera \`exception/GlobalExceptionHandler.java\` pronto all'uso, che:
+- Intercetta gli errori di validazione dei campi (\`@Valid\`) e risponde con **400 Bad Request** e una lista dettagliata di ogni campo errato con il relativo messaggio;
+- Intercetta \`ResponseStatusException\` mantenendo lo status HTTP specificato (es. 404, 409);
+- Intercetta \`EntityNotFoundException\` / \`NoSuchElementException\` rispondendo con **404 Not Found**;
+- Intercetta qualsiasi altro errore imprevisto rispondendo con un JSON pulito in formato standard.
+
 ## Provarlo: Swagger
 
 Ogni modulo creato da \`task new-service\` ha Swagger acceso. Con lo stack
@@ -1751,9 +1812,15 @@ Puoi generare l'interfaccia \`@FeignClient\` collegata al servizio target dirett
 task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto
 \`\`\`
 
-Crea \`CatalogoClient.java\` sotto \`prestiti-service/.../client/\`, già annotato con
-\`@FeignClient(name = "CATALOGO-SERVICE")\` e con i metodi HTTP (\`GET\`, \`POST\`, \`PUT\`, \`DELETE\`)
-predisposti per scambiare \`LibroDto\`.
+Oppure, se il DTO non esiste ancora in \`common-dto\`, puoi specificare anche i campi:
+
+\`\`\`bash
+task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto FIELDS=id:long,titolo:string:required,disponibile:bool
+\`\`\`
+
+Questo comando:
+1. Crea \`CatalogoClient.java\` sotto \`prestiti-service/.../client/\`, annotato con \`@FeignClient(name = "CATALOGO-SERVICE")\` e con i metodi HTTP (\`GET\`, \`POST\`, \`PUT\`, \`DELETE\`) predisposti per scambiare \`LibroDto\`.
+2. Se specifichi \`FIELDS=...\` e il DTO non esiste, genera in contemporanea il record \`LibroDto.java\` dentro \`common-dto/src/main/java/esame/common/dto/\` con campi e validazioni Jakarta!
 
 ## Usarlo
 
@@ -2759,6 +2826,7 @@ che non va, col nome breve che vedi nel primo (\`catalogo\`, \`prestiti\`,
 | *Load balancer does not contain an instance for the service X* | aspetta 10 secondi; poi confronta il nome in \`@FeignClient\` con la dashboard di Eureka |
 | \`FeignException$NotFound\` su un endpoint che esiste | il percorso nel client Feign non è quello del controller |
 | un 500 dalla pagina | \`task logs SERVICE=biblioteca-ui\`: di solito è un servizio chiamato che ha dato errore, e lo dice |
+| errori REST restituiscono 500 o stack trace invece di 400/404 | \`task new-handler SERVICE=<nome>\`: crea un \`@RestControllerAdvice\` che mappa le eccezioni in risposte JSON pulite |
 | *password authentication failed* o *database "prestiti" does not exist* | il volume di PostgreSQL è vecchio: \`task docker-reset\` (cancella i dati), poi \`task dev\` |
 | *release version 25 not supported* | il JDK è più vecchio del progetto: \`task set-java\` |
 | una porta **RISERVATA** in \`task status\` | l'ha presa Windows (Docker Desktop, Hyper-V): \`task set-port\` per spostare il servizio |
@@ -3222,8 +3290,8 @@ che trova in \`JAVA_HOME\` o, se manca, nel \`PATH\`.
 **Pubblicare una versione nuova** (dopo il push di \`main\` e dei branch):
 
 \`\`\`bash
-git tag v1.2.4
-git push origin v1.2.4
+git tag v1.2.5
+git push origin v1.2.5
 \`\`\`
 
 Il resto lo fa la GitHub Action [\`release.yml\`](./.github/workflows/release.yml):
@@ -5266,6 +5334,12 @@ public class OrdineController {
 }
 \`\`\`
 
+> 💡 **Generazione automatica con \`task new-view\`**:
+> \`\`\`bash
+> task new-view SERVICE=ordini-ui NAME=Ordini FIELDS=cliente:string:required,quantita:int
+> \`\`\`
+> Genera contemporaneamente il controller Spring MVC (\`OrdiniUiController.java\`) e la vista HTML (\`templates/ordini.html\`) con tabella dinamica e form validato.
+
 \`\`\`java
 // demo/ordini-ui/src/main/java/.../OrdineWebController.java
 package esame.ordiniui;
@@ -5492,6 +5566,13 @@ public class Main {
 }
 \`\`\`
 
+> 💡 **Generazione automatica con \`task new-client\`**:
+> Invece di scrivere l'interfaccia Feign e i DTO a mano:
+> \`\`\`bash
+> task new-client FROM=ordini-ui TO=ordini-service DTO=OrdineDTO FIELDS=id:long,cliente:string:required,quantita:int
+> \`\`\`
+> Genera \`OrdiniClient.java\` già annotato con \`@FeignClient(name = "ORDINI-SERVICE")\` e, se non esiste già, crea anche il record \`OrdineDTO\` dentro \`common-dto\` con i relativi campi!
+
 \`\`\`java
 // demo/ordini-ui/src/main/java/.../OrdiniClient.java
 package esame.ordiniui;
@@ -5569,6 +5650,20 @@ public class OrdineFacade {
 | \`@Transient\` | Campo Entity | Indica a JPA di ignorare il campo (non verrà creata alcuna colonna sul DB). |
 | \`@ManyToOne\` / \`@OneToMany\` | Campo Entity | Definisce le relazioni tra tabelle (Molti-a-Uno, Uno-a-Molti) con gestione delle Foreign Key. |
 | \`JpaRepository<Entity, IdType>\` | Interfaccia Repo | Interfaccia Spring Data che fornisce gratuitamente tutti i metodi CRUD (\`save\`, \`findById\`, \`findAll\`, \`deleteById\`). |
+
+#### Generazione automatica in 5 secondi: \`task new-entity\`
+
+Invece di scrivere da zero l'Entity, il Repository, il Service e il Controller REST con decine di righe boilerplate:
+
+\`\`\`bash
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=cliente:string(120):required,quantita:int:required,consegna:date
+\`\`\`
+
+Questo singolo comando genera un'architettura completa a 4 strati:
+1. **Entity JPA** (\`OrdineEntity.java\`): \`@Entity\`, \`@Table(name = "ordini")\`, chiave \`@Id @GeneratedValue\`, vincoli di validazione Jakarta (\`@NotBlank\`, \`@NotNull\`, ecc.) e getter/setter Lombok.
+2. **Spring Data Repository** (\`OrdineRepository.java\`): interfaccia estesa da \`JpaRepository<OrdineEntity, Long>\`.
+3. **Service di Business** (\`OrdineService.java\`): con metodi CRUD pronti (\`tutti()\`, \`perId()\`, \`crea()\`, \`aggiorna()\`, \`elimina()\`).
+4. **Controller REST** (\`OrdineController.java\`): con OpenAPI Swagger (\`@Tag\`, \`@Operation\`), rotte HTTP REST e validazione \`@Valid\`.
 
 #### Esempio completo — entity, repository, service, dati di prova
 
@@ -5850,7 +5945,13 @@ public OrdineDTO crea(@Valid @RequestBody OrdineDTO nuovo) {
 
 Senza altro, una richiesta non valida torna **400** con un corpo lungo e poco
 leggibile. Una classe sola lo trasforma in un messaggio pulito — e fa una bella
-figura in Swagger:
+figura in Swagger.
+
+> 💡 **Generazione automatica con \`task new-handler\`**:
+> \`\`\`bash
+> task new-handler SERVICE=ordini-service
+> \`\`\`
+> Genera \`exception/GlobalExceptionHandler.java\` con \`@RestControllerAdvice\`, gestione di \`MethodArgumentNotValidException\` (400), \`ResponseStatusException\`, \`EntityNotFoundException\` (404) ed errori generici (500).
 
 \`\`\`java
 // demo/ordini-service/src/main/java/.../GestioneErrori.java
@@ -6641,6 +6742,44 @@ rispettati). Prima prova su un H2 usa-e-getta e ti dice com'è andata.
 
 ---
 
+## 3.1 Cheat Sheet Scaffolding & Generazione Rapida
+
+Per non perdere ore a scrivere codice boilerplate e classi ripetitive durante l'esame, hai a disposizione questi comandi:
+
+| Task | Sintassi ed Esempio | Che cosa genera |
+| :--- | :--- | :--- |
+| **\`task wizard\`** | \`task wizard\` | Crea l'intera architettura a microservizi guidandoti passo passo. |
+| **\`task new-service\`** | \`task new-service NAME=ordini-service [UI=1] [NODB=1]\` | Crea un nuovo microservizio e lo collega a pom, Dockerfile, compose, porte ed editor. |
+| **\`task new-entity\`** | \`task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=cliente:string(100):required,quantita:int:required,totale:decimal,data:date\` | Genera in blocco **Entity JPA**, **Repository**, **Service CRUD** e **Controller REST** con Swagger. |
+| **\`task new-client\`** | \`task new-client FROM=ordini-ui TO=ordini-service DTO=OrdineDto [FIELDS=...]\` | Genera interfaccia \`@FeignClient(name="ORDINI-SERVICE")\` e, con \`FIELDS=\`, anche il DTO in \`common-dto\`. |
+| **\`task new-dto\`** | \`task new-dto NAME=OrdineDto FIELDS=id:long,cliente:string:required [CLASS=1]\` | Genera un Java record DTO immutabile con validazioni in \`common-dto\`. |
+| **\`task new-view\`** | \`task new-view SERVICE=ordini-ui NAME=Ordini FIELDS=cliente:string:required,quantita:int\` | Genera controller Spring MVC (\`OrdiniUiController\`) e template Thymeleaf (\`ordini.html\`) con form e tabella. |
+| **\`task new-auth\`** | \`task new-auth SERVICE=ordini-service TYPE=inmemory\`<br>\`task new-auth SERVICE=ordini-service TYPE=db\`<br>\`task new-auth SERVICE=ordini-ui TYPE=form\` | Configura Spring Security: Basic Auth in memoria, con tabella utenti/ruoli su database, o Form Login con pagina web. |
+| **\`task new-handler\`**| \`task new-handler SERVICE=ordini-service\` | Genera \`@RestControllerAdvice\` per gestire errori di validazione (400), non trovato (404) e 500 in formato JSON pulito. |
+| **\`task seed-data\`** | \`task seed-data\` | Popola automaticamente con dati credibili le tabelle vuote al bootstrap. |
+| **\`task db-schema\`** | \`task db-schema\` | Genera la tabella Markdown dello schema DB per l'allegato tecnico dell'esame. |
+| **\`task add-dep\`** | \`task add-dep SERVICE=ordini-service DEPS=security,mail\` | Aggiunge starter Maven senza dover cercare versioni o groupId. |
+| **\`task set-port\`** | \`task set-port SERVICE=ordini-service PORT=9080\` | Cambia la porta di un servizio ovunque sia scritta nel progetto. |
+| **\`task remove-service\`** | \`task remove-service SERVICE=vecchio-service\` | Rimuove un modulo e lo scollega da pom, Dockerfile, compose e liste di avvio. |
+
+### Tabella dei Tipi e Modificatori per \`FIELDS=\`
+
+| Tipo nel comando | Tipo Java | Dettaglio DB / Validazione |
+| :--- | :--- | :--- |
+| \`string\` / \`string(N)\` | \`String\` | \`VARCHAR(255)\` o \`VARCHAR(N)\` + \`@Size(max=N)\` |
+| \`int\` / \`integer\` | \`Integer\` | \`INTEGER\` |
+| \`long\` | \`Long\` | \`BIGINT\` |
+| \`decimal\` / \`double\` | \`BigDecimal\` | \`NUMERIC(12,2)\` |
+| \`bool\` / \`boolean\` | \`Boolean\` | \`BOOLEAN\` |
+| \`date\` | \`LocalDate\` | \`DATE\` |
+| \`datetime\` | \`LocalDateTime\` | \`TIMESTAMP\` |
+| \`email\` | \`String\` | \`@Email\` + \`VARCHAR(255)\` |
+| \`text\` | \`String\` | \`@Lob\` (\`TEXT\`) |
+| \`:required\` | vincolo | \`@NotNull\` / \`@NotBlank\` + \`nullable = false\` |
+| \`:unique\` | vincolo | vincolo di unicità \`unique = true\` |
+
+---
+
 ## 4. Collaudo Rapido
 
 ### Prima: il progetto è coerente?
@@ -6762,6 +6901,13 @@ task docker-up
 
 ### 🚨 Emergenza 4: "Eureka registra i servizi ma i Feign Client danno 500"
 Ogni servizio tiene una copia locale del registro di Eureka, e il load balancer di Feign una copia di quella. Con i valori di Spring le due cache insieme fanno anche 30-60 secondi di "Load balancer does not contain an instance for the service ...". I moduli creati da \`task new-service\` le accorciano a 5 secondi (\`registry-fetch-interval-seconds\` e \`spring.cloud.loadbalancer.cache.ttl\` nell'\`application.yml\`), e Eureka rinfresca le sue risposte ogni 5: dopo l'avvio bastano pochi secondi. Se un modulo scritto a mano ha ancora il problema, copia quelle righe da un modulo generato.
+
+### 🚨 Emergenza 5: "Errori 500 generici o validazioni @Valid non formattate nelle API REST"
+Se inviando dati non validi le tue API REST rispondono con 500 o messaggi illeggibili invece di 400 Bad Request:
+\`\`\`bash
+task new-handler SERVICE=<modulo>
+\`\`\`
+Genera \`exception/GlobalExceptionHandler.java\` (\`@RestControllerAdvice\`) che intercetta \`MethodArgumentNotValidException\` (trasformandola in 400 con dettaglio campo per campo), \`ResponseStatusException\` (mantenendo lo status HTTP 404/409) ed eccezioni non gestite (formattate in un JSON standard).
 
 ---
 
