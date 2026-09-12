@@ -182,6 +182,7 @@ ensure_sql_init() { # application.yml
       print "  sql:" cr
       print "    init:" cr
       print "      mode: always" cr
+      print "      continue-on-error: true" cr
       print ""
       in_spring=0
       print
@@ -198,6 +199,7 @@ ensure_sql_init() { # application.yml
         print "  sql:" cr
         print "    init:" cr
         print "      mode: always" cr
+        print "      continue-on-error: true" cr
       }
     }
   ' "$yml" >"$yml.tmp" && mv "$yml.tmp" "$yml"

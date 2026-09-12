@@ -101,6 +101,37 @@ function New-PortableZip {
 if (Test-Path $OutDir) { Remove-Item -Recurse -Force $OutDir }
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 
+# --- Un data.sql per ogni modulo che ne e' senza -----------------------------
+# devdata (il generatore) non arriva alla consegna, di proposito: senza un
+# data.sql la consegna avrebbe le tabelle vuote. Lo scriviamo qui, prima di
+# copiare i moduli, cosi' la copia sotto lo prende gia' pronto. Idempotente:
+# un modulo che ha gia' un data.sql (scritto a mano o da un SQL=1 precedente)
+# non viene toccato.
+foreach ($jm in (Get-JpaModules -RepoRoot $repoRoot | Where-Object { $_.HasEntities })) {
+    $sqlPath = Join-Path $jm.Dir 'src/main/resources/data.sql'
+    $ymlPath = Join-Path $jm.Dir 'src/main/resources/application.yml'
+    if (Test-Path $sqlPath) {
+        if (Test-Path $ymlPath) { Ensure-SqlInit -YmlPath $ymlPath }
+        continue
+    }
+    $rows = 5
+    if (Test-Path $ymlPath) {
+        $m = [regex]::Match((Read-TextFile $ymlPath), '(?m)^dev-data:[ \t]*\r?\n(?:[ \t]+.*\r?\n)*?[ \t]+rows:[ \t]*(\d+)')
+        if ($m.Success -and [int]$m.Groups[1].Value -gt 0) { $rows = [int]$m.Groups[1].Value }
+    }
+    Write-Host ''
+    Write-Host "==> $($jm.Name) non ha un data.sql: lo genero (task seed-data SQL=1)" -ForegroundColor Cyan
+    # Processo a parte, non "& script.ps1": dentro seed-data.ps1 ci sono degli
+    # exit, e in PowerShell un exit in uno script richiamato cosi' chiude
+    # l'intero processo (anche noi), non solo quello script.
+    $seedScript = Join-Path $PSScriptRoot 'seed-data.ps1'
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $seedScript -Module $jm.Name -Sql -Rows $rows
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "    generazione fallita per $($jm.Name): la consegna prosegue, ma quel modulo restera'' senza data.sql." -ForegroundColor Yellow
+    }
+}
+Write-Host ''
+
 # --- I moduli, senza roba compilata ------------------------------------------
 # Ognuno nella sua cartella accanto al pom aggregatore, come nel progetto: e'
 # li' che il Dockerfile e Maven li cercano.
@@ -155,21 +186,23 @@ foreach ($module in $modules) {
 }
 Write-Step 'pulizia consegna: rimosse classi del template (devdata) e configurazioni interne'
 
-# --- Avviso: senza un data.sql tuo, questa consegna ha le tabelle vuote -------
-# seed-data (devdata) e' uno strumento di sviluppo: sopra lo abbiamo appena
-# tolto apposta. Se nessun modulo ha un data.sql scritto a mano, chi apre
-# questa consegna vede tabelle vuote -- e i dati di prova valgono punti.
+# --- Verifica data.sql: la consegna deve avviare il database con i dati --------
 $entityModules = @(Get-JpaModules -RepoRoot $repoRoot | Where-Object { $_.HasEntities })
+$modulesWithData = @($entityModules | Where-Object {
+    Test-Path (Join-Path $OutDir "$($_.Name)/src/main/resources/data.sql")
+})
 $modulesWithoutData = @($entityModules | Where-Object {
     -not (Test-Path (Join-Path $OutDir "$($_.Name)/src/main/resources/data.sql"))
 })
+if ($modulesWithData.Count -gt 0) {
+    Write-Step "data.sql presente per: $(($modulesWithData | ForEach-Object { $_.Name }) -join ', ') (il database si popolera' all'avvio)"
+}
 if ($modulesWithoutData.Count -gt 0) {
     Write-Host ''
     Write-Host 'ATTENZIONE: nessun data.sql trovato per: ' -NoNewline -ForegroundColor Yellow
     Write-Host (($modulesWithoutData | ForEach-Object { $_.Name }) -join ', ') -ForegroundColor Yellow
-    Write-Host '  task seed-data (senza SQL=1) e'' solo per te, mentre sviluppi: i dati che' -ForegroundColor Yellow
-    Write-Host '  genera NON sono in questa consegna (rimossi qui sopra, di proposito).' -ForegroundColor Yellow
-    Write-Host '  task seed-data SQL=1        genera lui il data.sql, non serve scriverlo a mano' -ForegroundColor Yellow
+    Write-Host '  La generazione automatica di data.sql non e'' riuscita o manca H2 per generarlo.' -ForegroundColor Yellow
+    Write-Host '  task seed-data SQL=1        genera il data.sql; puoi eseguirlo prima della consegna' -ForegroundColor Yellow
     Write-Host '  Senza un data.sql, chi apre questo progetto vede tabelle vuote. Vedi' -ForegroundColor Yellow
     Write-Host '  GIORNO-ESAME.md, sezione "Riempire il database di dati di prova".' -ForegroundColor Yellow
     Write-Host ''

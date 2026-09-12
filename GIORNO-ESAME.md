@@ -576,10 +576,13 @@ task seed-data ROWS=0      # spenti
 **`task seed-data` (senza SQL=1) è solo per te, mentre sviluppi.** `task
 consegna` toglie di proposito il pacchetto `devdata` e la riga `dev-data:
 rows:` da ogni `application.yml`: nell'archivio finale non deve restare
-traccia degli strumenti del template, solo codice tuo. Questo vuol dire che
-**senza un `data.sql`, la consegna ha le tabelle vuote** — non è facoltativo,
-è l'unica cosa che sopravvive alla consegna. `task consegna` te lo ricorda se
-se lo dimentichi.
+traccia degli strumenti del template, solo codice tuo.
+
+Se un modulo non ha ancora un `data.sql`, **`task consegna` lo genera in
+automatico prima di impacchettare** (lanciando `task seed-data SQL=1` in modo
+idempotente): chi apre la consegna si ritrova il database già pronto che si
+popola all'avvio con lo script SQL, senza che tu debba ricordarti di lanciarlo
+prima. Se vuoi invece generarlo tu prima della consegna (o con un numero di righe diverso):
 
 ```bash
 task seed-data SQL=1
@@ -602,6 +605,7 @@ spring:
   sql:
     init:
       mode: always
+      continue-on-error: true
 ```
 
 e spegne `dev-data.rows` sul modulo (le righe ora sono fisse: non serve più

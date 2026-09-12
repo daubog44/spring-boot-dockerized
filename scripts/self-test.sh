@@ -846,20 +846,28 @@ else
   [ -z "$(find "$DEST" -type d -name target)" ] || fail "nella consegna ci sono cartelle target/"
   [ ! -d "$DEST/common-dto/src/main/java/devdata" ] || fail "devdata e' rimasto in common-dto nella consegna"
   [ ! -d "$DEST/common-dto/src/main/resources/META-INF" ] || fail "META-INF e' rimasto in common-dto nella consegna"
+  [ -f "$DEST/alfa-service/src/main/resources/data.sql" ] || fail "scompattato l'archivio, manca data.sql per alfa-service"
+  grep -q 'INSERT INTO' "$DEST/alfa-service/src/main/resources/data.sql" || fail "data.sql generato nella consegna non ha INSERT"
+  grep -q 'defer-datasource-initialization: true' "$DEST/alfa-service/src/main/resources/application.yml" || fail "manca defer-datasource-initialization in application.yml"
+  grep -q 'mode: always' "$DEST/alfa-service/src/main/resources/application.yml" || fail "manca sql.init.mode in application.yml"
+  grep -q 'continue-on-error: true' "$DEST/alfa-service/src/main/resources/application.yml" || fail "manca sql.init.continue-on-error in application.yml"
   [ -z "$(find "$DEST" -type f -name '*.zip')" ] || fail "archivi dentro l'archivio"
   grep -q 'Scompatta ogni archivio' "$DEST/ISTRUZIONI-ESECUZIONE.md" && fail "le istruzioni chiedono ancora di ricomporre il progetto"
   rm -rf "$DEST"
 fi
-case "$TOOL_OUT" in *"ATTENZIONE"*"data.sql"*) : ;; *) fail "non avvisa che manca un data.sql, con le entity senza" ;; esac
+case "$TOOL_OUT" in *"==> alfa-service non ha un data.sql: lo genero"*) : ;; *) fail "non ha avviato la generazione automatica di data.sql" ;; esac
+case "$TOOL_OUT" in *"data.sql presente per: alfa-service"*) : ;; *) fail "non conferma data.sql presente" ;; esac
 end_case
 
-start_case "consegna non avvisa per un modulo che ha gia' un data.sql"
+start_case "consegna non tocca un modulo che ha gia' un data.sql"
 mkdir -p "$SANDBOX/demo/alfa-service/src/main/resources"
 printf -- '-- dati veri per la traccia\nINSERT INTO libro (titolo) VALUES (%s);\n' "'Prova'" >"$SANDBOX/demo/alfa-service/src/main/resources/data.sql"
 run_tool consegna.sh --nome ROSSI_MARIO
 assert_ok "consegna con data.sql" &&
   { ATTN_LINE="$(printf '%s\n' "$TOOL_OUT" | grep 'ATTENZIONE: nessun data.sql' || true)";
-    case "$ATTN_LINE" in *alfa-service*) fail "avvisa anche per alfa-service, che ha gia' un data.sql" ;; *) : ;; esac; }
+    case "$ATTN_LINE" in *alfa-service*) fail "avvisa anche per alfa-service, che ha gia' un data.sql" ;; *) : ;; esac; } &&
+  { case "$TOOL_OUT" in *"==> alfa-service non ha un data.sql"*) fail "ha provato a rigenerare un data.sql che c'era gia'" ;; *) : ;; esac; } &&
+  grep -q 'dati veri per la traccia' "$SANDBOX/demo/alfa-service/src/main/resources/data.sql" || fail "ha sovrascritto il data.sql esistente"
 rm -f "$SANDBOX/demo/alfa-service/src/main/resources/data.sql"
 end_case
 

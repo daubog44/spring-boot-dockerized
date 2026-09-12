@@ -406,5 +406,5 @@ function Ensure-SqlInit {
         Add-LinesAt -Path $YmlPath -Index ($jpaIdx + 1) -NewLines @('    defer-datasource-initialization: true')
         $endIdx++
     }
-    Add-LinesAt -Path $YmlPath -Index $endIdx -NewLines @('  sql:', '    init:', '      mode: always', '')
+    Add-LinesAt -Path $YmlPath -Index $endIdx -NewLines @('  sql:', '    init:', '      mode: always', '      continue-on-error: true', '')
 }

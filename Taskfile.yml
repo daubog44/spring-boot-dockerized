@@ -131,9 +131,12 @@ tasks:
 
       Toglie anche ogni traccia del template (il pacchetto devdata di
       task seed-data e la riga dev-data: rows: da ogni application.yml):
-      nella consegna deve restare solo codice tuo. Questo vuol dire che
-      senza un data.sql scritto da te, la consegna ha le tabelle vuote --
-      te lo segnala se lo dimentichi (vedi GIORNO-ESAME.md).
+      nella consegna deve restare solo codice tuo. Se un modulo con entita'
+      non ha ancora un data.sql, la consegna avvia automaticamente
+      task seed-data SQL=1 (in modo idempotente): cosi' la consegna ha il
+      database pronto che si popola all'avvio con lo script SQL, senza tracce
+      del generatore. Un data.sql scritto a mano continua a valere e non
+      viene toccato (vedi GIORNO-ESAME.md).
 
       Le parti da scrivere a mano (analisi, algoritmo, che cosa fa ogni
       modulo, risposte teoriche) stanno in allegato.md, nella cartella del

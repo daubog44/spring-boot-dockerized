@@ -1,6 +1,6 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 18:09',
+  generato: '2026-09-12 20:17',
   progetto: {
     cartella: 'demo',
     pacchetto: 'esame',
@@ -4241,7 +4241,9 @@ allo stesso modo: **variabili \`NOME=valore\`, senza trattini**.
 > Ognuno di essi aprirà un comodo menu interattivo guidato nel terminale che rileverà i moduli e le opzioni disponibili e ti farà le domande passo dopo passo.
 
 \`task help\` (o \`task\` da solo) stampa l'elenco; \`task --summary <comando>\` il
-dettaglio di uno.
+dettaglio di uno (variabili, valori di default, esempio). \`task new-entity --help\`
+**non funziona**: \`--help\` lo intercetta \`task\` stesso, prima che arrivi allo
+script — usa sempre \`--summary\`.
 
 ### Aggiungere una dipendenza a un microservizio
 
@@ -4501,9 +4503,30 @@ task seed-data SERVICE=ordini-service ROWS=10
 task seed-data ROWS=0      # spenti
 \`\`\`
 
-Servono dati precisi, quelli della traccia? Scrivili in un \`data.sql\` tuo:
-le tabelle che riempie lui non vengono toccate. Perché venga eseguito dopo
-Hibernate, anche su PostgreSQL, nell'\`application.yml\` servono:
+**\`task seed-data\` (senza SQL=1) è solo per te, mentre sviluppi.** \`task
+consegna\` toglie di proposito il pacchetto \`devdata\` e la riga \`dev-data:
+rows:\` da ogni \`application.yml\`: nell'archivio finale non deve restare
+traccia degli strumenti del template, solo codice tuo.
+
+Se un modulo non ha ancora un \`data.sql\`, **\`task consegna\` lo genera in
+automatico prima di impacchettare** (lanciando \`task seed-data SQL=1\` in modo
+idempotente): chi apre la consegna si ritrova il database già pronto che si
+popola all'avvio con lo script SQL, senza che tu debba ricordarti di lanciarlo
+prima. Se vuoi invece generarlo tu prima della consegna (o con un numero di righe diverso):
+
+\`\`\`bash
+task seed-data SQL=1
+task seed-data SERVICE=ordini-service SQL=1 ROWS=10
+\`\`\`
+
+Non serve scriverlo a mano: \`SQL=1\` genera le stesse righe di sempre (via
+Hibernate, quindi con relazioni e vincoli rispettati) e le scrive in un
+\`data.sql\` vero, come \`INSERT\` SQL semplici — nessuna sintassi di un motore in
+particolare, letti dal database dopo che le righe ci sono davvero, non
+costruiti a mano riga per riga. Quel file sopravvive alla consegna (\`devdata\`
+no): quello che il correttore vede è un file SQL indistinguibile da uno
+scritto a mano, non codice del template. Aggiunge anche da solo le due chiavi
+che servono perché \`data.sql\` giri dopo Hibernate, anche su PostgreSQL:
 
 \`\`\`yaml
 spring:
@@ -4512,7 +4535,13 @@ spring:
   sql:
     init:
       mode: always
+      continue-on-error: true
 \`\`\`
+
+e spegne \`dev-data.rows\` sul modulo (le righe ora sono fisse: non serve più
+generarle a ogni avvio). Rilancialo quante volte vuoi: rigenera lo stesso
+file. Se preferisci scrivere tu i valori esatti della tua traccia, scrivi un
+\`data.sql\` a mano: \`SQL=1\` non tocca un \`data.sql\` che non ha scritto lui.
 
 I dati di prova valgono punti: una demo su tabelle vuote non si vede.
 

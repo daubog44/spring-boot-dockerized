@@ -56,6 +56,36 @@ echo "  il progetto e' coerente (task check)"
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
+# --- Un data.sql per ogni modulo che ne e' senza -----------------------------
+# devdata (il generatore) non arriva alla consegna, di proposito: senza un
+# data.sql la consegna avrebbe le tabelle vuote. Lo scriviamo qui, prima di
+# copiare i moduli, cosi' la copia sotto lo prende gia' pronto. Idempotente:
+# un modulo che ha gia' un data.sql (scritto a mano o da un SQL=1 precedente)
+# non viene toccato.
+. "$SCRIPT_DIR/scaffold-lib.sh"
+while IFS= read -r row; do
+  [ -n "$row" ] || continue
+  jm_name="${row%%|*}"
+  jm_rest="${row#*|}"
+  [ "${jm_rest%%|*}" = "1" ] || continue
+  jm_sql="$DEMO_DIR/$jm_name/src/main/resources/data.sql"
+  jm_yml="$DEMO_DIR/$jm_name/src/main/resources/application.yml"
+  if [ -f "$jm_sql" ]; then
+    [ -f "$jm_yml" ] && ensure_sql_init "$jm_yml"
+    continue
+  fi
+  jm_rows=5
+  if [ -f "$jm_yml" ]; then
+    found="$(awk '/^dev-data:/{f=1; next} f && /^[^ \t\r]/{f=0} f && /^[ \t]+rows:[ \t]*[1-9]/{match($0,/[0-9]+/); print substr($0,RSTART,RLENGTH); exit}' "$jm_yml")"
+    [ -n "$found" ] && jm_rows="$found"
+  fi
+  echo ""
+  echo "==> $jm_name non ha un data.sql: lo genero (task seed-data SQL=1)"
+  bash "$SCRIPT_DIR/seed-data.sh" --module "$jm_name" --sql --rows "$jm_rows" ||
+    echo "    generazione fallita per $jm_name: la consegna prosegue, ma quel modulo restera' senza data.sql."
+done < <(jpa_modules "$DEMO_DIR")
+echo ""
+
 # Un zip col contenuto di una cartella: percorsi relativi a lei, niente
 # cartella in cima ("Estrai tutto" di Windows ne crea gia' una col nome
 # dell'archivio) e i file nascosti compresi (senza .mvn/ il wrapper Maven non
@@ -127,23 +157,27 @@ for yml in "$OUT_DIR"/*/src/main/resources/application.yml; do
 done
 echo "  pulizia consegna: rimosse classi del template (devdata) e configurazioni interne"
 
-# --- Avviso: senza un data.sql tuo, questa consegna ha le tabelle vuote -------
-# seed-data (devdata) e' uno strumento di sviluppo: sopra lo abbiamo appena
-# tolto apposta. Se nessun modulo ha un data.sql scritto a mano, chi apre
-# questa consegna vede tabelle vuote -- e i dati di prova valgono punti.
+# --- Verifica data.sql: la consegna deve avviare il database con i dati --------
+WITH_DATA=""
 MISSING_DATA=""
 for m in $MODULES; do
   src="$OUT_DIR/$m/src/main/java"
   [ -d "$src" ] || continue
   grep -rlE '^[[:space:]]*@(jakarta\.persistence\.)?Entity\b' "$src" >/dev/null 2>&1 || continue
-  [ -f "$OUT_DIR/$m/src/main/resources/data.sql" ] || MISSING_DATA="$MISSING_DATA $m"
+  if [ -f "$OUT_DIR/$m/src/main/resources/data.sql" ]; then
+    WITH_DATA="$WITH_DATA $m"
+  else
+    MISSING_DATA="$MISSING_DATA $m"
+  fi
 done
+if [ -n "$WITH_DATA" ]; then
+  echo "  data.sql presente per:$WITH_DATA (il database si popolera' all'avvio)"
+fi
 if [ -n "$MISSING_DATA" ]; then
   echo ""
   echo "ATTENZIONE: nessun data.sql trovato per:$MISSING_DATA"
-  echo "  task seed-data (senza SQL=1) e' solo per te, mentre sviluppi: i dati che"
-  echo "  genera NON sono in questa consegna (rimossi qui sopra, di proposito)."
-  echo "  task seed-data SQL=1        genera lui il data.sql, non serve scriverlo a mano"
+  echo "  La generazione automatica di data.sql non e' riuscita o manca H2 per generarlo."
+  echo "  task seed-data SQL=1        genera il data.sql; puoi eseguirlo prima della consegna"
   echo "  Senza un data.sql, chi apre questo progetto vede tabelle vuote. Vedi"
   echo "  GIORNO-ESAME.md, sezione \"Riempire il database di dati di prova\"."
   echo ""

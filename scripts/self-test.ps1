@@ -943,7 +943,8 @@ Test-Case 'learn raccoglie lezioni, guide e moduli in contenuti.js' {
 Test-Case 'consegna prepara un archivio che parte appena scompattato' {
     $r = Invoke-Tool 'consegna.ps1' @('-Nome', 'ROSSI_MARIO')
     Assert-Ok $r 'consegna e'' fallita'
-    Assert-Contains $r.Output 'ATTENZIONE: nessun data.sql trovato per' 'non avvisa che manca un data.sql, con le entity senza'
+    Assert-Contains $r.Output '==> alfa-service non ha un data.sql: lo genero' 'non ha avviato la generazione automatica di data.sql'
+    Assert-Contains $r.Output 'data.sql presente per: alfa-service' 'non conferma data.sql presente'
     $zip = Join-Path $sandbox 'consegna/ROSSI_MARIO.zip'
     Assert-That (Test-Path $zip) 'manca consegna/ROSSI_MARIO.zip'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -972,6 +973,13 @@ Test-Case 'consegna prepara un archivio che parte appena scompattato' {
         Assert-That ($target.Count -eq 0) 'nella consegna ci sono cartelle target/'
         Assert-That (-not (Test-Path (Join-Path $dest 'common-dto/src/main/java/devdata'))) 'devdata e'' rimasto in common-dto nella consegna'
         Assert-That (-not (Test-Path (Join-Path $dest 'common-dto/src/main/resources/META-INF'))) 'META-INF e'' rimasto in common-dto nella consegna'
+        Assert-That (Test-Path (Join-Path $dest 'alfa-service/src/main/resources/data.sql')) "scompattato l'archivio, manca data.sql per alfa-service"
+        $alfaSql = Read-TextFile (Join-Path $dest 'alfa-service/src/main/resources/data.sql')
+        Assert-That ($alfaSql -match 'INSERT INTO') 'data.sql generato nella consegna non ha INSERT'
+        $alfaYml = Read-TextFile (Join-Path $dest 'alfa-service/src/main/resources/application.yml')
+        Assert-Contains $alfaYml 'defer-datasource-initialization: true' 'manca defer-datasource-initialization in application.yml'
+        Assert-Contains $alfaYml 'mode: always' 'manca sql.init.mode in application.yml'
+        Assert-Contains $alfaYml 'continue-on-error: true' 'manca sql.init.continue-on-error in application.yml'
         $zips = @(Get-ChildItem -Path $dest -Recurse -File -Filter '*.zip')
         Assert-That ($zips.Count -eq 0) ('archivi dentro l''archivio: ' + ($zips.Name -join ', '))
         Assert-NotContains (Read-TextFile (Join-Path $dest 'ISTRUZIONI-ESECUZIONE.md')) 'Scompatta ogni archivio' 'le istruzioni chiedono ancora di ricomporre il progetto'
@@ -980,7 +988,7 @@ Test-Case 'consegna prepara un archivio che parte appena scompattato' {
     }
 }
 
-Test-Case 'consegna non avvisa per un modulo che ha gia'' un data.sql' {
+Test-Case 'consegna non tocca un modulo che ha gia'' un data.sql' {
     $dataSql = Join-Path $demo 'alfa-service/src/main/resources/data.sql'
     Write-TextFile -Path $dataSql -Text "-- dati veri per la traccia`nINSERT INTO libro (titolo) VALUES ('Prova');`n"
     try {
@@ -988,6 +996,9 @@ Test-Case 'consegna non avvisa per un modulo che ha gia'' un data.sql' {
         Assert-Ok $r 'consegna con data.sql e'' fallita'
         $attnLine = @($r.Output -split "`n" | Where-Object { $_ -match 'ATTENZIONE: nessun data.sql' })
         Assert-That (($attnLine.Count -eq 0) -or ($attnLine[0] -notmatch 'alfa-service')) 'avvisa anche per alfa-service, che ha gia'' un data.sql'
+        Assert-NotContains $r.Output '==> alfa-service non ha un data.sql' 'ha provato a rigenerare un data.sql che c''era gia'''
+        $currentSql = Read-TextFile $dataSql
+        Assert-Contains $currentSql 'dati veri per la traccia' 'ha sovrascritto il data.sql esistente'
     } finally {
         Remove-Item -Force $dataSql -ErrorAction SilentlyContinue
     }
