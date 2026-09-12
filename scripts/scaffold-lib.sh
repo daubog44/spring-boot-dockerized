@@ -32,6 +32,12 @@ sb_module_package() { # modulo, cartella dell'aggregatore
   printf '%s.%s' "$(base_package "$2")" "$(printf '%s' "$1" | tr -cd 'a-zA-Z0-9')"
 }
 
+# Una riga di avanzamento, indentata come le altre. Equivalente bash di
+# Write-Step in scaffold-lib.ps1.
+sb_step() { # messaggio
+  printf '  %s\n' "$1"
+}
+
 # Il JDK con cui Maven compilera': quello di JAVA_HOME se c'e', se no il java
 # del PATH. Stampa "versione|cartella" (25|/usr/lib/jvm/temurin-25), o niente
 # e ritorna 1 se non ne trova.
