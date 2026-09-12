@@ -235,27 +235,201 @@ private UtenteEntity utente;
 3. **MAI `@Data` di Lombok sulle entity con relazioni**: genera in automatico
    `toString()`, `equals()` e `hashCode()` ricorsivi. Con relazioni bidirezionali,
    `toString()` entra in un loop infinito che fa esplodere la JVM con `StackOverflowError`.
-4. **Serializzazione JSON Jackson delle relazioni (loop e LazyInitializationException)**:
-   Se serializzi un'entity con relazione bidirezionale, Jackson va in loop infinito (`Articolo -> Categoria -> Articoli -> ...`).
-   - **Con DTO (approccio consigliato)**: nel record `ArticoloDto`, includi direttamente un `CategoriaDto` annidato (oppure appiattisci con `Long categoriaId, String categoriaNome`). Nel metodo `toDto(entity)` nel service fai:
-     ```java
-     CategoriaDto cat = entity.getCategoria() != null ? new CategoriaDto(entity.getCategoria().getId(), entity.getCategoria().getNome()) : null;
-     ```
-     Così hai tutto l'oggetto collegato in JSON, pulito, senza loop e senza problemi di lazy loading!
-   - **Senza DTO (serializzando direttamente le Entity)**: se restituisci l'Entity dal controller e vuoi l'oggetto collegato intero, usa `@JsonIgnoreProperties`:
-     ```java
-     // In ArticoloEntity: mostra la categoria ma salta la lista ciclica dentro di essa
-     @ManyToOne(fetch = FetchType.LAZY)
-     @JoinColumn(name = "categoria_id")
-     @JsonIgnoreProperties("articoli")
-     private CategoriaEntity categoria;
+   Usa sempre `@Getter`, `@Setter` e `@NoArgsConstructor`.
 
-     // In CategoriaEntity: mostra gli articoli ma salta il puntatore indietro
-     @OneToMany(mappedBy = "categoria", cascade = CascadeType.ALL)
-     @JsonIgnoreProperties("categoria")
-     private List<ArticoloEntity> articoli = new ArrayList<>();
-     ```
-     > ⚠️ **Nota su `fetch = LAZY` senza DTO**: se Jackson serializza un'entity con `fetch = LAZY` fuori dalla transazione del service, potrebbe lanciare `LazyInitializationException` (no Session). Per questo con le relazioni è sempre più sicuro e pulito usare i DTO (`task new-entity ... DTO=1`)!
+---
+
+## Serializzazione JSON delle Relazioni & Join Completi
+
+Quando due tabelle sono collegate da una relazione bidirezionale (es. un `Articolo` ha una `Categoria`, e una `Categoria` ha una lista di `Articoli`), sorgono due sfide cruciali:
+1. **Loop infinito Jackson**: Jackson serializza `Articolo` -> trova `categoria` -> serializza `Categoria` -> trova `articoli` -> serializza di nuovo ogni `Articolo`... all'infinito (`StackOverflowError`).
+2. **`LazyInitializationException`**: con `fetch = FetchType.LAZY`, se la serializzazione JSON avviene nel Controller fuori dal confine transazionale del Service, la sessione Hibernate è chiusa e l'accesso all'oggetto correlato fallisce.
+
+Ecco le due soluzioni complete a confronto:
+
+### Soluzione 1: Senza DTO — `@JsonIgnoreProperties` + `JOIN FETCH`
+
+Se nel tuo microservizio hai scelto di restituire direttamente le classi `@Entity` dal controller, puoi risolvere il ciclo e ottenere l'entità correlata completa annotando `@JsonIgnoreProperties`:
+
+```java
+// ArticoloEntity.java
+@Entity
+@Table(name = "articoli")
+@Getter @Setter @NoArgsConstructor
+public class ArticoloEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String nome;
+    private BigDecimal prezzo;
+
+    // Mostra l'intera Categoria in JSON, ma ignora la lista 'articoli' dentro di essa per spezzare il loop!
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categoria_id")
+    @JsonIgnoreProperties("articoli")
+    private CategoriaEntity categoria;
+}
+```
+
+```java
+// CategoriaEntity.java
+@Entity
+@Table(name = "categorie")
+@Getter @Setter @NoArgsConstructor
+public class CategoriaEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String nome;
+
+    // Quando chiedi la Categoria, mostra la lista di articoli ma ignora il puntatore indietro 'categoria'!
+    @OneToMany(mappedBy = "categoria", cascade = CascadeType.ALL)
+    @JsonIgnoreProperties("categoria")
+    private List<ArticoloEntity> articoli = new ArrayList<>();
+}
+```
+
+#### E come si fa il JOIN nel Database?
+Con `fetch = FetchType.LAZY`, chiamare `findAll()` farebbe una query per la tabella principale più una query per ogni categoria correlata (problema della query N+1), oppure lancerebbe `LazyInitializationException`.
+Per fare un **vero JOIN SQL** in un'unica query veloce, definisci una query con `JOIN FETCH` nel Repository:
+
+```java
+public interface ArticoloRepository extends JpaRepository<ArticoloEntity, Long> {
+
+    // Esegue una sola query SQL con LEFT JOIN caricando Articolo e Categoria insieme
+    @Query("SELECT a FROM ArticoloEntity a LEFT JOIN FETCH a.categoria")
+    List<ArticoloEntity> findAllWithCategoria();
+
+    @Query("SELECT a FROM ArticoloEntity a LEFT JOIN FETCH a.categoria WHERE a.id = :id")
+    Optional<ArticoloEntity> findByIdWithCategoria(@Param("id") Long id);
+}
+```
+
+In questo modo il database esegue:
+```sql
+SELECT a.*, c.* FROM articoli a LEFT JOIN categorie c ON a.categoria_id = c.id;
+```
+Tutti i dati sono già in memoria, e Jackson restituisce il JSON completo con la categoria annidata senza alcun errore!
+
+---
+
+### Soluzione 2: Con DTO — Pattern "DTO in DTO" per un Join Completo (Consigliata)
+
+È la soluzione enterprise standard: non tocca le entity con annotazioni Jackson e garantisce che fuori dal microservizio escano solo contratti stabili e documentati in OpenAPI.
+
+#### 1. I DTO in `common-dto`
+Definisci in `common-dto` sia il DTO della tabella secondaria che quello principale, annidando il primo nel secondo:
+
+```java
+// common-dto/.../CategoriaDto.java
+public record CategoriaDto(
+    Long id,
+    @NotBlank String nome
+) {}
+```
+
+```java
+// common-dto/.../ArticoloDto.java (annida CategoriaDto)
+public record ArticoloDto(
+    Long id,
+    @NotBlank String nome,
+    @NotNull BigDecimal prezzo,
+    Integer quantita,
+    Boolean disponibile,
+    CategoriaDto categoria // <-- DTO in DTO: l'intera entita' correlata!
+) {}
+```
+
+#### 2. Il Repository (con JOIN FETCH per caricare tutto in 1 query)
+```java
+public interface ArticoloRepository extends JpaRepository<ArticoloEntity, Long> {
+    @Query("SELECT a FROM ArticoloEntity a LEFT JOIN FETCH a.categoria")
+    List<ArticoloEntity> findAllConCategoria();
+}
+```
+
+#### 3. Il Service (metodo mapper `toDto`)
+Nel Service mappi l'entity correlata nel relativo DTO annidato:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class ArticoloService {
+    private final ArticoloRepository articoli;
+
+    public List<ArticoloDto> tutti() {
+        return articoli.findAllConCategoria().stream()
+                .map(ArticoloService::toDto)
+                .toList();
+    }
+
+    public static ArticoloDto toDto(ArticoloEntity entity) {
+        CategoriaDto catDto = null;
+        if (entity.getCategoria() != null) {
+            catDto = new CategoriaDto(
+                entity.getCategoria().getId(),
+                entity.getCategoria().getNome()
+            );
+        }
+        return new ArticoloDto(
+            entity.getId(),
+            entity.getNome(),
+            entity.getPrezzo(),
+            entity.getQuantita(),
+            entity.getDisponibile(),
+            catDto // Oggetto annidato
+        );
+    }
+}
+```
+
+#### 4. Il JSON risultante
+L'API REST risponde con un JSON pulito e senza campi superflui:
+```json
+{
+  "id": 1,
+  "nome": "Smartphone Galaxy",
+  "prezzo": 599.90,
+  "quantita": 25,
+  "disponibile": true,
+  "categoria": {
+    "id": 2,
+    "nome": "Telefonia"
+  }
+}
+```
+
+> 💡 **E se voglio il join inverso? (Categoria con la lista di Articoli)**:
+> Basta definire:
+> ```java
+> public record CategoriaConArticoliDto(Long id, String nome, List<ArticoloDto> articoli) {}
+> ```
+> E nel `CategoriaService`:
+> ```java
+> static CategoriaConArticoliDto toDto(CategoriaEntity c) {
+>     List<ArticoloDto> list = c.getArticoli() != null
+>         ? c.getArticoli().stream().map(ArticoloService::toDto).toList()
+>         : List.of();
+>     return new CategoriaConArticoliDto(c.getId(), c.getNome(), list);
+> }
+> ```
+
+> 💡 **Alternativa: DTO Piatto (Flat DTO)**:
+> Se per il frontend o per OpenFeign non ti serve l'oggetto annidato ma bastano le colonne appiattite:
+> ```java
+> public record ArticoloFlatDto(Long id, String nome, BigDecimal prezzo, Long categoriaId, String categoriaNome) {}
+> ```
+
+---
+
+### Tabella di Confronto: `@JsonIgnoreProperties` vs DTO in DTO
+
+| Caratteristica | Soluzione 1: `@JsonIgnoreProperties` | Soluzione 2: "DTO in DTO" (Consigliata) |
+| :--- | :--- | :--- |
+| **Dove si configura** | Sulle annotazioni `@ManyToOne` / `@OneToMany` delle `@Entity`. | Nei record Java in `common-dto` e nel mapper `toDto()`. |
+| **Esecuzione del Join DB** | Tramite `@Query("... LEFT JOIN FETCH ...")` nel repository. | Tramite `@Query("... LEFT JOIN FETCH ...")` nel repository. |
+| **Rischio loop infinito** | Evitato se `@JsonIgnoreProperties` è configurato su entrambi i lati. | **Zero assoluto**: i DTO record sono immutabili e lineari. |
+| **Rischio LazyInitException** | Possibile se accedi all'oggetto fuori da transazione senza `JOIN FETCH`. | Nessuno: il mapping avviene dentro il Service. |
+| **Documentazione Swagger** | Mostra l'intera Entity con tutti i dettagli interni. | Mostra solo lo schema esatto dei dati esposti. |
+| **Flessibilità per Feign/UI** | I client devono importare le annotazioni di serializzazione. | I client usano direttamente il record DTO condiviso. |
 
 ### Configurare le relazioni in 5 secondi: `task add-relation`
 

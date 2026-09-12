@@ -54,8 +54,10 @@ public class CatalogoService {
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Libro " + id + " non trovato"));
     }
 
-    // Fuori dal servizio esce il DTO, mai l'entity: l'autore diventa una
-    // stringa, e chi chiama non dipende da come e' fatto il database.
+    // Fuori dal servizio esce il DTO, mai l'entity:
+    // Qui usiamo un DTO piatto (l'autore diventa una stringa).
+    // Se ti serve l'intero oggetto autore strutturato, usa il pattern "DTO in DTO"
+    // (es. new AutoreDto(autore.getId(), autore.getNome())) come spiegato nella lezione 8!
     static LibroDto toDto(LibroEntity libro) {
         AutoreEntity autore = libro.getAutore();
         return new LibroDto(
