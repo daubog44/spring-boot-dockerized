@@ -241,6 +241,7 @@ if [ -n "$SERVICE" ]; then
   echo ""
   bash "$SCRIPT_DIR/check.sh" --project-only
   echo ""
+  echo "  task new-entity   genera entity, repository, service e controller"
   echo "  task dev          riavvia lo stack (un modulo nuovo non basta ricompilarlo)"
   echo ""
   exit 0
@@ -368,12 +369,12 @@ if [ -n "${CREATED// /}" ]; then
 fi
 echo "  Adesso, nell'ordine:"
 echo ""
-echo "   1. scrivi le entity del dominio della traccia"
-echo "      (@Entity, @Table, @Id, i campi, le relazioni)"
-echo "   2. task seed-data      riempie il database di dati di prova"
-echo "   3. task dev            avvia tutto in locale, con hot reload"
-echo "   4. task db-schema      lo schema da incollare nell'allegato"
-echo "   5. task consegna       la cartella da consegnare"
+echo "   1. Genera entity e CRUD:      task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=..."
+echo "   2. Client Feign e DTO:        task new-client FROM=<ui> TO=<backend> DTO=<NomeDto> [FIELDS=...]"
+echo "   3. Vista Thymeleaf (se UI):   task new-view SERVICE=<ui> NAME=<Nome> FIELDS=..."
+echo "   4. Errori / Sicurezza:        task new-handler SERVICE=<modulo> | task new-auth"
+echo "   5. Dati di prova e avvio:     task seed-data && task dev"
+echo "   6. Schema ER e Consegna:      task db-schema && task consegna NOME=COGNOME_NOME"
 echo ""
-echo "  task help per tutto il resto."
+echo "  task help per tutti i dettagli e gli esempi."
 echo ""
