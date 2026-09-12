@@ -27,7 +27,24 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ -n "$NAME" ] || { echo "Uso: task new-service NAME=<nome-modulo> [PORT=<porta>] [UI=1] [NODB=1]" >&2; exit 1; }
+if [ -z "$NAME" ]; then
+  if [ ! -t 0 ]; then
+    echo "Uso: task new-service NAME=<nome-modulo> [PORT=<porta>] [UI=1] [NODB=1]" >&2
+    exit 1
+  fi
+  echo ""
+  echo "CREAZIONE MICROSERVIZIO GUIDATA"
+  printf "  Nome del servizio (es. ordini-service, magazzino-ui): "
+  read -r NAME
+  [ -n "$NAME" ] || { echo "Uso: task new-service NAME=<nome-modulo> [PORT=<porta>] [UI=1] [NODB=1]" >&2; exit 1; }
+  printf "  Tipo: [1] REST con Database (default), [2] Web UI Thymeleaf (UI=1), [3] Senza Database (NODB=1) [Default: 1]: "
+  read -r TIPO
+  if [ "$TIPO" = "2" ] || [[ "$NAME" =~ -ui$ ]]; then UI=1; fi
+  if [ "$TIPO" = "3" ]; then NO_DB=1; fi
+  printf "  Porta specifica (premi Invio per la prima libera): "
+  read -r PORT_IN
+  if [[ "$PORT_IN" =~ ^[0-9]+$ ]]; then PORT="$PORT_IN"; fi
+fi
 if ! printf '%s' "$NAME" | grep -qE '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'; then
   echo "Nome non valido: '$NAME'. Usa minuscole e trattini, es. ordini-service." >&2
   exit 1

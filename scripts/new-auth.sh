@@ -23,8 +23,46 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$SERVICE" ]; then
-  echo "Uso: task new-auth SERVICE=<modulo> [TYPE=inmemory|db|form]" >&2
-  exit 1
+  if [ ! -t 0 ]; then
+    echo "Uso: task new-auth SERVICE=<modulo> [TYPE=inmemory|db|form]" >&2
+    exit 1
+  fi
+
+  ALL_MODULES=()
+  for d in "$DEMO_DIR"/*; do
+    if [ -f "$d/pom.xml" ] && [ "$(basename "$d")" != "common-dto" ]; then
+      ALL_MODULES+=("$(basename "$d")")
+    fi
+  done
+  if [ "${#ALL_MODULES[@]}" -eq 0 ]; then
+    echo "Non ci sono moduli in demo/." >&2
+    exit 1
+  fi
+
+  echo ""
+  echo "CONFIGURAZIONE SICUREZZA (SPRING SECURITY) GUIDATA"
+  echo "Seleziona il modulo in cui configurare la sicurezza:"
+  for i in "${!ALL_MODULES[@]}"; do
+    echo "  $((i+1))) ${ALL_MODULES[$i]}"
+  done
+  printf "  [1] > "
+  read -r IDX
+  [ -n "$IDX" ] || IDX=1
+  SERVICE="${ALL_MODULES[$((IDX-1))]}"
+
+  if [ -z "$TYPE" ]; then
+    POM="$DEMO_DIR/$SERVICE/pom.xml"
+    DEFAULT_TYPE="inmemory"
+    if grep -q '<artifactId>spring-boot-starter-thymeleaf</artifactId>' "$POM"; then
+      DEFAULT_TYPE="form"
+    fi
+    echo "Modalita' di autenticazione: [1] inmemory (Basic Auth per REST), [2] db (tabella utenti + BCrypt), [3] form (login web HTML)"
+    printf "  [Default: %s] > " "$DEFAULT_TYPE"
+    read -r TANS
+    if [ "$TANS" = "1" ]; then TYPE="inmemory"; fi
+    if [ "$TANS" = "2" ]; then TYPE="db"; fi
+    if [ "$TANS" = "3" ]; then TYPE="form"; fi
+  fi
 fi
 
 MODULE_DIR="$DEMO_DIR/$SERVICE"

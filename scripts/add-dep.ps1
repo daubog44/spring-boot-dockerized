@@ -120,7 +120,34 @@ if ($List) {
 }
 
 if (-not $Module -or -not $Deps) {
-    throw "Uso: task add-dep SERVICE=<modulo> DEPS=<dip1,dip2>   (elenco: task add-dep LIST=1)"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task add-dep SERVICE=<modulo> DEPS=<dip1,dip2>   (elenco: task add-dep LIST=1)"
+    }
+
+    $allModules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object {
+        Test-Path (Join-Path $_.FullName 'pom.xml')
+    } | Select-Object -ExpandProperty Name)
+
+    Write-Host ''
+    Write-Host 'AGGIUNTA DIPENDENZE GUIDATA' -ForegroundColor Cyan
+    if (-not $Module) {
+        Write-Host "Seleziona il modulo a cui aggiungere dipendenze:" -ForegroundColor DarkGray
+        for ($i = 0; $i -lt $allModules.Count; $i++) {
+            Write-Host "  $($i + 1)) $($allModules[$i])"
+        }
+        $idx = Read-Host "  [1] >"
+        $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
+        $Module = $allModules[$idxNum - 1]
+    }
+
+    if (-not $Deps) {
+        Write-Host "Inserisci le dipendenze da aggiungere separate da virgola (es. security, mail, kafka, validation)." -ForegroundColor DarkGray
+        Write-Host "Nomi brevi noti: security, mail, kafka, data-jpa, validation, thymeleaf, feign..." -ForegroundColor DarkGray
+        $Deps = (Read-Host "  Dipendenze").Trim()
+        if (-not $Deps) {
+            throw "Uso: task add-dep SERVICE=<modulo> DEPS=<dip1,dip2>"
+        }
+    }
 }
 
 # --- Modulo -------------------------------------------------------------------

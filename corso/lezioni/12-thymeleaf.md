@@ -28,6 +28,8 @@ Per non dover scrivere a mano controller, tabella, form e gestione errori:
 task new-view SERVICE=biblioteca-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int
 ```
 
+> 💡 **Modalità Interattiva**: puoi anche lanciare `task new-view` senza argomenti. Ti mostrerà i moduli UI tra cui scegliere e ti chiederà nome della vista e campi del form!
+
 Genera:
 1. `controller/LibriUiController.java`: controller Spring MVC con `@GetMapping` (elenco + form vuoto) e `@PostMapping` (salvataggio con `@Valid` e binding errori).
 2. `src/main/resources/templates/libri.html`: pagina HTML completa, con stile pulito, tabella dinamica `th:each` e form collegato `th:object` con visualizzazione errori `th:errors`.

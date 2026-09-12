@@ -40,8 +40,43 @@ $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
 
 if (-not $Service -or -not $Name) {
-    throw "Uso: task new-view SERVICE=<modulo-ui> NAME=<Nome> [ROUTE=<percorso>] [FIELDS=<campi>]`n" +
-          "Esempio: task new-view SERVICE=event-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task new-view SERVICE=<modulo-ui> NAME=<Nome> [ROUTE=<percorso>] [FIELDS=<campi>]`n" +
+              "Esempio: task new-view SERVICE=event-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int"
+    }
+
+    $uiModules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object {
+        $p = Join-Path $_.FullName 'pom.xml'
+        (Test-Path $p) -and ((Read-TextFile $p) -match 'spring-boot-starter-thymeleaf')
+    } | Select-Object -ExpandProperty Name)
+
+    if ($uiModules.Count -eq 0) {
+        throw "Non ci sono moduli UI (Thymeleaf) in demo/. Creane uno con task new-service NAME=<nome-ui> UI=1."
+    }
+
+    Write-Host ''
+    Write-Host 'CREAZIONE VISTA THYMELEAF GUIDATA' -ForegroundColor Cyan
+    if (-not $Service) {
+        Write-Host "Seleziona il modulo UI:" -ForegroundColor DarkGray
+        for ($i = 0; $i -lt $uiModules.Count; $i++) {
+            Write-Host "  $($i + 1)) $($uiModules[$i])"
+        }
+        $idx = Read-Host "  [1] >"
+        $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
+        $Service = $uiModules[$idxNum - 1]
+    }
+
+    if (-not $Name) {
+        $Name = (Read-Host "  Nome della Vista in PascalCase (es. Libri, Eventi, Clienti)").Trim()
+        if (-not $Name) {
+            throw "Uso: task new-view SERVICE=<modulo-ui> NAME=<Nome> [ROUTE=<percorso>] [FIELDS=<campi>]"
+        }
+    }
+
+    if (-not $Fields) {
+        Write-Host "  Campi da mostrare nella tabella e nel form (es. titolo:string:required,autore:string,anno:int):" -ForegroundColor DarkGray
+        $Fields = (Read-Host "  Campi (premi Invio se nessuno)").Trim()
+    }
 }
 
 if ($Name -cnotmatch '^[A-Z][a-zA-Z0-9]*$') {

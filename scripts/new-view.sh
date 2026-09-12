@@ -27,8 +27,46 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$SERVICE" ] || [ -z "$NAME" ]; then
-  echo "Uso: task new-view SERVICE=<modulo-ui> NAME=<Nome> [ROUTE=<percorso>] [FIELDS=<campi>]" >&2
-  exit 1
+  if [ ! -t 0 ]; then
+    echo "Uso: task new-view SERVICE=<modulo-ui> NAME=<Nome> [ROUTE=<percorso>] [FIELDS=<campi>]" >&2
+    exit 1
+  fi
+
+  UI_MODULES=()
+  for d in "$DEMO_DIR"/*; do
+    if [ -f "$d/pom.xml" ] && grep -q 'spring-boot-starter-thymeleaf' "$d/pom.xml"; then
+      UI_MODULES+=("$(basename "$d")")
+    fi
+  done
+  if [ "${#UI_MODULES[@]}" -eq 0 ]; then
+    echo "Non ci sono moduli UI (Thymeleaf) in demo/. Creane uno con task new-service NAME=<nome-ui> UI=1." >&2
+    exit 1
+  fi
+
+  echo ""
+  echo "CREAZIONE VISTA THYMELEAF GUIDATA"
+  if [ -z "$SERVICE" ]; then
+    echo "Seleziona il modulo UI:"
+    for i in "${!UI_MODULES[@]}"; do
+      echo "  $((i+1))) ${UI_MODULES[$i]}"
+    done
+    printf "  [1] > "
+    read -r IDX
+    [ -n "$IDX" ] || IDX=1
+    SERVICE="${UI_MODULES[$((IDX-1))]}"
+  fi
+
+  if [ -z "$NAME" ]; then
+    printf "  Nome della Vista in PascalCase (es. Libri, Eventi, Clienti): "
+    read -r NAME
+    [ -n "$NAME" ] || { echo "Nome obbligatorio." >&2; exit 1; }
+  fi
+
+  if [ -z "$FIELDS" ]; then
+    echo "  Campi (es. titolo:string:required,autore:string,anno:int):"
+    printf "  Campi (premi Invio se nessuno): "
+    read -r FIELDS
+  fi
 fi
 
 if ! printf '%s' "$NAME" | grep -qE '^[A-Z][a-zA-Z0-9]*$'; then

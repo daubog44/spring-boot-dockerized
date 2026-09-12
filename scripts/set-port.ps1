@@ -34,11 +34,43 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
-$moduleDir = Join-Path $demoDir $Module
-
 if (-not $Module -or $Port -eq 0) {
-    throw "Uso: task set-port SERVICE=<modulo> PORT=<porta>"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task set-port SERVICE=<modulo> PORT=<porta>"
+    }
+
+    $allModules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object {
+        Test-Path (Join-Path $_.FullName 'pom.xml')
+    } | Select-Object -ExpandProperty Name)
+
+    Write-Host ''
+    Write-Host 'CAMBIO PORTA GUIDATA' -ForegroundColor Cyan
+    if (-not $Module) {
+        Write-Host "Seleziona il modulo di cui cambiare la porta:" -ForegroundColor DarkGray
+        for ($i = 0; $i -lt $allModules.Count; $i++) {
+            $mYml = Join-Path $demoDir (Join-Path $allModules[$i] 'src/main/resources/application.yml')
+            $currPort = '?'
+            if (Test-Path $mYml) {
+                $pm = [regex]::Match((Read-TextFile $mYml), 'SERVER_PORT:(\d+)')
+                if ($pm.Success) { $currPort = $pm.Groups[1].Value }
+            }
+            Write-Host "  $($i + 1)) $($allModules[$i]) (porta attuale: $currPort)"
+        }
+        $idx = Read-Host "  [1] >"
+        $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
+        $Module = $allModules[$idxNum - 1]
+    }
+
+    if ($Port -eq 0) {
+        $pInput = (Read-Host "  Nuova porta per $Module").Trim()
+        if ($pInput -match '^\d+$') {
+            $Port = [int]$pInput
+        } else {
+            throw "Uso: task set-port SERVICE=<modulo> PORT=<porta>"
+        }
+    }
 }
+$moduleDir = Join-Path $demoDir $Module
 if (-not (Test-Path (Join-Path $moduleDir 'pom.xml'))) {
     $available = (Get-ChildItem -Path $demoDir -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'pom.xml') } | ForEach-Object { $_.Name }) -join ', '
     throw "Modulo '$Module' non trovato. Moduli disponibili: $available"

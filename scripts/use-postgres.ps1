@@ -41,12 +41,45 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
-$moduleDir = Join-Path $demoDir $Module
 $compose = Join-Path $demoDir 'docker-compose.yml'
-
 if (-not $Module) {
-    throw "Uso: task use-postgres SERVICE=<modulo> [DBNAME=<database>] [REMOVE_H2=1]"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task use-postgres SERVICE=<modulo> [DBNAME=<database>] [REMOVE_H2=1]"
+    }
+
+    $allModules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object {
+        Test-Path (Join-Path $_.FullName 'pom.xml')
+    } | Select-Object -ExpandProperty Name)
+
+    if ($allModules.Count -eq 0) {
+        throw "Nessun modulo trovato in demo/."
+    }
+
+    Write-Host ''
+    Write-Host 'COLLEGAMENTO A POSTGRESQL GUIDATO' -ForegroundColor Cyan
+    Write-Host 'Seleziona il microservizio da collegare a PostgreSQL:'
+    for ($i = 0; $i -lt $allModules.Count; $i++) {
+        Write-Host "  $($i + 1)) $($allModules[$i])"
+    }
+    $idx = Read-Host "  [1] >"
+    $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
+    if ($idxNum -lt 1 -or $idxNum -gt $allModules.Count) { $idxNum = 1 }
+    $Module = $allModules[$idxNum - 1]
+
+    if (-not $DbName) {
+        $defaultDb = ($Module -replace '-service$', '') -replace '-ui$', ''
+        $dbInput = (Read-Host "  Nome database dedicato [$defaultDb]").Trim()
+        $DbName = if ($dbInput) { $dbInput } else { $defaultDb }
+    }
+
+    if (-not $RemoveH2) {
+        $h2Answer = Read-Host "  Rimuovere la dipendenza H2 in memoria? [s/N]"
+        if ($h2Answer.Trim().ToLower() -in @('s', 'si', 'y', 'yes')) {
+            $RemoveH2 = $true
+        }
+    }
 }
+$moduleDir = Join-Path $demoDir $Module
 if (-not (Test-Path (Join-Path $moduleDir 'pom.xml'))) {
     $available = (Get-ChildItem -Path $demoDir -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'pom.xml') } | ForEach-Object { $_.Name }) -join ', '
     throw "Modulo '$Module' non trovato. Moduli disponibili: $available"

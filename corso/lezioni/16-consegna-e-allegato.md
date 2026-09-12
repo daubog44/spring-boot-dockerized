@@ -12,6 +12,8 @@ prendono con la testa fredda.
 task consegna NOME=ROSSI_MARIO
 ```
 
+> 💡 **Modalità Interattiva**: puoi anche lanciare semplicemente `task consegna` senza parametri: ti chiederà interattivamente il tuo `COGNOME_NOME` prima di impacchettare il tutto!
+
 Prima controlla che il progetto sia coerente (`task check`) e si ferma se non
 lo è. Poi prepara la cartella `consegna/`:
 

@@ -28,6 +28,8 @@ Invece di creare a mano classi, costruttori, annotazioni e interfacce, hai a dis
 task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):required:unique,annoPubblicazione:int,disponibile:bool
 ```
 
+> 💡 **Modalità Interattiva**: se non ricordi i parametri a memoria, puoi anche lanciare semplicemente `task new-entity` senza argomenti. Un wizard ti chiederà a quale modulo applicarlo, il nome dell'entità, i campi e se desideri generare anche il DTO!
+
 In un solo colpo questo comando genera quattro file sincronizzati:
 1. **`entity/LibroEntity.java`**: classe `@Entity` con `@Table(name = "libri")`, chiave `@Id @GeneratedValue`, campi con annotazioni di validazione (`@NotBlank`, `@NotNull`, ecc.) e getter/setter Lombok.
 2. **`repository/LibroRepository.java`**: interfaccia `JpaRepository<LibroEntity, Long>` pronta con tutti i metodi CRUD.

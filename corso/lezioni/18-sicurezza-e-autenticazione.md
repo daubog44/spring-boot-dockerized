@@ -65,6 +65,8 @@ task new-auth SERVICE=ordini-service TYPE=db
 task new-auth SERVICE=store-ui TYPE=form
 ```
 
+> 💡 **Modalità Interattiva**: puoi anche lanciare `task new-auth` senza argomenti. Ti mostrerà l'elenco dei moduli del progetto e ti farà scegliere quale tipo di sicurezza configurare (`inmemory`, `db`, `form`)!
+
 ---
 
 ## 4. Approfondimento Tecnico: Le Tre Architetture

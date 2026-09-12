@@ -31,8 +31,54 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$FROM" ] || [ -z "$TO" ]; then
-  echo "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [PATH=<rotta>]" >&2
-  exit 1
+  if [ ! -t 0 ]; then
+    echo "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [PATH=<rotta>]" >&2
+    exit 1
+  fi
+
+  ALL_MODULES=()
+  for d in "$DEMO_DIR"/*; do
+    if [ -f "$d/pom.xml" ] && [ "$(basename "$d")" != "common-dto" ]; then
+      ALL_MODULES+=("$(basename "$d")")
+    fi
+  done
+  if [ "${#ALL_MODULES[@]}" -lt 2 ]; then
+    echo "Servono almeno due moduli in demo/ per collegare un client OpenFeign." >&2
+    exit 1
+  fi
+
+  echo ""
+  echo "CREAZIONE OPENFEIGN CLIENT GUIDATA"
+  if [ -z "$FROM" ]; then
+    echo "Seleziona il modulo CHIAMANTE (da dove parte la chiamata):"
+    for i in "${!ALL_MODULES[@]}"; do
+      echo "  $((i+1))) ${ALL_MODULES[$i]}"
+    done
+    printf "  [1] > "
+    read -r IDX
+    [ -n "$IDX" ] || IDX=1
+    FROM="${ALL_MODULES[$((IDX-1))]}"
+  fi
+
+  if [ -z "$TO" ]; then
+    TARGETS=()
+    for m in "${ALL_MODULES[@]}"; do
+      [ "$m" != "$FROM" ] && TARGETS+=("$m")
+    done
+    echo "Seleziona il modulo TARGET (chi risponde):"
+    for i in "${!TARGETS[@]}"; do
+      echo "  $((i+1))) ${TARGETS[$i]}"
+    done
+    printf "  [1] > "
+    read -r IDX
+    [ -n "$IDX" ] || IDX=1
+    TO="${TARGETS[$((IDX-1))]}"
+  fi
+
+  if [ -z "$DTO" ]; then
+    printf "  Nome DTO scambiato (es. LibroDto, OrdineDto): "
+    read -r DTO
+  fi
 fi
 
 FROM_DIR="$DEMO_DIR/$FROM"
