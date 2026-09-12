@@ -119,7 +119,17 @@ fi
 
 ROUTE_PATH="$PATH_VAL"
 if [ -z "$ROUTE_PATH" ]; then
-  ROUTE_PATH="/api"
+  if [ -d "$TO_DIR/src/main/java" ]; then
+    while IFS= read -r c; do
+      [ -f "$c" ] || continue
+      m="$(grep -oE '@RequestMapping\([[:space:]]*(value[[:space:]]*=[[:space:]]*|path[[:space:]]*=[[:space:]]*)?"[^"]*"' "$c" 2>/dev/null | head -n 1 | sed -E 's/.*"([^"]*)".*/\1/' || true)"
+      if [ -n "$m" ] && [ "$m" != "/api/ping" ]; then
+        ROUTE_PATH="$m"
+        break
+      fi
+    done < <(find "$TO_DIR/src/main/java" -name '*Controller.java' 2>/dev/null)
+  fi
+  [ -z "$ROUTE_PATH" ] && ROUTE_PATH="/api"
 fi
 
 DTO_NAME="${DTO:-}"

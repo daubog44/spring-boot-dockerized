@@ -126,7 +126,7 @@ if (-not $routePath) {
     $toControllers = @(Get-ChildItem -Path (Join-Path $toDir 'src/main/java') -Recurse -Filter '*Controller.java' -ErrorAction SilentlyContinue)
     foreach ($c in $toControllers) {
         $cText = Read-TextFile $c.FullName
-        $m = [regex]::Match($cText, '@RequestMapping\s*\(\s*"([^"]+)"\s*\)')
+        $m = [regex]::Match($cText, '@RequestMapping\s*\(\s*(?:(?:value|path)\s*=\s*)?"([^"]+)"\s*\)')
         if ($m.Success -and $m.Groups[1].Value -ne '/api/ping') {
             $routePath = $m.Groups[1].Value
             break
