@@ -186,6 +186,8 @@ DTO_IMPORT=""
 if [ "$DTO_NAME" != "Object" ]; then
   DTO_IMPORT="import $BASE_PKG.common.dto.$DTO_NAME;"$'\n'
 fi
+FIRST_CHAR="$(printf '%s' "${CLIENT_NAME:0:1}" | tr '[:upper:]' '[:lower:]')"
+CONTEXT_ID="${FIRST_CHAR}${CLIENT_NAME:1}"
 
 cat > "$CLIENT_FILE" <<EOF
 package $FROM_PKG.client;
@@ -198,7 +200,7 @@ import java.util.List;
  * Client OpenFeign per comunicare con $EUREKA_NAME via Eureka.
  * Generato da task new-client.
  */
-@FeignClient(name = "$EUREKA_NAME")
+@FeignClient(name = "$EUREKA_NAME", contextId = "$CONTEXT_ID")
 public interface $CLIENT_NAME {
 
     @GetMapping("$ROUTE_PATH")

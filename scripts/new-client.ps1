@@ -184,6 +184,7 @@ if (Test-Path $clientFile) {
 
 $basePkg = Get-BasePackage -RepoRoot $repoRoot
 $dtoImport = if ($dtoName -ne 'Object') { "import $basePkg.common.dto.$dtoName;`n" } else { "" }
+$contextId = $clientName.Substring(0, 1).ToLowerInvariant() + $clientName.Substring(1)
 
 $clientSrc = @"
 package $fromPkg.client;
@@ -196,7 +197,7 @@ import java.util.List;
  * Client OpenFeign per comunicare con $eurekaName via Eureka.
  * Generato da task new-client.
  */
-@FeignClient(name = "$eurekaName")
+@FeignClient(name = "$eurekaName", contextId = "$contextId")
 public interface $clientName {
 
     @GetMapping("$routePath")

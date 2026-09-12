@@ -284,7 +284,8 @@ start_case "new-client genera FeignClient collegato al servizio target"
 run_tool new-client.sh --from alfa-service --to epsilon-service --dto VolumeDto
 assert_ok "new-client" &&
   assert_file "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" &&
-  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" '@FeignClient(name = "EPSILON-SERVICE")' &&
+  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" 'name = "EPSILON-SERVICE"' &&
+  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" 'contextId = "epsilonClient"' &&
   assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" "List<VolumeDto> getAll()"
 end_case
 
@@ -303,6 +304,15 @@ run_tool new-client.sh --from alfa-service --to beta-ui --name BetaClient --dto 
 assert_ok "new-client con FIELDS" &&
   assert_file "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/AutoreDto.java" &&
   assert_file "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/BetaClient.java"
+end_case
+
+start_case "new-client supporta client multipli verso lo stesso target con contextId distinti"
+run_tool new-client.sh --from alfa-service --to epsilon-service --name EpsilonExtraClient --path /api/extra --dto VolumeDto
+assert_ok "new-client multiplo" &&
+  assert_file "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonExtraClient.java" &&
+  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonExtraClient.java" 'name = "EPSILON-SERVICE"' &&
+  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonExtraClient.java" 'contextId = "epsilonExtraClient"' &&
+  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonExtraClient.java" '@GetMapping("/api/extra")'
 end_case
 
 start_case "task new-client (CLI reale, senza ROUTE) non spezza la riga di comando"

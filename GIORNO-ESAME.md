@@ -448,14 +448,41 @@ public class PrenotazioneService {
 }
 ```
 
-#### Relazioni tra Microservizi Diversi (es. Many-to-Many o One-to-Many inter-servizio)
+#### Più Client Feign verso lo STESSO microservizio (rotte o controller diversi)
+Se un microservizio target gestisce più domini/controller (es. `catalogo-service` gestisce sia `/api/evento` che `/api/categoria`), puoi generare client separati e specializzati specificando `NAME` e `ROUTE`:
+```bash
+task new-client FROM=prenotazioni-service TO=catalogo-service ROUTE=/api/evento NAME=EventiClient DTO=EventoDto
+task new-client FROM=prenotazioni-service TO=catalogo-service ROUTE=/api/categoria NAME=CategorieClient DTO=CategoriaDto
+```
+> **Nota tecnica**: Ogni client generato contiene automaticamente l'attributo `contextId` (`@FeignClient(name = "CATALOGO-SERVICE", contextId = "eventiClient")`). Questo evita qualsiasi conflitto di bean name in Spring Boot e permette di iniettare entrambi i client nello stesso `@Service` o controller senza alcuna configurazione aggiuntiva.
+
+#### Relazioni Many-to-Many tra Microservizi e Composite DTO via Feign
+
 > **REGOLA ARCHITETTURALE FONDAMENTALE**: Nei microservizi ogni modulo ha il proprio database isolato (*Database per Service*). Non puoi MAI creare una relazione JPA (`@ManyToMany` o `@ManyToOne`) tra entità che appartengono a due microservizi diversi!
-> 
-> **Come si modella una relazione Many-to-Many tra microservizi?**
-> 1. **Salva solo gli ID numerici**: nel tuo servizio salvi una tabella ponte locale con gli ID (es. `RigaOrdineEntity` con `Long ordineId` e `Long prodottoId`, oppure un `Set<Long> corsiIds`).
-> 2. **Recupera i dettagli tramite Feign**: quando devi visualizzare o elaborare i dati completi, il `@Service` chiama il Feign Client passandogli gli ID (`prodottoClient.getById(prodottoId)`) per ottenere i `ProdottoDto`.
-> 
-> *Spiegare questo nell'Allegato Tecnico dimostra alla commissione la piena comprensione del disaccoppiamento a microservizi.*
+
+Ci sono due scenari tipici all'esame:
+
+**Scenario 1: La relazione Many-to-Many è interna al microservizio target, e un altro servizio la consuma**
+- Il microservizio `catalogo-service` ha nel proprio DB una Many-to-Many tra `Evento` e `Categoria` (con tabella di join `evento_categoria`).
+- `catalogo-service` esegue la join internamente (query JPA) e restituisce un **Composite DTO** (definito in `common-dto`):
+  ```java
+  public record EventoDto(
+      Long id,
+      @NotBlank String titolo,
+      BigDecimal prezzo,
+      Set<CategoriaDto> categorie
+  ) {}
+  ```
+- Il microservizio `prenotazioni-service` riceve questo DTO direttamente via Feign (`eventiClient.getById(id)`): non deve fare alcuna join, riceve l'oggetto già assemblato!
+- **Come documentarlo nell'Allegato Tecnico**:
+  > *"Per rispettare il principio del **Database-per-Service**, le relazioni Many-to-Many interne (es. Eventi ↔ Categorie) sono gestite e incapsulate nel database del microservizio proprietario (`catalogo-service`). Il servizio espone all'esterno un DTO aggregato (`EventoDto` contenente una collezione annidata `Set<CategoriaDto>`) tramite il pattern **API Composition / Composite DTO**. I servizi consumatori interrogano l'endpoint via OpenFeign, consumando la vista già aggregata senza violare l'isolamento dei dati né richiedere accessi cross-database."*
+
+**Scenario 2: La relazione Many-to-Many attraversa due microservizi diversi**
+- Esempio: un `Utente` in `utenti-service` può prenotare molti `Eventi` in `catalogo-service`.
+- **Come si modella**:
+  1. Nel DB di `prenotazioni-service` salvi una tabella/entità locale con gli ID numerici: `Prenotazione(Long id, String codiceFiscale, Long eventoId, int numPosti)`.
+  2. Quando devi mostrare all'utente i dettagli dell'evento prenotato, `prenotazioni-service` (o il modulo UI) chiama `catalogoClient.getById(prenotazione.getEventoId())` via Feign.
+  3. Il frontend o il controller assembla il risultato per l'utente.
 
 ### Pagine Web Thymeleaf: task new-view
 

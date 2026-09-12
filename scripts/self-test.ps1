@@ -401,7 +401,8 @@ Test-Case 'new-client genera FeignClient collegato al servizio target' {
     $clientFile = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/client/EpsilonClient.java')
     Assert-That (Test-Path $clientFile) 'EpsilonClient.java non e'' nel modulo chiamante'
     $client = Read-TextFile $clientFile
-    Assert-Contains $client '@FeignClient(name = "EPSILON-SERVICE")' 'nome Eureka errato'
+    Assert-Contains $client 'name = "EPSILON-SERVICE"' 'nome Eureka errato'
+    Assert-Contains $client 'contextId = "epsilonClient"' 'contextId mancante o errato'
     Assert-Contains $client 'List<VolumeDto> getAll()' 'manca getAll'
 }
 
@@ -425,6 +426,16 @@ Test-Case 'new-client crea automaticamente il DTO in common-dto se sono passati 
     $clientFile = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/client/BetaClient.java')
     Assert-That (Test-Path $dtoFile) 'AutoreDto.java non e'' stato creato automaticamente in common-dto'
     Assert-That (Test-Path $clientFile) 'BetaClient.java non e'' stato creato nel chiamante'
+}
+
+Test-Case 'new-client supporta client multipli verso lo stesso target con contextId distinti' {
+    Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'epsilon-service', '-Name', 'EpsilonExtraClient', '-Path', '/api/extra', '-Dto', 'VolumeDto')) 'secondo client verso epsilon-service fallito'
+    $extraClientFile = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/client/EpsilonExtraClient.java')
+    Assert-That (Test-Path $extraClientFile) 'EpsilonExtraClient.java non trovato'
+    $client = Read-TextFile $extraClientFile
+    Assert-Contains $client 'name = "EPSILON-SERVICE"' 'nome Eureka errato nel secondo client'
+    Assert-Contains $client 'contextId = "epsilonExtraClient"' 'contextId non corretto nel secondo client'
+    Assert-Contains $client '@GetMapping("/api/extra")' 'rotta /api/extra non presente'
 }
 
 Test-Case 'task new-client (CLI reale, senza ROUTE) non spezza la riga di comando' {
