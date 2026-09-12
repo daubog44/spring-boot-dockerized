@@ -20,6 +20,22 @@ while [ $# -gt 0 ]; do
     *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
   esac
 done
+
+if [ -z "$NOME" ]; then
+  if [ -t 0 ]; then
+    echo ""
+    echo "PREPARAZIONE CONSEGNA"
+    printf "Inserisci il tuo COGNOME_NOME (o premi Invio per 'CONSEGNA'): "
+    read -r USER_NAME
+    if [ -n "$USER_NAME" ]; then
+      NOME="$USER_NAME"
+    else
+      NOME="CONSEGNA"
+    fi
+  else
+    NOME="CONSEGNA"
+  fi
+fi
 [ -n "$OUT_DIR" ] || OUT_DIR="$REPO_ROOT/consegna"
 
 echo ""

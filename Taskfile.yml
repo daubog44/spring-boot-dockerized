@@ -91,6 +91,7 @@ tasks:
 
   consegna:
     desc: "Prepara la cartella da consegnare: progetto pronto da eseguire, allegato tecnico, istruzioni (task consegna NOME=ROSSI_MARIO)"
+    interactive: true
     summary: |
       Mette in consegna/ tutto quello che va consegnato e niente di quello che
       non serve:
@@ -194,6 +195,7 @@ tasks:
 
   new-service:
     desc: "Crea un microservizio nuovo e lo collega a tutto (task new-service NAME=ordini-service)"
+    interactive: true
     summary: |
       Crea un modulo nuovo e lo collega dove serve: <modules> del pom
       aggregatore, COPY nel Dockerfile, blocco in docker-compose.yml e lista
@@ -218,6 +220,7 @@ tasks:
 
   new-entity:
     desc: "Genera entity, repository, service e controller per una tabella (task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=...)"
+    interactive: true
     summary: |
       Ogni tabella si scrive con lo stesso schema: una classe @Entity, un
       repository che estende JpaRepository, un service col CRUD e un
@@ -281,6 +284,7 @@ tasks:
 
   new-dto:
     desc: "Genera un DTO/Record in common-dto (task new-dto NAME=Libro FIELDS=...)"
+    interactive: true
     summary: |
       Genera un Java record moderno (o una classe con Lombok, se CLASS=1)
       in common-dto con campi e annotazioni di validazione (jakarta.validation).
@@ -303,6 +307,7 @@ tasks:
 
   new-client:
     desc: "Genera un client OpenFeign per chiamare un altro microservizio (task new-client FROM=... TO=...)"
+    interactive: true
     summary: |
       Genera un'interfaccia @FeignClient nel modulo chiamante (FROM) gia'
       collegata al nome logico del servizio target (TO) registrato su Eureka,
@@ -324,6 +329,7 @@ tasks:
 
   new-view:
     desc: "Genera controller Thymeleaf e vista HTML con tabella e form (task new-view SERVICE=event-ui NAME=Libri)"
+    interactive: true
     summary: |
       Genera in un modulo UI:
         1. Il controller Spring MVC (@Controller) con GET (lista) e POST (salvataggio)
@@ -342,6 +348,7 @@ tasks:
 
   new-auth:
     desc: "Configura autenticazione Spring Security (task new-auth SERVICE=<modulo> [TYPE=inmemory|db|form])"
+    interactive: true
     summary: |
       Configura Spring Security con utenti e ruoli per un modulo in tre modalita':
         - TYPE=inmemory (default per REST): HTTP Basic, utenti admin/user, Swagger aperto
@@ -361,6 +368,7 @@ tasks:
 
   new-handler:
     desc: "Genera GlobalExceptionHandler (@RestControllerAdvice) per un modulo (task new-handler SERVICE=<modulo>)"
+    interactive: true
     summary: |
       Genera GlobalExceptionHandler.java con annotazione @RestControllerAdvice:
       cattura errori di validazione (@Valid), 404 Not Found ed errori imprevisti
@@ -376,6 +384,7 @@ tasks:
 
   add-dep:
     desc: "Aggiunge dipendenze al pom di un modulo (task add-dep SERVICE=wms-service DEPS=security,mail)"
+    interactive: true
     summary: |
       Inserisce dipendenze nel pom.xml di un modulo. Le versioni non si
       scrivono: le decide il pom padre (Spring Boot e il BOM di Spring Cloud).
@@ -398,6 +407,7 @@ tasks:
 
   set-port:
     desc: "Sposta un modulo su un'altra porta, ovunque sia scritta (task set-port SERVICE=wms-ui PORT=9080)"
+    interactive: true
     summary: |
       Cambia la porta di un modulo in tutti e quattro i posti in cui e'
       scritta: application.yml, docker-compose.yml (variabile d'ambiente e
@@ -463,6 +473,7 @@ tasks:
 
   remove-service:
     desc: "Toglie un modulo dal progetto e da tutti i file che lo nominano (task remove-service SERVICE=<modulo>)"
+    interactive: true
     summary: |
       L'inverso di new-service: cancella la cartella del modulo e lo toglie dai
       <modules>, dal Dockerfile, dal docker-compose e dalle liste dei servizi.
@@ -478,6 +489,7 @@ tasks:
 
   use-postgres:
     desc: "Collega un modulo al PostgreSQL del progetto, al posto dell'H2 (task use-postgres SERVICE=<modulo>)"
+    interactive: true
     summary: |
       Sposta un modulo da H2 in memoria al PostgreSQL che sta gia' nel
       docker-compose: dipendenze nel pom, url/utente/password

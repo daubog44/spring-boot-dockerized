@@ -42,8 +42,24 @@ $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
 
 if (-not $Name) {
-    throw "Uso: task new-dto NAME=<Nome> [FIELDS=<campo:tipo:modificatore,...>] [SERVICE=common-dto]`n" +
-          "Esempio: task new-dto NAME=Libro FIELDS=id:long,titolo:string(150):required,disponibile:bool"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task new-dto NAME=<Nome> [FIELDS=<campo:tipo:modificatore,...>] [SERVICE=common-dto]`n" +
+              "Esempio: task new-dto NAME=Libro FIELDS=id:long,titolo:string(150):required,disponibile:bool"
+    }
+    Write-Host ''
+    Write-Host 'CREAZIONE DTO/RECORD GUIDATA' -ForegroundColor Cyan
+    $Name = (Read-Host "  Nome del DTO in PascalCase (es. LibroDto, OrdineDto, ArticoloDto)").Trim()
+    if (-not $Name) {
+        throw "Uso: task new-dto NAME=<Nome> [FIELDS=<campo:tipo:modificatore,...>] [SERVICE=common-dto]"
+    }
+
+    if (-not $Fields) {
+        Write-Host "  Campi (formato nome:tipo[:modificatore], es. id:long,nome:string:required,prezzo:decimal):" -ForegroundColor DarkGray
+        $Fields = (Read-Host "  Campi (premi Invio se nessuno)").Trim()
+    }
+
+    $cAns = (Read-Host "  Tipo: [1] Record moderno (default), [2] Classe classica con Lombok (CLASS=1)").Trim()
+    if ($cAns -eq '2') { $Class = $true }
 }
 
 if ($Name -cnotmatch '^[A-Z][a-zA-Z0-9]*$') {

@@ -167,6 +167,10 @@ rispettati). Prima prova su un H2 usa-e-getta e ti dice com'è andata.
 
 Per non perdere ore a scrivere codice boilerplate e classi ripetitive durante l'esame, hai a disposizione questi comandi:
 
+> 💡 **Modalità Interattiva Senza Parametri per TUTTI i Comandi**:
+> Non ricordi i parametri a memoria? Nessun problema: **puoi lanciare qualsiasi comando senza argomenti** (es. `task new-service`, `task new-entity`, `task add-relation`, `task new-client`, `task new-dto`, `task new-view`, `task new-auth`, `task new-handler`, `task add-dep`, `task set-port`, `task remove-service`, `task use-postgres`, `task consegna`).
+> Ognuno di essi aprirà un **wizard interattivo da terminale** con domande passo-passo, elenchi numerati dei moduli/entità tra cui scegliere e default intelligenti!
+
 | Task | Sintassi ed Esempio | Che cosa genera |
 | :--- | :--- | :--- |
 | **`task wizard`** | `task wizard` | Crea l'intera architettura a microservizi guidandoti passo passo. |

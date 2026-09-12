@@ -46,7 +46,21 @@ $demoDir = Join-Path $repoRoot 'demo'
 # --- Nomi derivati ------------------------------------------------------------
 
 if (-not $Name) {
-    throw "Uso: task new-service NAME=<nome-modulo> [PORT=<porta>] [UI=1] [NODB=1]"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task new-service NAME=<nome-modulo> [PORT=<porta>] [UI=1] [NODB=1]"
+    }
+    Write-Host ''
+    Write-Host 'CREAZIONE MICROSERVIZIO GUIDATA' -ForegroundColor Cyan
+    $Name = (Read-Host "  Nome del servizio (es. ordini-service, magazzino-ui)").Trim()
+    if (-not $Name) {
+        throw "Uso: task new-service NAME=<nome-modulo> [PORT=<porta>] [UI=1] [NODB=1]"
+    }
+    $tipo = (Read-Host "  Tipo: [1] REST con Database (default), [2] Web UI Thymeleaf (UI=1), [3] Senza Database (NODB=1)").Trim()
+    if ($tipo -eq '2' -or $Name -like '*-ui') { $Ui = $true }
+    elseif ($tipo -eq '3') { $NoDb = $true }
+
+    $pInput = (Read-Host "  Porta specifica (premi Invio per la prima libera)").Trim()
+    if ($pInput -match '^\d+$') { $Port = [int]$pInput }
 }
 if ($Name -cnotmatch '^[a-z][a-z0-9]*(-[a-z0-9]+)*$') {
     throw "Nome non valido: '$Name'. Usa minuscole e trattini, es. ordini-service."

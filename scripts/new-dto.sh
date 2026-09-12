@@ -27,8 +27,25 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$NAME" ]; then
-  echo "Uso: task new-dto NAME=<Nome> [FIELDS=<campo:tipo:modificatore,...>] [SERVICE=common-dto]" >&2
-  exit 1
+  if [ ! -t 0 ]; then
+    echo "Uso: task new-dto NAME=<Nome> [FIELDS=<campo:tipo:modificatore,...>] [SERVICE=common-dto]" >&2
+    exit 1
+  fi
+  echo ""
+  echo "CREAZIONE DTO/RECORD GUIDATA"
+  printf "  Nome del DTO in PascalCase (es. LibroDto, OrdineDto, ArticoloDto): "
+  read -r NAME
+  [ -n "$NAME" ] || { echo "Uso: task new-dto NAME=<Nome> [FIELDS=<campo:tipo:modificatore,...>] [SERVICE=common-dto]" >&2; exit 1; }
+
+  if [ -z "$FIELDS" ]; then
+    echo "  Campi (formato nome:tipo[:modificatore], es. id:long,nome:string:required,prezzo:decimal):"
+    printf "  Campi (premi Invio se nessuno): "
+    read -r FIELDS
+  fi
+
+  printf "  Tipo: [1] Record moderno (default), [2] Classe classica con Lombok: "
+  read -r CANS
+  if [ "$CANS" = "2" ]; then CLASS_MODE=1; fi
 fi
 
 if ! printf '%s' "$NAME" | grep -qE '^[A-Z][a-zA-Z0-9]*$'; then

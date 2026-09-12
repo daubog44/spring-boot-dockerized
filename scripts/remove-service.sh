@@ -19,8 +19,40 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$MODULE" ]; then
-  echo "Uso: task remove-service SERVICE=<modulo>" >&2
-  exit 1
+  if [ ! -t 0 ]; then
+    echo "Uso: task remove-service SERVICE=<modulo>" >&2
+    exit 1
+  fi
+
+  ALL_MODULES=()
+  for d in "$DEMO_DIR"/*; do
+    if [ -f "$d/pom.xml" ]; then
+      ALL_MODULES+=("$(basename "$d")")
+    fi
+  done
+  if [ "${#ALL_MODULES[@]}" -eq 0 ]; then
+    echo "Nessun modulo trovato in demo/." >&2
+    exit 1
+  fi
+
+  echo ""
+  echo "RIMOZIONE SERVIZIO GUIDATA"
+  echo "Seleziona il modulo da rimuovere:"
+  for i in "${!ALL_MODULES[@]}"; do
+    echo "  $((i+1))) ${ALL_MODULES[$i]}"
+  done
+  printf "  [1] > "
+  read -r IDX
+  [ -n "$IDX" ] || IDX=1
+  MODULE="${ALL_MODULES[$((IDX-1))]}"
+
+  printf "Sei sicuro di voler eliminare definitivamente '%s'? [s/N] " "$MODULE"
+  read -r CONFIRM
+  CONFIRM="$(printf '%s' "$CONFIRM" | tr '[:upper:]' '[:lower:]')"
+  if [ "$CONFIRM" != "s" ] && [ "$CONFIRM" != "si" ] && [ "$CONFIRM" != "y" ]; then
+    echo "Operazione annullata."
+    exit 0
+  fi
 fi
 if [ ! -f "$DEMO_DIR/$MODULE/pom.xml" ]; then
   available=""
