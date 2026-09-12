@@ -431,6 +431,32 @@ task new-client FROM=report-service TO=ordini-service DTO=OrdineDto FIELDS=id:lo
 Se passi `FIELDS=...` o se il DTO non esiste ancora in `common-dto`, il comando genera automaticamente il record Java `OrdineDto` con validazione in `common-dto` e crea subito dopo il `@FeignClient` dentro `FROM`.
 Per generare solo un DTO: `task new-dto NAME=ProdottoDto FIELDS=...`.
 
+#### Chiamare più microservizi (Più Client Feign nello stesso servizio)
+Se un servizio deve interrogare più microservizi diversi (es. `prenotazioni-service` deve chiamare sia `catalogo-service` che `notifiche-service`), lancia semplicemente `task new-client` una volta per ciascun target:
+```bash
+task new-client FROM=prenotazioni-service TO=catalogo-service
+task new-client FROM=prenotazioni-service TO=notifiche-service
+```
+Nel tuo `@Service` Lombok (`@RequiredArgsConstructor`) inietterà automaticamente tutti i client:
+```java
+@Service
+@RequiredArgsConstructor
+public class PrenotazioneService {
+    private final CatalogoClient catalogoClient;
+    private final NotificheClient notificheClient;
+    ...
+}
+```
+
+#### Relazioni tra Microservizi Diversi (es. Many-to-Many o One-to-Many inter-servizio)
+> **REGOLA ARCHITETTURALE FONDAMENTALE**: Nei microservizi ogni modulo ha il proprio database isolato (*Database per Service*). Non puoi MAI creare una relazione JPA (`@ManyToMany` o `@ManyToOne`) tra entità che appartengono a due microservizi diversi!
+> 
+> **Come si modella una relazione Many-to-Many tra microservizi?**
+> 1. **Salva solo gli ID numerici**: nel tuo servizio salvi una tabella ponte locale con gli ID (es. `RigaOrdineEntity` con `Long ordineId` e `Long prodottoId`, oppure un `Set<Long> corsiIds`).
+> 2. **Recupera i dettagli tramite Feign**: quando devi visualizzare o elaborare i dati completi, il `@Service` chiama il Feign Client passandogli gli ID (`prodottoClient.getById(prodottoId)`) per ottenere i `ProdottoDto`.
+> 
+> *Spiegare questo nell'Allegato Tecnico dimostra alla commissione la piena comprensione del disaccoppiamento a microservizi.*
+
 ### Pagine Web Thymeleaf: task new-view
 
 Se stai lavorando su un modulo UI (`task new-service NAME=web-ui UI=1`):
