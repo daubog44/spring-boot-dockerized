@@ -32,11 +32,12 @@ Tutto quello che tocca più file passa da un comando `task`, scritto nel
 trattini:
 
 ```bash
-task new-service NAME=catalogo-service
-```
-
-```bash
-task add-dep SERVICE=catalogo-service DEPS=security
+task wizard                                                              # configura l'intera architettura
+task new-service NAME=catalogo-service                                   # crea un singolo modulo
+task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=...           # genera Entity, Repo, Service, Controller
+task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto   # genera Feign client (+ DTO)
+task new-view SERVICE=biblioteca-ui NAME=Libri FIELDS=...                # genera pagina Thymeleaf e controller UI
+task add-dep SERVICE=catalogo-service DEPS=security                      # aggiunge dipendenze
 ```
 
 `task help` li elenca con una riga di spiegazione; `task --summary new-service`

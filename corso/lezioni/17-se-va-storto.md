@@ -31,6 +31,7 @@ che non va, col nome breve che vedi nel primo (`catalogo`, `prestiti`,
 | *Load balancer does not contain an instance for the service X* | aspetta 10 secondi; poi confronta il nome in `@FeignClient` con la dashboard di Eureka |
 | `FeignException$NotFound` su un endpoint che esiste | il percorso nel client Feign non è quello del controller |
 | un 500 dalla pagina | `task logs SERVICE=biblioteca-ui`: di solito è un servizio chiamato che ha dato errore, e lo dice |
+| errori REST restituiscono 500 o stack trace invece di 400/404 | `task new-handler SERVICE=<nome>`: crea un `@RestControllerAdvice` che mappa le eccezioni in risposte JSON pulite |
 | *password authentication failed* o *database "prestiti" does not exist* | il volume di PostgreSQL è vecchio: `task docker-reset` (cancella i dati), poi `task dev` |
 | *release version 25 not supported* | il JDK è più vecchio del progetto: `task set-java` |
 | una porta **RISERVATA** in `task status` | l'ha presa Windows (Docker Desktop, Hyper-V): `task set-port` per spostare il servizio |
