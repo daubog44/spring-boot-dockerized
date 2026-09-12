@@ -300,6 +300,44 @@ Test-Case 'new-entity DTO=1 genera entity, dto in common-dto, service con mapper
     Assert-Contains $controller 'public EditoreDto crea(@Valid @RequestBody EditoreDto nuovo)' 'crea non usa EditoreDto'
 }
 
+Test-Case 'new-entity guidato campo per campo accetta tipo e modificatori dal menu' {
+    Assert-Ok (Invoke-Tool 'new-service.ps1' @('-Name', 'wizfields-service')) 'new-service wizfields-service e'' fallito'
+
+    # Stesso elenco che new-entity.ps1 costruisce in modalita' interattiva: la
+    # risposta al menu dipende da dove finisce il modulo appena creato, non da
+    # un indice fisso che un'altra prova aggiunta prima potrebbe spostare.
+    $jpaModules = @(Get-ChildItem -Path $demo -Directory | Where-Object {
+        $p = Join-Path $_.FullName 'pom.xml'
+        (Test-Path $p) -and ((Get-Content -Raw $p) -match 'spring-boot-starter-data-jpa')
+    } | Select-Object -ExpandProperty Name)
+    $idx = [array]::IndexOf($jpaModules, 'wizfields-service') + 1
+    Assert-That ($idx -gt 0) 'wizfields-service non risulta fra i moduli con JPA'
+
+    $answers = Join-Path $sandbox 'risposte-new-entity.txt'
+    $lines = @(
+        "$idx"                              # modulo: wizfields-service
+        'Prova'                             # nome entity
+        'codice', '2', '20', '1,2'          # campo: codice, string(N), required+unique
+        ''                                   # un altro campo? si
+        'durata', '9', '3,4', '1', '600'    # campo: durata, int, min(1)+max(600)
+        'n'                                  # basta campi
+        'n'                                  # niente DTO
+    )
+    Write-TextFile -Path $answers -Text (($lines -join "`n") + "`n")
+    $env:WIZARD_ANSWERS = $answers
+    try { $r = Invoke-Tool 'new-entity.ps1' } finally { Remove-Item Env:WIZARD_ANSWERS -ErrorAction SilentlyContinue }
+    Assert-Ok $r 'new-entity guidato campo per campo e'' fallito'
+
+    $entityFile = Join-Path $demo ('wizfields-service/src/main/java/' + (Get-SandboxPackagePath 'wizfields-service') + '/entity/ProvaEntity.java')
+    Assert-That (Test-Path $entityFile) 'ProvaEntity.java non e'' stato creato dal wizard'
+    $entity = Get-Text ('demo/wizfields-service/src/main/java/' + (Get-SandboxPackagePath 'wizfields-service') + '/entity/ProvaEntity.java')
+    Assert-Contains $entity 'private String codice;' 'il tipo string(N) scelto dal menu non e'' stato applicato'
+    Assert-Contains $entity '@Column(nullable = false, unique = true, length = 20)' 'i modificatori scelti dal menu non sono stati applicati'
+    Assert-Contains $entity 'private Integer durata;' 'il tipo int scelto dal menu non e'' stato applicato'
+    Assert-Contains $entity '@Min(1)' 'min(N) scelto dal menu dei modificatori non applicato'
+    Assert-Contains $entity '@Max(600)' 'max(N) scelto dal menu dei modificatori non applicato'
+}
+
 Test-Case 'add-relation configura ManyToOne e OneToMany fra due entity' {
     $r = Invoke-Tool 'add-relation.ps1' @('-Service', 'epsilon-service', '-From', 'Libro', '-To', 'Editore', '-Type', 'many-to-one')
     Assert-Ok $r 'add-relation e'' fallito'

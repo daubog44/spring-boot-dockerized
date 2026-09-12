@@ -32,10 +32,32 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$SERVICE" ] || [ -z "$NAME" ]; then
-  if [ ! -t 0 ]; then
+  # Le risposte possono arrivare anche da un file, una per riga (riga vuota =
+  # Invio): e' cosi' che `task test` collauda questo wizard senza nessuno
+  # alla tastiera. Stesso meccanismo di wizard.sh.
+  ANSWERS_FILE="${WIZARD_ANSWERS:-}"
+  if [ -n "$ANSWERS_FILE" ]; then
+    [ -f "$ANSWERS_FILE" ] || { echo "WIZARD_ANSWERS: non trovo $ANSWERS_FILE" >&2; exit 1; }
+    exec 3<"$ANSWERS_FILE"
+  elif [ ! -t 0 ]; then
     echo "Uso: task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=<campo:tipo:modificatore,...>" >&2
     exit 1
   fi
+
+  REPLY_TEXT=""
+  read_answer() { # $1 il prompt; la risposta finisce in REPLY_TEXT
+    local prompt="${1:-  >}"
+    if [ -z "$ANSWERS_FILE" ]; then
+      read -r -p "$prompt " REPLY_TEXT
+      return 0
+    fi
+    if ! IFS= read -r REPLY_TEXT <&3 && [ -z "$REPLY_TEXT" ]; then
+      echo "WIZARD_ANSWERS: le risposte sono finite prima delle domande." >&2
+      exit 1
+    fi
+    REPLY_TEXT="${REPLY_TEXT%$'\r'}"
+    echo "$prompt $REPLY_TEXT"
+  }
 
   JPA_MODULES=()
   for d in "$DEMO_DIR"/*; do
@@ -57,27 +79,88 @@ if [ -z "$SERVICE" ] || [ -z "$NAME" ]; then
     for i in "${!JPA_MODULES[@]}"; do
       echo "  $((i+1))) ${JPA_MODULES[$i]}"
     done
-    printf "  [1] > "
-    read -r IDX
+    read_answer "  [1] >"
+    IDX="$REPLY_TEXT"
     [ -n "$IDX" ] || IDX=1
     SERVICE="${JPA_MODULES[$((IDX-1))]}"
   fi
 
   if [ -z "$NAME" ]; then
-    printf "  Nome dell'Entity in PascalCase (es. Libro, Ordine, Articolo): "
-    read -r NAME
+    read_answer "  Nome dell'Entity in PascalCase (es. Libro, Ordine, Articolo):"
+    NAME="$REPLY_TEXT"
     [ -n "$NAME" ] || { echo "Nome obbligatorio." >&2; exit 1; }
   fi
 
   if [ -z "$FIELDS" ]; then
-    echo "  Campi (es. nome:string:required,prezzo:decimal,disponibile:bool):"
-    printf "  Campi (premi Invio se nessuno): "
-    read -r FIELDS
+    echo ""
+    echo "  Campi della entity, uno alla volta (Invio al nome per non aggiungerne altri):"
+    FIELD_TOKENS=()
+    while true; do
+      read_answer "  Nome campo:"
+      F_NAME="$REPLY_TEXT"
+      [ -n "$F_NAME" ] || break
+
+      echo "    1) string      4) long       7) date        10) email"
+      echo "    2) string(N)   5) decimal    8) datetime    11) enum(A|B|C)"
+      echo "    3) text        6) bool       9) int"
+      read_answer "    Tipo [1]:"
+      F_TYPE_CHOICE="$REPLY_TEXT"
+      case "$F_TYPE_CHOICE" in
+        2) read_answer "    Lunghezza massima:"; F_TYPE="string($REPLY_TEXT)" ;;
+        3) F_TYPE="text" ;;
+        4) F_TYPE="long" ;;
+        5) F_TYPE="decimal" ;;
+        6) F_TYPE="bool" ;;
+        7) F_TYPE="date" ;;
+        8) F_TYPE="datetime" ;;
+        9) F_TYPE="int" ;;
+        10) F_TYPE="email" ;;
+        11) read_answer "    Valori separati da | (es. ROMANZO|SAGGIO|GIALLO):"; F_TYPE="enum($REPLY_TEXT)" ;;
+        *) F_TYPE="string" ;;
+      esac
+
+      echo "    Modificatori, numeri separati da virgola (Invio per nessuno):"
+      echo "      1) required   2) unique   3) min(N)   4) max(N)"
+      read_answer "    Modificatori:"
+      F_MOD_CHOICE="$REPLY_TEXT"
+      F_MODS=()
+      if [ -n "$F_MOD_CHOICE" ]; then
+        F_OLD_IFS="$IFS"
+        IFS=','
+        for m in $F_MOD_CHOICE; do
+          IFS="$F_OLD_IFS"
+          m="$(printf '%s' "$m" | tr -d '[:space:]')"
+          case "$m" in
+            1) F_MODS+=("required") ;;
+            2) F_MODS+=("unique") ;;
+            3) read_answer "      Minimo:"; F_MODS+=("min($REPLY_TEXT)") ;;
+            4) read_answer "      Massimo:"; F_MODS+=("max($REPLY_TEXT)") ;;
+          esac
+          IFS=','
+        done
+        IFS="$F_OLD_IFS"
+      fi
+
+      F_TOKEN="$F_NAME:$F_TYPE"
+      for m in "${F_MODS[@]}"; do F_TOKEN="$F_TOKEN:$m"; done
+      FIELD_TOKENS+=("$F_TOKEN")
+      echo "    -> $F_TOKEN"
+      echo ""
+
+      read_answer "  Un altro campo? [S/n]:"
+      F_AGAIN="$REPLY_TEXT"
+      if [ "$F_AGAIN" = "n" ] || [ "$F_AGAIN" = "N" ]; then break; fi
+    done
+    FIELDS=""
+    F_FIRST=1
+    for tok in "${FIELD_TOKENS[@]}"; do
+      if [ "$F_FIRST" = "1" ]; then FIELDS="$tok"; F_FIRST=0; else FIELDS="$FIELDS,$tok"; fi
+    done
   fi
 
   if [ "$DTO" = "0" ]; then
-    printf "  Generare anche il DTO in common-dto e mappare Service/Controller? [S/n]: "
-    read -r DANS
+    read_answer "  Generare anche il DTO in common-dto e mappare Service/Controller? [S/n]:"
+    DANS="$REPLY_TEXT"
     if [ "$DANS" != "n" ] && [ "$DANS" != "N" ]; then
       DTO=1
     fi

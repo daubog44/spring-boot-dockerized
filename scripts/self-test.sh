@@ -212,6 +212,40 @@ assert_ok "new-entity con --dto" &&
   assert_contains "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/controller/EditoreController.java" "List<EditoreDto> elenco()"
 end_case
 
+start_case "new-entity guidato campo per campo accetta tipo e modificatori dal menu"
+run_tool new-service.sh --name wizfields-service
+assert_ok "new-service wizfields-service"
+
+# Stesso elenco che new-entity.sh costruisce in modalita' interattiva: la
+# risposta al menu dipende da dove finisce il modulo appena creato, non da
+# un indice fisso che un'altra prova aggiunta prima potrebbe spostare.
+WIZ_JPA_IDX=0
+WIZ_I=0
+for d in "$DEMO"/*; do
+  [ -f "$d/pom.xml" ] || continue
+  grep -q 'spring-boot-starter-data-jpa' "$d/pom.xml" || continue
+  WIZ_I=$((WIZ_I + 1))
+  [ "$(basename "$d")" = "wizfields-service" ] && WIZ_JPA_IDX=$WIZ_I
+done
+
+printf '%s\n' \
+  "$WIZ_JPA_IDX" \
+  Prova \
+  codice 2 20 1,2 \
+  '' \
+  durata 9 3,4 1 600 \
+  n \
+  n >"$SANDBOX/risposte-new-entity.txt"
+TOOL_OUT="$(WIZARD_ANSWERS="$SANDBOX/risposte-new-entity.txt" bash "$SB_SCRIPTS/new-entity.sh" </dev/null 2>&1)"; TOOL_CODE=$?
+assert_ok "new-entity guidato campo per campo" &&
+  assert_file "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/ProvaEntity.java" &&
+  assert_contains "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/ProvaEntity.java" "private String codice;" "tipo string(N) dal menu" &&
+  assert_contains "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/ProvaEntity.java" "@Column(nullable = false, unique = true, length = 20)" "modificatori dal menu" &&
+  assert_contains "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/ProvaEntity.java" "private Integer durata;" "tipo int dal menu" &&
+  assert_contains "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/ProvaEntity.java" "@Min(1)" "min(N) dal menu" &&
+  assert_contains "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/ProvaEntity.java" "@Max(600)" "max(N) dal menu"
+end_case
+
 start_case "add-relation configura ManyToOne e OneToMany fra due entity"
 run_tool add-relation.sh --service epsilon-service --from Libro --to Editore --type many-to-one
 assert_ok "add-relation" &&

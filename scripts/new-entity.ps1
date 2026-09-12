@@ -56,9 +56,26 @@ $demoDir = Join-Path $repoRoot 'demo'
 # --- Argomenti ------------------------------------------------------------
 
 if (-not $Service -or -not $Name) {
-    if ([Console]::IsInputRedirected) {
+    # Le risposte possono arrivare anche da un file, una per riga (riga vuota
+    # = Invio): e' cosi' che `task test` collauda questo wizard senza nessuno
+    # alla tastiera. Stesso meccanismo di wizard.ps1.
+    $script:answers = $null
+    if ($env:WIZARD_ANSWERS) {
+        if (-not (Test-Path $env:WIZARD_ANSWERS)) { throw "WIZARD_ANSWERS: non trovo $env:WIZARD_ANSWERS" }
+        $script:answers = New-Object 'System.Collections.Generic.Queue[string]'
+        foreach ($line in [System.IO.File]::ReadAllLines($env:WIZARD_ANSWERS)) { $script:answers.Enqueue($line) }
+    }
+    if ($null -eq $script:answers -and [Console]::IsInputRedirected) {
         throw "Uso: task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=<campo:tipo:modificatore,...>`n" +
               "Esempio: task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):unique"
+    }
+    function Read-Answer {
+        param([string]$Prompt = '  >')
+        if ($null -eq $script:answers) { return (Read-Host $Prompt) }
+        if ($script:answers.Count -eq 0) { throw 'WIZARD_ANSWERS: le risposte sono finite prima delle domande.' }
+        $answer = $script:answers.Dequeue()
+        Write-Host "$Prompt $answer"
+        return $answer
     }
 
     $jpaModules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object {
@@ -79,25 +96,73 @@ if (-not $Service -or -not $Name) {
         for ($i = 0; $i -lt $jpaModules.Count; $i++) {
             Write-Host "  $($i + 1)) $($jpaModules[$i])"
         }
-        $idx = Read-Host "  [1] >"
+        $idx = Read-Answer "  [1] >"
         $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
         $Service = $jpaModules[$idxNum - 1]
     }
 
     if (-not $Name) {
-        $Name = (Read-Host "  Nome dell'Entity in PascalCase (es. Libro, Ordine, Articolo)").Trim()
+        $Name = (Read-Answer "  Nome dell'Entity in PascalCase (es. Libro, Ordine, Articolo)").Trim()
         if (-not $Name) {
             throw "Uso: task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=<campo:tipo:modificatore,...>"
         }
     }
 
     if (-not $Fields) {
-        Write-Host "  Campi (formato nome:tipo[:modificatore], es. nome:string:required,prezzo:decimal,disponibile:bool):" -ForegroundColor DarkGray
-        $Fields = (Read-Host "  Campi (premi Invio se nessuno)").Trim()
+        Write-Host ''
+        Write-Host '  Campi della entity, uno alla volta (Invio al nome per non aggiungerne altri):' -ForegroundColor DarkGray
+        $fieldTokens = @()
+        while ($true) {
+            $fName = (Read-Answer '  Nome campo').Trim()
+            if (-not $fName) { break }
+
+            Write-Host '    1) string      4) long       7) date        10) email'
+            Write-Host '    2) string(N)   5) decimal    8) datetime    11) enum(A|B|C)'
+            Write-Host '    3) text        6) bool       9) int'
+            $typeChoice = (Read-Answer '    Tipo [1]').Trim()
+            $typeToken = switch ($typeChoice) {
+                '2' { "string(" + (Read-Answer '    Lunghezza massima').Trim() + ")" }
+                '3' { 'text' }
+                '4' { 'long' }
+                '5' { 'decimal' }
+                '6' { 'bool' }
+                '7' { 'date' }
+                '8' { 'datetime' }
+                '9' { 'int' }
+                '10' { 'email' }
+                '11' { "enum(" + (Read-Answer '    Valori separati da | (es. ROMANZO|SAGGIO|GIALLO)').Trim() + ")" }
+                default { 'string' }
+            }
+
+            Write-Host '    Modificatori, numeri separati da virgola (Invio per nessuno):'
+            Write-Host '      1) required   2) unique   3) min(N)   4) max(N)'
+            $modChoice = (Read-Answer '    Modificatori').Trim()
+            $mods = @()
+            if ($modChoice) {
+                foreach ($m in ($modChoice -split ',')) {
+                    switch ($m.Trim()) {
+                        '1' { $mods += 'required' }
+                        '2' { $mods += 'unique' }
+                        '3' { $mods += "min(" + (Read-Answer '      Minimo').Trim() + ")" }
+                        '4' { $mods += "max(" + (Read-Answer '      Massimo').Trim() + ")" }
+                    }
+                }
+            }
+
+            $token = "${fName}:${typeToken}"
+            if ($mods.Count -gt 0) { $token += ':' + ($mods -join ':') }
+            $fieldTokens += $token
+            Write-Host "    -> $token" -ForegroundColor DarkGray
+            Write-Host ''
+
+            $again = (Read-Answer '  Un altro campo? [S/n]').Trim().ToLowerInvariant()
+            if ($again -eq 'n' -or $again -eq 'no') { break }
+        }
+        $Fields = $fieldTokens -join ','
     }
 
     if (-not $Dto) {
-        $dAns = (Read-Host "  Generare anche il DTO in common-dto e mappare Service/Controller? [S/n]").Trim().ToLowerInvariant()
+        $dAns = (Read-Answer "  Generare anche il DTO in common-dto e mappare Service/Controller? [S/n]").Trim().ToLowerInvariant()
         if ($dAns -ne 'n' -and $dAns -ne 'no') {
             $Dto = $true
         }
