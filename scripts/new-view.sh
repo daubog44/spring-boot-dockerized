@@ -228,8 +228,10 @@ if m:
 " 2>/dev/null || true)"
 
         if [ -n "$DTO_ARGS" ]; then
+          TARGET_DTO_PKG="$(grep -E '^[[:space:]]*package[[:space:]]+' "$DTO_FILE" | sed -E 's/^[[:space:]]*package[[:space:]]+//;s/[[:space:]]*;.*$//' | head -1 || true)"
+          [ -z "$TARGET_DTO_PKG" ] && TARGET_DTO_PKG="$(get_base_package).common.dto"
           CLIENT_CALL_CREATE="        try {
-            ${CLIENT_CAMEL}.create(new esame.common.dto.$TARGET_DTO_NAME(
+            ${CLIENT_CAMEL}.create(new ${TARGET_DTO_PKG}.$TARGET_DTO_NAME(
 $DTO_ARGS
             ));
         } catch (Exception e) {

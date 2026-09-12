@@ -227,6 +227,8 @@ if ($Client) {
             $dtoFiles = @(Get-ChildItem -Path $commonDtoDir -Recurse -Filter "$targetDtoName.java" -ErrorAction SilentlyContinue)
             if ($dtoFiles.Count -gt 0) {
                 $dtoContent = Read-TextFile $dtoFiles[0].FullName
+                $targetDtoPkg = [regex]::Match($dtoContent, '(?m)^\s*package\s+([\w.]+)\s*;').Groups[1].Value
+                if (-not $targetDtoPkg) { $targetDtoPkg = (Get-BasePackage) + '.common.dto' }
                 $m = [regex]::Match($dtoContent, 'public\s+record\s+\w+\s*\(([\s\S]*?)\)\s*\{')
                 if ($m.Success) {
                     $rawParams = $m.Groups[1].Value -split ','
@@ -250,7 +252,7 @@ if ($Client) {
                     $dtoArgsStr = ($argExprs | ForEach-Object { "                $_" }) -join ",`n"
                     $clientCallCreate = @"
         try {
-            ${clientCamel}.create(new esame.common.dto.$targetDtoName(
+            ${clientCamel}.create(new ${targetDtoPkg}.$targetDtoName(
 $dtoArgsStr
             ));
         } catch (Exception e) {
