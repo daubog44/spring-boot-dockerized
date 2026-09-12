@@ -93,18 +93,29 @@ if ($isZip) {
     New-Item -ItemType Directory -Path $tempExtract -Force | Out-Null
     try {
         [System.IO.Compression.ZipFile]::ExtractToDirectory($Src, $tempExtract)
-        # Se c'e' una sola sottocartella radice che contiene tutto, scendiamo di un livello
-        $children = @(Get-ChildItem -Path $tempExtract)
+        # Trova la cartella corretta contenente il pom.xml
         $effectiveSource = $tempExtract
-        if ($children.Count -eq 1 -and $children[0].PSIsContainer) {
-            $effectiveSource = $children[0].FullName
+        if (-not (Test-Path (Join-Path $tempExtract 'pom.xml'))) {
+            $foundPoms = @(Get-ChildItem -Path $tempExtract -Filter 'pom.xml' -Recurse -File)
+            if ($foundPoms.Count -gt 0) {
+                $topPom = $foundPoms | Sort-Object { $_.FullName.Length } | Select-Object -First 1
+                $effectiveSource = Split-Path -Parent $topPom.FullName
+            }
         }
         Copy-Item -Path "$effectiveSource\*" -Destination $moduleDir -Recurse -Force
     } finally {
         if (Test-Path $tempExtract) { Remove-Item -Path $tempExtract -Recurse -Force -ErrorAction SilentlyContinue }
     }
 } else {
-    Copy-Item -Path "$Src\*" -Destination $moduleDir -Recurse -Force
+    $effectiveSource = $Src
+    if (-not (Test-Path (Join-Path $Src 'pom.xml'))) {
+        $foundPoms = @(Get-ChildItem -Path $Src -Filter 'pom.xml' -Recurse -File)
+        if ($foundPoms.Count -gt 0) {
+            $topPom = $foundPoms | Sort-Object { $_.FullName.Length } | Select-Object -First 1
+            $effectiveSource = Split-Path -Parent $topPom.FullName
+        }
+    }
+    Copy-Item -Path "$effectiveSource\*" -Destination $moduleDir -Recurse -Force
 }
 
 # Pulizia cartelle di build o metadati IDE

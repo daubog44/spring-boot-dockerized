@@ -74,17 +74,31 @@ mkdir -p "$MODULE_DIR"
 if [[ "$SRC" == *.zip ]]; then
   TMP_DIR="$(mktemp -d)"
   unzip -q "$SRC" -d "$TMP_DIR"
-  # Se c'e' una cartella sola dentro
-  SUB_COUNT="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 | wc -l)"
-  if [ "$SUB_COUNT" -eq 1 ] && [ -d "$(find "$TMP_DIR" -mindepth 1 -maxdepth 1)" ]; then
-    SINGLE_DIR="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1)"
-    cp -r "$SINGLE_DIR"/* "$MODULE_DIR"/
+  # Trova la cartella con pom.xml
+  if [ ! -f "$TMP_DIR/pom.xml" ]; then
+    POM_FOUND="$(find "$TMP_DIR" -name "pom.xml" | head -n 1 || true)"
+    if [ -n "$POM_FOUND" ]; then
+      SRC_SUBDIR="$(dirname "$POM_FOUND")"
+      cp -r "$SRC_SUBDIR"/* "$MODULE_DIR"/
+    else
+      cp -r "$TMP_DIR"/* "$MODULE_DIR"/
+    fi
   else
     cp -r "$TMP_DIR"/* "$MODULE_DIR"/
   fi
   rm -rf "$TMP_DIR"
 else
-  cp -r "$SRC"/* "$MODULE_DIR"/
+  if [ ! -f "$SRC/pom.xml" ]; then
+    POM_FOUND="$(find "$SRC" -name "pom.xml" | head -n 1 || true)"
+    if [ -n "$POM_FOUND" ]; then
+      SRC_SUBDIR="$(dirname "$POM_FOUND")"
+      cp -r "$SRC_SUBDIR"/* "$MODULE_DIR"/
+    else
+      cp -r "$SRC"/* "$MODULE_DIR"/
+    fi
+  else
+    cp -r "$SRC"/* "$MODULE_DIR"/
+  fi
 fi
 
 # Pulizia cartelle inutili
