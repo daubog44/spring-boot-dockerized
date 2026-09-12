@@ -370,6 +370,64 @@ per un servizio senza JPA.
 
 Poi `task dev`, e il servizio nuovo si registra su Eureka con gli altri.
 
+### Generare Entity, Repository, Service e Controller: task new-entity
+
+Invece di scrivere a mano le classi ripetitive di ogni tabella:
+
+```bash
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal:required,data:date
+```
+
+Genera le quattro classi canoniche nello standard del progetto:
+- `OrdineEntity.java` con annotazioni JPA e validazione Jakarta.
+- `OrdineRepository.java` che estende `JpaRepository`.
+- `OrdineService.java` con il CRUD pronto.
+- `OrdineController.java` con gli endpoint REST documentati in OpenAPI/Swagger.
+
+### Contratti DTO e Feign Client in un solo comando: task new-client e task new-dto
+
+I microservizi non condividono le entity: si scambiano DTO definiti nel modulo `common-dto`.
+Per collegare due microservizi:
+
+```bash
+task new-client FROM=report-service TO=ordini-service DTO=OrdineDto FIELDS=id:long,numero:string:required,totale:decimal
+```
+
+Se passi `FIELDS=...` o se il DTO non esiste ancora in `common-dto`, il comando genera automaticamente il record Java `OrdineDto` con validazione in `common-dto` e crea subito dopo il `@FeignClient` dentro `FROM`.
+Per generare solo un DTO: `task new-dto NAME=ProdottoDto FIELDS=...`.
+
+### Pagine Web Thymeleaf: task new-view
+
+Se stai lavorando su un modulo UI (`task new-service NAME=web-ui UI=1`):
+
+```bash
+task new-view SERVICE=web-ui NAME=Ordini FIELDS=numero:string:required,totale:decimal
+```
+
+Genera:
+- `OrdiniController.java` con `@Controller` per le rotte GET e POST.
+- `templates/ordini.html` con tabella dinamica per visualizzare i record e form HTML per l'inserimento con validazione.
+
+### Sicurezza e Login: task new-auth
+
+Per proteggere le API o aggiungere una pagina di login senza configurare Spring Security a mano:
+
+```bash
+task new-auth SERVICE=ordini-service TYPE=db        # Utenti su DB con BCrypt e ruoli (ROLE_USER, ROLE_ADMIN)
+task new-auth SERVICE=web-ui TYPE=form             # Form login Thymeleaf con LoginController e login.html
+task new-auth SERVICE=ordini-service TYPE=inmemory # Basic Auth leggera in memoria
+```
+
+### Gestione Errori Globale REST: task new-handler
+
+Per intercettare gli errori di validazione (`@Valid`) e rispondere con un JSON chiaro (`400 Bad Request`) invece di schermate d'errore grezze:
+
+```bash
+task new-handler SERVICE=ordini-service
+```
+
+Genera `GlobalExceptionHandler.java` con `@RestControllerAdvice`.
+
 ### Collegare un servizio a PostgreSQL
 
 ```bash

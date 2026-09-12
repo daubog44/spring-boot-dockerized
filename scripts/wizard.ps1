@@ -213,6 +213,7 @@ if ($Service) {
     Write-Host ''
     & (Join-Path $PSScriptRoot 'check.ps1') -ProjectOnly
     Write-Host ''
+    Write-Host '  task new-entity   genera entity, repository, service e controller'
     Write-Host '  task dev          riavvia lo stack (un modulo nuovo non basta ricompilarlo)'
     Write-Host ''
     exit 0
@@ -335,12 +336,12 @@ if ($created.Count -gt 0) {
 }
 Write-Host '  Adesso, nell''ordine:'
 Write-Host ''
-Write-Host '   1. scrivi le entity del dominio della traccia'
-Write-Host '      (@Entity, @Table, @Id, i campi, le relazioni)'
-Write-Host '   2. task seed-data      riempie il database di dati di prova'
-Write-Host '   3. task dev            avvia tutto in locale, con hot reload'
-Write-Host '   4. task db-schema      lo schema da incollare nell''allegato'
-Write-Host '   5. task consegna       la cartella da consegnare'
+Write-Host '   1. Genera entity e CRUD:      task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=...'
+Write-Host '   2. Client Feign e DTO:        task new-client FROM=<ui> TO=<backend> DTO=<NomeDto> [FIELDS=...]'
+Write-Host '   3. Vista Thymeleaf (se UI):   task new-view SERVICE=<ui> NAME=<Nome> FIELDS=...'
+Write-Host '   4. Errori / Sicurezza:        task new-handler SERVICE=<modulo> | task new-auth'
+Write-Host '   5. Dati di prova e avvio:     task seed-data && task dev'
+Write-Host '   6. Schema ER e Consegna:      task db-schema && task consegna NOME=COGNOME_NOME'
 Write-Host ''
-Write-Host '  task help per tutto il resto.' -ForegroundColor DarkGray
+Write-Host '  task help per tutti i dettagli e gli esempi.' -ForegroundColor DarkGray
 Write-Host ''
