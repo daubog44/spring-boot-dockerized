@@ -116,7 +116,6 @@ task set-port SERVICE=event-ui PORT=9080
 ```bash
 task remove-service SERVICE=ordini-service
 ```
-```
 
 Dopo una dipendenza o un modulo nuovo ci vuole `task dev`: `task compile` non
 basta, perche' il classpath di un servizio e' fissato quando parte.

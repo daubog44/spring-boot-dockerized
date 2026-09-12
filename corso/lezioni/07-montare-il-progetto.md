@@ -133,6 +133,18 @@ I nomi brevi (`eureka`, `catalogo`, `prestiti`, `biblioteca-ui`) sono quelli
 che stampa `task status`. Da qui in poi il ciclo è: scrivi, `task compile`, il
 servizio riparte da solo in qualche secondo.
 
+## Cosa fare subito dopo aver montato il progetto
+
+Una volta che i moduli esistono e `task check` dice *Tutto coerente*, non devi scrivere a mano il codice ripetitivo:
+
+| Cosa vuoi creare | Comando dedicato | Cosa fa |
+| :--- | :--- | :--- |
+| Tabella, Entity, Repository, Service e Controller REST | `task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=...` | Genera le 4 classi canoniche con CRUD completo e Swagger |
+| DTO condiviso e Feign Client | `task new-client FROM=biblioteca-ui TO=catalogo-service DTO=LibroDto FIELDS=...` | Crea `LibroDto` in `common-dto` e l'interfaccia `@FeignClient` in un solo comando |
+| Pagine e form Thymeleaf | `task new-view SERVICE=biblioteca-ui NAME=Libri FIELDS=...` | Genera `LibriController` e il template `libri.html` con tabella e form |
+| Gestione errori globale REST | `task new-handler SERVICE=catalogo-service` | Genera `@RestControllerAdvice` per formattare gli errori `@Valid` in JSON |
+| Autenticazione e Sicurezza | `task new-auth SERVICE=catalogo-service TYPE=db` | Configura Spring Security (utenti su DB con BCrypt, oppure Form per UI) |
+
 ## Se la traccia cambia a metà
 
 | Serve | Comando |
