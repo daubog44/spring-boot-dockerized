@@ -380,6 +380,43 @@ l'entity col repository, cambiarne un campo col setter, e richiamare `save`
 (Hibernate si accorge da solo che è un update, non un insert, perché l'`id`
 c'è già).
 
+## Paura dell'autocompletamento nell'editor? Le 3 strategie a prova di bomba
+
+Negli editor (come Zed, VS Code o IntelliJ), il Language Server Java suggerisce immediatamente tutti i metodi standard di `JpaRepository`:
+- `findAll()`, `findById(id)`, `save(entity)` (fa sia `INSERT` che `UPDATE`), `deleteById(id)`, `existsById(id)`, `count()`. Nel 90% delle tracce d'esame questi metodi predefiniti bastano per coprire l'intero CRUD!
+
+Tuttavia, quando vuoi scrivere un metodo di ricerca personalizzato (es. `findByTitoloContainingIgnoreCase`), l'editor spesso **non può suggerirlo in anticipo** con l'autocompletamento, perché in Spring Data i *derived query methods* vengono sintetizzati a runtime da Spring via proxy dinamico.
+
+Se all'esame ti viene il dubbio sulla sintassi esatta, hai tre strategie infallibili:
+
+### Strategia 1: La formula mnemonica del nome
+La regola è sempre lineare:
+```text
+findBy + <NomeCampoJava> + [Condizione] + [And/Or + AltroCampo]
+```
+- Uguaglianza: `findByGenere(Genere g)`
+- Testo parziale: `findByTitoloContainingIgnoreCase(String testo)`
+- Confronto numerico: `findByPrezzoLessThan(BigDecimal max)`
+- Combinazione: `findByPrezzoLessThanAndDisponibileTrue(BigDecimal max)`
+- Esistenza rapida: `existsByCodice(String codice)`
+
+### Strategia 2: La query a mano con `@Query` (Il salvagente definitivo)
+Non perdere tempo a indovinare il nome del metodo! Dai al metodo il nome che preferisci tu e scrivi la query sopra l'interfaccia:
+- **In JPQL (oggetti Java)**: usi il nome della classe Entity e dei suoi campi Java:
+  ```java
+  @Query("SELECT l FROM LibroEntity l WHERE l.prezzo <= :max AND l.disponibile = true")
+  List<LibroEntity> trovaEconomici(@Param("max") BigDecimal max);
+  ```
+- **In SQL Nativo (`nativeQuery = true`)**: usi il normalissimo SQL del database (nomi di tabelle e colonne SQL reali):
+  ```java
+  @Query(value = "SELECT * FROM libri WHERE prezzo <= :max AND disponibile = true", nativeQuery = true)
+  List<LibroEntity> trovaEconomiciSql(@Param("max") BigDecimal max);
+  ```
+  Con `nativeQuery = true` scrivi la query SQL esattamente come la testeresti in DBeaver o nella console di PostgreSQL.
+
+### Strategia 3: Il cheat sheet offline con `task learn`
+Il giorno dell'esame lancia `task learn` in un terminale: si aprirà questa guida nel browser **completamente offline e senza connessione**. Puoi consultare la tabella delle parole chiave in qualsiasi momento e fare copia-incolla delle firme.
+
 ## Chi crea le tabelle
 
 Nessuno le scrive: le crea Hibernate all'avvio, leggendo le entity, perché
