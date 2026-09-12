@@ -321,12 +321,16 @@ tasks:
         FIELDS=<campi>     facoltativa: se il DTO non esiste o sono specificati,
                            crea automaticamente il DTO in common-dto!
         NAME=<Nome>        facoltativa: nome client (default: derivato da TO)
-        PATH=<rotta>       facoltativa: prefisso rotta (default: /api/<risorsa>)
+        ROUTE=<rotta>      facoltativa: prefisso rotta (default: /api/<risorsa>)
 
       Esempio:
         task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto FIELDS=id:long,titolo:string:required
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-client.ps1{{if .FROM}} -From {{.FROM}}{{end}}{{if .TO}} -To {{.TO}}{{end}}{{if .DTO}} -Dto {{.DTO}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .PATH}} -Path {{.PATH}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-client.sh{{if .FROM}} --from {{.FROM}}{{end}}{{if .TO}} --to {{.TO}}{{end}}{{if .DTO}} --dto {{.DTO}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .PATH}} --path {{.PATH}}{{end}} {{.CLI_ARGS}}{{end}}'
+      # Variabile ROUTE, non PATH: Task legge le variabili d'ambiente del
+      # sistema con lo stesso {{.NOME}}, e PATH e' sempre valorizzata (l'intero
+      # PATH di sistema) anche senza passarla --> finiva in -Path non quotato
+      # e mvdan/sh si spezzava sulla prima parentesi di "Program Files (x86)".
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-client.ps1{{if .FROM}} -From {{.FROM}}{{end}}{{if .TO}} -To {{.TO}}{{end}}{{if .DTO}} -Dto {{.DTO}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .ROUTE}} -Path "{{.ROUTE}}"{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-client.sh{{if .FROM}} --from {{.FROM}}{{end}}{{if .TO}} --to {{.TO}}{{end}}{{if .DTO}} --dto {{.DTO}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .ROUTE}} --path "{{.ROUTE}}"{{end}} {{.CLI_ARGS}}{{end}}'
 
   new-view:
     desc: "Genera controller Thymeleaf e vista HTML con tabella e form (task new-view SERVICE=event-ui NAME=Libri)"

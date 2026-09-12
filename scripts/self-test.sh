@@ -222,20 +222,22 @@ assert_ok "add-relation" &&
 end_case
 
 start_case "new-dto genera record in common-dto con validazione"
-run_tool new-dto.sh --name Libro --fields "id:long,titolo:string(150):required,disponibile:bool"
+# "Volume", non "Libro": su example/biblioteca esiste gia' un vero
+# LibroDto.java in common-dto, e il nome collide col progetto reale.
+run_tool new-dto.sh --name Volume --fields "id:long,titolo:string(150):required,disponibile:bool"
 assert_ok "new-dto" &&
-  assert_file "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/LibroDto.java" &&
-  assert_contains "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/LibroDto.java" "public record LibroDto" &&
-  assert_contains "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/LibroDto.java" "@Size(max = 150)" &&
-  assert_contains "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/LibroDto.java" "@NotBlank"
+  assert_file "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/VolumeDto.java" &&
+  assert_contains "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/VolumeDto.java" "public record VolumeDto" &&
+  assert_contains "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/VolumeDto.java" "@Size(max = 150)" &&
+  assert_contains "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/VolumeDto.java" "@NotBlank"
 end_case
 
 start_case "new-client genera FeignClient collegato al servizio target"
-run_tool new-client.sh --from alfa-service --to epsilon-service --dto LibroDto
+run_tool new-client.sh --from alfa-service --to epsilon-service --dto VolumeDto
 assert_ok "new-client" &&
   assert_file "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" &&
   assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" '@FeignClient(name = "EPSILON-SERVICE")' &&
-  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" "List<LibroDto> getAll()"
+  assert_contains "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/EpsilonClient.java" "List<VolumeDto> getAll()"
 end_case
 
 start_case "new-view genera controller e template thymeleaf nel modulo UI"
@@ -253,6 +255,23 @@ run_tool new-client.sh --from alfa-service --to beta-ui --name BetaClient --dto 
 assert_ok "new-client con FIELDS" &&
   assert_file "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/AutoreDto.java" &&
   assert_file "demo/alfa-service/src/main/java/$(sb_package_path alfa-service)/client/BetaClient.java"
+end_case
+
+start_case "task new-client (CLI reale, senza ROUTE) non spezza la riga di comando"
+# Passa per il Taskfile vero, non per lo script diretto come le altre prove:
+# una variabile Task chiamata come una variabile d'ambiente di sistema
+# (successo con PATH, prima di diventare ROUTE) viene risolta con quella del
+# sistema anche se non la passi, e senza virgolette rompe il parsing di
+# mvdan/sh sulla prima parentesi che trova (es. "Program Files (x86)").
+if command -v task >/dev/null 2>&1; then
+  TASK_OUT="$(cd "$SANDBOX" && task new-client FROM=epsilon-service TO=gamma-service 2>&1)"
+  TASK_CODE=$?
+  { [ "$TASK_CODE" -eq 0 ] || fail "task new-client FROM=epsilon-service TO=gamma-service: exit $TASK_CODE
+$TASK_OUT"; } &&
+    assert_file "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/client/GammaClient.java"
+else
+  echo "        (comando task non trovato sul PATH: prova saltata)"
+fi
 end_case
 
 start_case "new-auth configura la sicurezza su database (UtenteEntity, Repo, UserDetailsService, BCrypt)"
