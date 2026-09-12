@@ -27,7 +27,7 @@ All'esame il tempo è prezioso: delega agli strumenti il lavoro meccanico e conc
 | Ambito | Cosa deleghi al Template / ai comandi `task` | Cosa spetta a TE (Candidato) |
 | :--- | :--- | :--- |
 | **Architettura & Moduli** | `task new-service` collega il modulo in tutti i 6 punti (pom aggregatore, Dockerfile, docker-compose, dev, VS Code, porte). | Scegliere i nomi dei moduli dalla traccia (es. `catalogo-service`, `ordini-service`, `ui-service`). |
-| **Persistenza & Entity** | `task new-entity` genera Entity, Repository, Service CRUD e Controller REST con Swagger. | Definire le **relazioni JPA** (@ManyToOne, @ManyToMany...) all'interno del modulo e i metodi custom del repository. |
+| **Persistenza & Entity** | `task new-entity` genera Entity, Repository, Service CRUD e Controller REST con Swagger. | Definire le **relazioni JPA** (@ManyToOne, @ManyToMany...) all'interno del modulo e i metodi custom del repository (tramite nome derivato `findBy...` o query esplicita `@Query`/`nativeQuery`). |
 | **Microservizi & Database** | Ogni modulo ha il suo database isolato (H2 in-memory o Postgres dedicato con `task use-postgres`). | **NON creare mai chiavi esterne tra moduli diversi!** Usare solo l'ID numerico (`Long libroId`) e OpenFeign. |
 | **Contratti DTO & Record** | `task new-dto` genera i record Java in `common-dto` con validazione Bean Validation. | Decidere quali campi esporre e scambiare tra i microservizi. |
 | **Chiamate tra Servizi** | `task new-client` crea l'interfaccia `@FeignClient` pronta con metodi CRUD risolti tramite Eureka. | Invocare il client nel `@Service` chiamante e gestire le eccezioni di business (es. 404 se un record non esiste). |
