@@ -67,18 +67,25 @@ WITH_DB=1
 
 # --- Porta --------------------------------------------------------------------
 
-# Porte gia' impegnate: quelle nella configurazione di dev.ps1 (compresa la 8080
-# di default della UI) e quelle scritte negli application.yml dei moduli.
+# Porte gia' impegnate: quelle nella lista dei servizi di dev.ps1 e quelle scritte
+# nelle configurazioni dei moduli in demo/.
 used_ports() {
-  grep -oE 'Port[[:space:]]*=[[:space:]]*[0-9]+' "$DEV_PS1" | grep -oE '[0-9]+'
-  find "$DEMO_DIR" -mindepth 4 -name application.yml -path '*/src/main/resources/*' \
-    -exec grep -hoE 'SERVER_PORT:[0-9]+' {} + 2>/dev/null | cut -d: -f2
+  grep -oE "Module[[:space:]]*=[[:space:]]*'[^']+';[[:space:]]*Port[[:space:]]*=[[:space:]]*[0-9]+" "$DEV_PS1" 2>/dev/null | grep -oE '[0-9]+$' || true
+  for d in "$DEMO_DIR"/*; do
+    [ -d "$d" ] || continue
+    p="$(module_port "$d" || true)"
+    [ -n "$p" ] && [ "$p" -gt 0 ] && echo "$p"
+  done
 }
 USED="$(used_ports | sort -un)"
 
 if [ "$PORT" -eq 0 ]; then
-  PORT=8081
-  while printf '%s\n' "$USED" | grep -qx "$PORT"; do PORT=$((PORT + 1)); done
+  if [ "$IS_UI" = "1" ] && ! printf '%s\n' "$USED" | grep -qx "8080"; then
+    PORT=8080
+  else
+    PORT=8081
+    while printf '%s\n' "$USED" | grep -qx "$PORT"; do PORT=$((PORT + 1)); done
+  fi
 elif printf '%s\n' "$USED" | grep -qx "$PORT"; then
   echo "La porta $PORT e' gia' assegnata a un altro modulo. Scegline un'altra, oppure sposta l'altro con: task set-port SERVICE=<modulo> PORT=<porta>" >&2
   exit 1

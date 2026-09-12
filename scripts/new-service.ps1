@@ -84,24 +84,26 @@ $withDb = (-not $NoDb) -and (-not $Ui)
 $devPs1 = Join-Path $PSScriptRoot 'dev.ps1'
 $devSh = Join-Path $PSScriptRoot 'dev.sh'
 
-# Porte gia' impegnate: quelle nella configurazione di dev.ps1 (compresa la
-# 8080 di default della UI) e quelle scritte negli application.yml dei moduli,
-# che possono esserci anche se il modulo non e' nella lista di avvio.
+# Porte gia' impegnate: quelle nella lista dei servizi di dev.ps1 e quelle scritte
+# nelle configurazioni dei moduli in demo/.
 $used = @()
-foreach ($hit in ([regex]'Port\s*=\s*(\d+)').Matches((Read-TextFile $devPs1))) {
+$devText = Read-TextFile $devPs1
+foreach ($hit in ([regex]"Module\s*=\s*'[^']+';\s*Port\s*=\s*(\d+)").Matches($devText)) {
     $used += [int]$hit.Groups[1].Value
 }
 foreach ($dir in (Get-ChildItem -Path $demoDir -Directory)) {
-    $yml = Join-Path $dir.FullName 'src/main/resources/application.yml'
-    if (Test-Path $yml) {
-        $hit = [regex]::Match((Read-TextFile $yml), 'SERVER_PORT:(\d+)')
-        if ($hit.Success) { $used += [int]$hit.Groups[1].Value }
-    }
+    $p = Get-ModulePort -ModuleDir $dir.FullName
+    if ($p -gt 0) { $used += $p }
 }
+$used = @($used | Select-Object -Unique)
 
 if ($Port -eq 0) {
-    $Port = 8081
-    while ($used -contains $Port) { $Port++ }
+    if ($Ui -and ($used -notcontains 8080)) {
+        $Port = 8080
+    } else {
+        $Port = 8081
+        while ($used -contains $Port) { $Port++ }
+    }
 } elseif ($used -contains $Port) {
     throw "La porta $Port e' gia' assegnata a un altro modulo. Scegline un'altra, oppure sposta l'altro con: task set-port SERVICE=<modulo> PORT=<porta>"
 }
