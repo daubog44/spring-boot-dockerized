@@ -128,6 +128,7 @@ MODULE_DIR="$DEMO_DIR/$SERVICE"
 
 PKG="$(sb_module_package "$SERVICE")"
 PKG_PATH="$(printf '%s' "$PKG" | tr '.' '/')"
+BASE_PKG="$(base_package "$DEMO_DIR")"
 ENTITY_DIR="$MODULE_DIR/src/main/java/$PKG_PATH/entity"
 [ -d "$ENTITY_DIR" ] || { echo "Non trovo la cartella entity in $SERVICE ($ENTITY_DIR)." >&2; exit 1; }
 
@@ -451,6 +452,7 @@ if idx > 0:
     SERVICE_FILE="$MODULE_DIR/src/main/java/$PKG_PATH/service/${CLEAN_FROM}Service.java"
     TO_REPO_FILE="$MODULE_DIR/src/main/java/$PKG_PATH/repository/${CLEAN_TO}Repository.java"
     if [ -f "$SERVICE_FILE" ]; then
+      add_import_if_missing "$SERVICE_FILE" "$BASE_PKG.common.dto.${CLEAN_TO}Dto"
       TO_CAMEL="$(to_camel "$CLEAN_TO")"
       REPO_FIELD_NAME="${TO_CAMEL}Repository"
       python3 -c "
