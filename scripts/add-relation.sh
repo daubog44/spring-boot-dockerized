@@ -31,8 +31,94 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$SERVICE" ] || [ -z "$FROM" ] || [ -z "$TO" ]; then
-  echo "Uso: task add-relation SERVICE=<modulo> FROM=<Entita1> TO=<Entita2> [TYPE=many-to-one|one-to-many|many-to-many|one-to-one] [FIELD=<nomeCampo>]" >&2
-  exit 1
+  if [ ! -t 0 ]; then
+    echo "Uso: task add-relation SERVICE=<modulo> FROM=<Entita1> TO=<Entita2> [TYPE=many-to-one|one-to-many|many-to-many|one-to-one] [FIELD=<nomeCampo>]" >&2
+    exit 1
+  fi
+
+  if [ -z "$SERVICE" ]; then
+    JPA_MODULES=()
+    for d in "$DEMO_DIR"/*; do
+      if [ -f "$d/pom.xml" ] && grep -q 'spring-boot-starter-data-jpa' "$d/pom.xml"; then
+        JPA_MODULES+=("$(basename "$d")")
+      fi
+    done
+    if [ "${#JPA_MODULES[@]}" -eq 0 ]; then
+      echo "Non ci sono moduli con JPA (database) in demo/. Creane uno con task new-service." >&2
+      exit 1
+    fi
+    echo ""
+    echo "Seleziona il microservizio con le entita':"
+    for i in "${!JPA_MODULES[@]}"; do
+      echo "  $((i+1))) ${JPA_MODULES[$i]}"
+    done
+    printf "  [1] > "
+    read -r IDX
+    [ -n "$IDX" ] || IDX=1
+    SERVICE="${JPA_MODULES[$((IDX-1))]}"
+  fi
+
+  MODULE_DIR="$DEMO_DIR/$SERVICE"
+  [ -f "$MODULE_DIR/pom.xml" ] || { echo "Non trovo il modulo '$SERVICE' in demo/." >&2; exit 1; }
+  PKG="$(sb_module_package "$SERVICE")"
+  PKG_PATH="$(printf '%s' "$PKG" | tr '.' '/')"
+  ENTITY_DIR="$MODULE_DIR/src/main/java/$PKG_PATH/entity"
+  [ -d "$ENTITY_DIR" ] || { echo "Non trovo la cartella entity in $SERVICE ($ENTITY_DIR). Crea prima le entita' con task new-entity." >&2; exit 1; }
+
+  EXISTING_ENTITIES=()
+  for ef in "$ENTITY_DIR"/*Entity.java; do
+    [ -f "$ef" ] || continue
+    bname="$(basename "$ef")"
+    EXISTING_ENTITIES+=("${bname%Entity.java}")
+  done
+
+  if [ "${#EXISTING_ENTITIES[@]}" -lt 2 ]; then
+    echo "Nel modulo '$SERVICE' ci sono meno di 2 entita'. Crea almeno due entita' con task new-entity prima di collegarle." >&2
+    exit 1
+  fi
+
+  if [ -z "$FROM" ]; then
+    echo ""
+    echo "Scegli l'entita' di partenza (FROM):"
+    for i in "${!EXISTING_ENTITIES[@]}"; do
+      echo "  $((i+1))) ${EXISTING_ENTITIES[$i]}"
+    done
+    printf "  [1] > "
+    read -r IDX
+    [ -n "$IDX" ] || IDX=1
+    FROM="${EXISTING_ENTITIES[$((IDX-1))]}"
+  fi
+
+  if [ -z "$TO" ]; then
+    CANDIDATES=()
+    for e in "${EXISTING_ENTITIES[@]}"; do
+      [ "$e" != "$FROM" ] && CANDIDATES+=("$e")
+    done
+    echo ""
+    echo "Scegli l'entita' di arrivo (TO):"
+    for i in "${!CANDIDATES[@]}"; do
+      echo "  $((i+1))) ${CANDIDATES[$i]}"
+    done
+    printf "  [1] > "
+    read -r IDX
+    [ -n "$IDX" ] || IDX=1
+    TO="${CANDIDATES[$((IDX-1))]}"
+  fi
+
+  echo ""
+  echo "Tipo di relazione (1: many-to-one [default], 2: one-to-many, 3: many-to-many, 4: one-to-one):"
+  echo "  1) many-to-one"
+  echo "  2) one-to-many"
+  echo "  3) many-to-many"
+  echo "  4) one-to-one"
+  printf "  [1] > "
+  read -r T_IDX
+  case "$T_IDX" in
+    2) TYPE="one-to-many" ;;
+    3) TYPE="many-to-many" ;;
+    4) TYPE="one-to-one" ;;
+    *) TYPE="many-to-one" ;;
+  esac
 fi
 
 MODULE_DIR="$DEMO_DIR/$SERVICE"

@@ -47,7 +47,38 @@ $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
 
 if (-not $Service) {
-    throw "Uso: task new-auth SERVICE=<modulo> [TYPE=inmemory|db|form]"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task new-auth SERVICE=<modulo> [TYPE=inmemory|db|form]"
+    }
+
+    $allModules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object {
+        (Test-Path (Join-Path $_.FullName 'pom.xml')) -and ($_.Name -ne 'common-dto')
+    } | Select-Object -ExpandProperty Name)
+
+    if ($allModules.Count -eq 0) {
+        throw "Non ci sono moduli in demo/."
+    }
+
+    Write-Host ''
+    Write-Host 'CONFIGURAZIONE SICUREZZA (SPRING SECURITY) GUIDATA' -ForegroundColor Cyan
+    Write-Host "Seleziona il modulo in cui configurare la sicurezza:" -ForegroundColor DarkGray
+    for ($i = 0; $i -lt $allModules.Count; $i++) {
+        Write-Host "  $($i + 1)) $($allModules[$i])"
+    }
+    $idx = Read-Host "  [1] >"
+    $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
+    $Service = $allModules[$idxNum - 1]
+
+    if (-not $Type) {
+        $modPom = Read-TextFile (Join-Path (Join-Path $demoDir $Service) 'pom.xml')
+        $isUi = $modPom -match 'spring-boot-starter-thymeleaf'
+        $defaultType = if ($isUi) { 'form' } else { 'inmemory' }
+        Write-Host "Modalita' di autenticazione: [1] inmemory (Basic Auth per REST), [2] db (tabella utenti + BCrypt), [3] form (login web HTML)" -ForegroundColor DarkGray
+        $tAns = (Read-Host "  [Default: $defaultType] >").Trim()
+        if ($tAns -eq '1') { $Type = 'inmemory' }
+        elseif ($tAns -eq '2') { $Type = 'db' }
+        elseif ($tAns -eq '3') { $Type = 'form' }
+    }
 }
 
 $moduleDir = Join-Path $demoDir $Service

@@ -28,8 +28,52 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$MODULE" ] || [ -z "$PORT" ]; then
-  echo "Uso: task set-port SERVICE=<modulo> PORT=<porta>" >&2
-  exit 1
+  if [ ! -t 0 ]; then
+    echo "Uso: task set-port SERVICE=<modulo> PORT=<porta>" >&2
+    exit 1
+  fi
+
+  ALL_MODULES=()
+  for d in "$DEMO_DIR"/*; do
+    if [ -f "$d/pom.xml" ]; then
+      ALL_MODULES+=("$(basename "$d")")
+    fi
+  done
+  if [ "${#ALL_MODULES[@]}" -eq 0 ]; then
+    echo "Nessun modulo trovato in demo/." >&2
+    exit 1
+  fi
+
+  echo ""
+  echo "CAMBIO PORTA GUIDATA"
+  if [ -z "$MODULE" ]; then
+    echo "Seleziona il modulo di cui cambiare la porta:"
+    for i in "${!ALL_MODULES[@]}"; do
+      m="${ALL_MODULES[$i]}"
+      mYml="$DEMO_DIR/$m/src/main/resources/application.yml"
+      currPort="?"
+      if [ -f "$mYml" ]; then
+        currPort="$(grep -oE 'SERVER_PORT:[0-9]+' "$mYml" | head -n 1 | cut -d: -f2 || true)"
+        [ -n "$currPort" ] || currPort="?"
+      fi
+      echo "  $((i+1))) $m (porta attuale: $currPort)"
+    done
+    printf "  [1] > "
+    read -r IDX
+    [ -n "$IDX" ] || IDX=1
+    MODULE="${ALL_MODULES[$((IDX-1))]}"
+  fi
+
+  if [ -z "$PORT" ]; then
+    printf "  Nuova porta per %s: " "$MODULE"
+    read -r P_INPUT
+    if [[ "$P_INPUT" =~ ^[0-9]+$ ]]; then
+      PORT="$P_INPUT"
+    else
+      echo "Uso: task set-port SERVICE=<modulo> PORT=<porta>" >&2
+      exit 1
+    fi
+  fi
 fi
 
 YML="$DEMO_DIR/$MODULE/src/main/resources/application.yml"

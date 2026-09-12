@@ -45,7 +45,20 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
-if (-not $Nome) { $Nome = 'CONSEGNA' }
+if (-not $Nome) {
+    if (-not [Console]::IsInputRedirected) {
+        Write-Host ''
+        Write-Host 'PREPARAZIONE CONSEGNA' -ForegroundColor Cyan
+        $n = Read-Host "Inserisci il tuo COGNOME_NOME (o premi Invio per 'CONSEGNA')"
+        if ($n -and $n.Trim()) {
+            $Nome = $n.Trim()
+        } else {
+            $Nome = 'CONSEGNA'
+        }
+    } else {
+        $Nome = 'CONSEGNA'
+    }
+}
 if (-not $OutDir) { $OutDir = Join-Path $repoRoot 'consegna' }
 
 Write-Host ''

@@ -1,6 +1,6 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 13:42',
+  generato: '2026-09-12 13:55',
   progetto: {
     cartella: 'demo',
     pacchetto: 'com.example.ttfcloud_esame',
@@ -498,6 +498,8 @@ Crea il file in \`demo/common-dto/src/main/java/esame/common/dto/\` come Java \`
 moderno con le annotazioni di validazione (\`@NotNull\`, \`@NotBlank\`, \`@Email\`, \`@Min\`, \`@Max\`).
 Se preferisci una classe classica con getter e setter Lombok, aggiungi \`CLASS=1\`.
 
+> 💡 **Modalità Interattiva**: puoi anche lanciare \`task new-dto\` senza parametri. Un comodo wizard ti chiederà nome del record, campi da inserire e se preferisci un record o una classe!
+
 
 Il record è la forma giusta per un DTO: immutabile, con costruttore,
 accessori, \`equals\` e \`toString\` già fatti, e Jackson lo trasforma in JSON e
@@ -875,7 +877,9 @@ Biblioteca:
 Alla fine lancia \`task check\`. Il wizard non fa niente di magico: chiama gli
 stessi comandi che puoi dare a mano, nell'ordine giusto.
 
-## Oppure, un comando alla volta
+## Oppure, un comando alla volta (anche interattivi!)
+
+Puoi passare le variabili sulla riga di comando oppure lanciare qualsiasi comando **senza argomenti** (es. \`task new-service\`, \`task use-postgres\`): si aprirà un wizard interattivo con elenchi numerati tra cui scegliere e default intelligenti.
 
 Sono i comandi con cui è stato montato il branch \`example/biblioteca\`:
 
@@ -1041,6 +1045,8 @@ Invece di creare a mano classi, costruttori, annotazioni e interfacce, hai a dis
 \`\`\`bash
 task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):required:unique,annoPubblicazione:int,disponibile:bool
 \`\`\`
+
+> 💡 **Modalità Interattiva**: se non ricordi i parametri a memoria, puoi anche lanciare semplicemente \`task new-entity\` senza argomenti. Un wizard ti chiederà a quale modulo applicarlo, il nome dell'entità, i campi e se desideri generare anche il DTO!
 
 In un solo colpo questo comando genera quattro file sincronizzati:
 1. **\`entity/LibroEntity.java\`**: classe \`@Entity\` con \`@Table(name = "libri")\`, chiave \`@Id @GeneratedValue\`, campi con annotazioni di validazione (\`@NotBlank\`, \`@NotNull\`, ecc.) e getter/setter Lombok.
@@ -1848,6 +1854,8 @@ Puoi generare l'interfaccia \`@FeignClient\` collegata al servizio target dirett
 task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto
 \`\`\`
 
+> 💡 **Modalità Interattiva**: puoi anche lanciare semplicemente \`task new-client\` senza argomenti. Ti mostrerà l'elenco dei microservizi presenti da cui scegliere il modulo chiamante e il target, e ti chiederà il nome del DTO!
+
 Oppure, se il DTO non esiste ancora in \`common-dto\`, puoi specificare anche i campi:
 
 \`\`\`bash
@@ -2152,6 +2160,8 @@ Per non dover scrivere a mano controller, tabella, form e gestione errori:
 \`\`\`bash
 task new-view SERVICE=biblioteca-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int
 \`\`\`
+
+> 💡 **Modalità Interattiva**: puoi anche lanciare \`task new-view\` senza argomenti. Ti mostrerà i moduli UI tra cui scegliere e ti chiederà nome della vista e campi del form!
 
 Genera:
 1. \`controller/LibriUiController.java\`: controller Spring MVC con \`@GetMapping\` (elenco + form vuoto) e \`@PostMapping\` (salvataggio con \`@Valid\` e binding errori).
@@ -2697,6 +2707,8 @@ prendono con la testa fredda.
 task consegna NOME=ROSSI_MARIO
 \`\`\`
 
+> 💡 **Modalità Interattiva**: puoi anche lanciare semplicemente \`task consegna\` senza parametri: ti chiederà interattivamente il tuo \`COGNOME_NOME\` prima di impacchettare il tutto!
+
 Prima controlla che il progetto sia coerente (\`task check\`) e si ferma se non
 lo è. Poi prepara la cartella \`consegna/\`:
 
@@ -2962,6 +2974,8 @@ task new-auth SERVICE=ordini-service TYPE=db
 # Modalità 3: Form Login Web (per un modulo UI con login.html e sessioni)
 task new-auth SERVICE=store-ui TYPE=form
 \`\`\`
+
+> 💡 **Modalità Interattiva**: puoi anche lanciare \`task new-auth\` senza argomenti. Ti mostrerà l'elenco dei moduli del progetto e ti farà scegliere quale tipo di sicurezza configurare (\`inmemory\`, \`db\`, \`form\`)!
 
 ---
 
@@ -6668,6 +6682,10 @@ rispettati). Prima prova su un H2 usa-e-getta e ti dice com'è andata.
 ## 3.1 Cheat Sheet Scaffolding & Generazione Rapida
 
 Per non perdere ore a scrivere codice boilerplate e classi ripetitive durante l'esame, hai a disposizione questi comandi:
+
+> 💡 **Modalità Interattiva Senza Parametri per TUTTI i Comandi**:
+> Non ricordi i parametri a memoria? Nessun problema: **puoi lanciare qualsiasi comando senza argomenti** (es. \`task new-service\`, \`task new-entity\`, \`task add-relation\`, \`task new-client\`, \`task new-dto\`, \`task new-view\`, \`task new-auth\`, \`task new-handler\`, \`task add-dep\`, \`task set-port\`, \`task remove-service\`, \`task use-postgres\`, \`task consegna\`).
+> Ognuno di essi aprirà un **wizard interattivo da terminale** con domande passo-passo, elenchi numerati dei moduli/entità tra cui scegliere e default intelligenti!
 
 | Task | Sintassi ed Esempio | Che cosa genera |
 | :--- | :--- | :--- |

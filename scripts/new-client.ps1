@@ -44,8 +44,45 @@ $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
 
 if (-not $From -or -not $To) {
-    throw "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [PATH=<rotta>]`n" +
-          "Esempio: task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto FIELDS=id:long,titolo:string:required"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [PATH=<rotta>]`n" +
+              "Esempio: task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto FIELDS=id:long,titolo:string:required"
+    }
+
+    $allModules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object {
+        (Test-Path (Join-Path $_.FullName 'pom.xml')) -and ($_.Name -ne 'common-dto')
+    } | Select-Object -ExpandProperty Name)
+
+    if ($allModules.Count -lt 2) {
+        throw "Servono almeno due moduli in demo/ per collegare un client OpenFeign."
+    }
+
+    Write-Host ''
+    Write-Host 'CREAZIONE OPENFEIGN CLIENT GUIDATA' -ForegroundColor Cyan
+    if (-not $From) {
+        Write-Host "Seleziona il modulo CHIAMANTE (da dove parte la chiamata):" -ForegroundColor DarkGray
+        for ($i = 0; $i -lt $allModules.Count; $i++) {
+            Write-Host "  $($i + 1)) $($allModules[$i])"
+        }
+        $idx = Read-Host "  [1] >"
+        $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
+        $From = $allModules[$idxNum - 1]
+    }
+
+    if (-not $To) {
+        $targets = @($allModules | Where-Object { $_ -ne $From })
+        Write-Host "Seleziona il modulo TARGET (chi risponde):" -ForegroundColor DarkGray
+        for ($i = 0; $i -lt $targets.Count; $i++) {
+            Write-Host "  $($i + 1)) $($targets[$i])"
+        }
+        $idx = Read-Host "  [1] >"
+        $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
+        $To = $targets[$idxNum - 1]
+    }
+
+    if (-not $Dto) {
+        $Dto = (Read-Host "  Nome DTO scambiato (es. LibroDto, OrdineDto)").Trim()
+    }
 }
 
 $fromDir = Join-Path $demoDir $From

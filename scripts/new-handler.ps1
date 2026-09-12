@@ -26,7 +26,27 @@ $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
 
 if (-not $Service) {
-    throw "Uso: task new-handler SERVICE=<modulo>"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task new-handler SERVICE=<modulo>"
+    }
+
+    $allModules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object {
+        (Test-Path (Join-Path $_.FullName 'pom.xml')) -and ($_.Name -ne 'common-dto')
+    } | Select-Object -ExpandProperty Name)
+
+    if ($allModules.Count -eq 0) {
+        throw "Non ci sono moduli in demo/."
+    }
+
+    Write-Host ''
+    Write-Host 'GENERATORE GLOBAL EXCEPTION HANDLER' -ForegroundColor Cyan
+    Write-Host "Seleziona il modulo in cui inserire GlobalExceptionHandler:" -ForegroundColor DarkGray
+    for ($i = 0; $i -lt $allModules.Count; $i++) {
+        Write-Host "  $($i + 1)) $($allModules[$i])"
+    }
+    $idx = Read-Host "  [1] >"
+    $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
+    $Service = $allModules[$idxNum - 1]
 }
 
 $moduleDir = Join-Path $demoDir $Service

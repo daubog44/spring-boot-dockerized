@@ -27,7 +27,9 @@ Biblioteca:
 Alla fine lancia `task check`. Il wizard non fa niente di magico: chiama gli
 stessi comandi che puoi dare a mano, nell'ordine giusto.
 
-## Oppure, un comando alla volta
+## Oppure, un comando alla volta (anche interattivi!)
+
+Puoi passare le variabili sulla riga di comando oppure lanciare qualsiasi comando **senza argomenti** (es. `task new-service`, `task use-postgres`): si aprirà un wizard interattivo con elenchi numerati tra cui scegliere e default intelligenti.
 
 Sono i comandi con cui è stato montato il branch `example/biblioteca`:
 
