@@ -43,7 +43,8 @@ param(
     [string]$Service = '',
     [string]$Name = '',
     [string]$Fields = '',
-    [string]$Table = ''
+    [string]$Table = '',
+    [switch]$Dto
 )
 
 $ErrorActionPreference = 'Stop'
@@ -280,12 +281,152 @@ public interface ${Name}Repository extends JpaRepository<${Name}Entity, Long> {
 Write-TextFile -Path (Join-Path $repoDir "${Name}Repository.java") -Text ($repoSrc + "`n")
 Write-Step "demo/$Service/src/main/java/$packagePath/repository/${Name}Repository.java"
 
-# --- 4. Il service -----------------------------------------------------------
+# --- 4. Generazione DTO opzionale (DTO=1) ------------------------------------
 
-$setterLines = ($fieldSpecs | ForEach-Object { "        esistente.set$($_.Pascal)(dati.get$($_.Pascal)());" }) -join "`n"
-if (-not $setterLines) { $setterLines = "        // Nessun campo da FIELDS=: aggiungi qui i tuoi set..." }
+$basePkg = Get-BasePackage -RepoRoot $repoRoot
 
-$serviceSrc = @"
+if ($Dto) {
+    $dtoFields = if ($Fields -match '\bid:long\b') { $Fields } else { if ($Fields) { "id:long,$Fields" } else { "id:long" } }
+    $dtoParams = @{ Name = $Name; Fields = $dtoFields; Service = 'common-dto' }
+    & (Join-Path $PSScriptRoot 'new-dto.ps1') @dtoParams | Out-Null
+
+    $dtoName = "${Name}Dto"
+    $toDtoArgs = ($fieldSpecs | ForEach-Object { "            entity.get$($_.Pascal)()" }) -join ",`n"
+    if ($toDtoArgs) { $toDtoArgs = ",`n" + $toDtoArgs }
+
+    $toEntitySetters = ($fieldSpecs | ForEach-Object { "        entity.set$($_.Pascal)(dto.$($_.Name)());" }) -join "`n"
+    $setterLinesFromDto = ($fieldSpecs | ForEach-Object { "        esistente.set$($_.Pascal)(dati.$($_.Name)());" }) -join "`n"
+    if (-not $toEntitySetters) { $toEntitySetters = "        // Nessun campo aggiuntivo" }
+    if (-not $setterLinesFromDto) { $setterLinesFromDto = "        // Nessun campo da aggiornare" }
+
+    $serviceSrc = @"
+package $package.service;
+
+import $package.entity.${Name}Entity;
+import $package.repository.${Name}Repository;
+import $basePkg.common.dto.$dtoName;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class ${Name}Service {
+
+    private final ${Name}Repository repository;
+
+    public List<$dtoName> elenco() {
+        return repository.findAll().stream().map(${Name}Service::toDto).toList();
+    }
+
+    public $dtoName trova(Long id) {
+        return toDto(trovaEntity(id));
+    }
+
+    public $dtoName crea($dtoName nuovo) {
+        ${Name}Entity entity = toEntity(nuovo);
+        entity.setId(null);
+        return toDto(repository.save(entity));
+    }
+
+    public $dtoName aggiorna(Long id, $dtoName dati) {
+        ${Name}Entity esistente = trovaEntity(id);
+$setterLinesFromDto
+        return toDto(repository.save(esistente));
+    }
+
+    public void elimina(Long id) {
+        trovaEntity(id);
+        repository.deleteById(id);
+    }
+
+    private ${Name}Entity trovaEntity(Long id) {
+        return repository.findById(id).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "$Name " + id + " non trovato"));
+    }
+
+    // --- Mapper Entity <-> DTO ---
+
+    public static $dtoName toDto(${Name}Entity entity) {
+        if (entity == null) return null;
+        return new $dtoName(
+            entity.getId()$toDtoArgs
+        );
+    }
+
+    public static ${Name}Entity toEntity($dtoName dto) {
+        if (dto == null) return null;
+        ${Name}Entity entity = new ${Name}Entity();
+        entity.setId(dto.id());
+$toEntitySetters
+        return entity;
+    }
+}
+"@
+
+    $controllerSrc = @"
+package $package.controller;
+
+import $basePkg.common.dto.$dtoName;
+import $package.service.${Name}Service;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Tag(name = "$Name", description = "CRUD per $Name basato su DTO")
+@RestController
+@RequestMapping("/api/$routeBase")
+@RequiredArgsConstructor
+public class ${Name}Controller {
+
+    private final ${Name}Service service;
+
+    @Operation(summary = "Tutti/e")
+    @GetMapping
+    public List<$dtoName> elenco() {
+        return service.elenco();
+    }
+
+    @Operation(summary = "Per id (404 se non c'e')")
+    @GetMapping("/{id}")
+    public $dtoName perId(@PathVariable Long id) {
+        return service.trova(id);
+    }
+
+    @Operation(summary = "Crea")
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public $dtoName crea(@Valid @RequestBody $dtoName nuovo) {
+        return service.crea(nuovo);
+    }
+
+    @Operation(summary = "Aggiorna (404 se non c'e')")
+    @PutMapping("/{id}")
+    public $dtoName aggiorna(@PathVariable Long id, @Valid @RequestBody $dtoName dati) {
+        return service.aggiorna(id, dati);
+    }
+
+    @Operation(summary = "Elimina (404 se non c'e')")
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void elimina(@PathVariable Long id) {
+        service.elimina(id);
+    }
+}
+"@
+} else {
+    $setterLines = ($fieldSpecs | ForEach-Object { "        esistente.set$($_.Pascal)(dati.get$($_.Pascal)());" }) -join "`n"
+    if (-not $setterLines) { $setterLines = "        // Nessun campo da FIELDS=: aggiungi qui i tuoi set..." }
+
+    $serviceSrc = @"
 package $package.service;
 
 import $package.entity.${Name}Entity;
@@ -330,12 +471,8 @@ $setterLines
     }
 }
 "@
-Write-TextFile -Path (Join-Path $serviceDir "${Name}Service.java") -Text ($serviceSrc + "`n")
-Write-Step "demo/$Service/src/main/java/$packagePath/service/${Name}Service.java"
 
-# --- 5. Il controller ---------------------------------------------------------
-
-$controllerSrc = @"
+    $controllerSrc = @"
 package $package.controller;
 
 import $package.entity.${Name}Entity;
@@ -351,10 +488,9 @@ import java.util.List;
 
 // CRUD generato da task new-entity: aggiungi qui le regole della tua
 // traccia. Se questi dati li consuma anche un altro servizio (Feign), o non
-// vuoi esporre tutti i campi cosi' come sono in tabella, sostituisci
+// vuoi esporre tutti i campi cosi' come sono in tabella, usa DTO=1 oppure sostituisci
 // ${Name}Entity con un DTO tuo -- vedi la lezione 9 ("fuori dal servizio
-// esce il DTO, mai l'entity") e, se il DTO serve anche altrove, la
-// lezione 4 su common-dto.
+// esce il DTO, mai l'entity") e la lezione 4 su common-dto.
 @Tag(name = "$Name", description = "Generato da new-entity: descrivilo meglio")
 @RestController
 @RequestMapping("/api/$routeBase")
@@ -396,6 +532,11 @@ public class ${Name}Controller {
     }
 }
 "@
+}
+
+Write-TextFile -Path (Join-Path $serviceDir "${Name}Service.java") -Text ($serviceSrc + "`n")
+Write-Step "demo/$Service/src/main/java/$packagePath/service/${Name}Service.java"
+
 Write-TextFile -Path (Join-Path $controllerDir "${Name}Controller.java") -Text ($controllerSrc + "`n")
 Write-Step "demo/$Service/src/main/java/$packagePath/controller/${Name}Controller.java"
 

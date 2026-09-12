@@ -51,6 +51,17 @@ In un solo colpo questo comando genera quattro file sincronizzati:
 | `:required` | vincolo | `@NotNull` / `@NotBlank` + `nullable = false` |
 | `:unique` | vincolo | `unique = true` sul database |
 
+### Generazione automatica con DTO (`DTO=1`)
+
+Se aggiungi `DTO=1`:
+```bash
+task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,prezzo:decimal,disponibile:bool DTO=1
+```
+Il comando:
+1. Crea automaticamente il record immutabile `LibroDto` in `common-dto` con tutte le validazioni.
+2. Genera in `LibroService` i metodi mapper statici `toDto(entity)` e `toEntity(dto)`.
+3. Modifica `LibroController` in modo che riceva e restituisca `LibroDto` invece dell'Entity. In questo modo rispetti alla lettera la best practice "fuori dal service esce solo il DTO" ed eviti per sempre i loop di serializzazione Jackson con le relazioni bidirezionali!
+
 Dopo aver lanciato il comando, puoi aprire i file per aggiungere relazioni (`@ManyToOne`, `@OneToMany`), campi speciali (enum) o metodi di ricerca nel repository come vediamo qui sotto.
 
 ## Un'entity
@@ -225,7 +236,28 @@ private UtenteEntity utente;
    Usa solo `@Getter`, `@Setter`, `@NoArgsConstructor`.
 4. **Evita il loop JSON Jackson**: se serializzi un'entity con relazione bidirezionale,
    Jackson va in loop infinito. La soluzione pulita è **restituire sempre DTO** dai
-   controller (o mettere `@JsonIgnore` sul lato inverso).
+   controller (usa `DTO=1` in `task new-entity`!).
+
+### Configurare le relazioni in 5 secondi: `task add-relation`
+
+Invece di scrivere annotazioni, chiavi esterne e collezioni inverse a mano col rischio di dimenticare `fetch = FetchType.LAZY`, `mappedBy`, o gli import:
+
+```bash
+task add-relation SERVICE=catalogo-service FROM=Libro TO=Autore TYPE=many-to-one
+```
+
+Oppure lancialo **senza argomenti**:
+```bash
+task add-relation
+```
+Si aprirà una comoda procedura guidata nel terminale: ti chiederà in quale microservizio vuoi operare, elencherà tutte le entità rilevate e ti farà scegliere il tipo di relazione desiderata (`many-to-one`, `one-to-many`, `one-to-one`, `many-to-many`).
+
+Cosa fa per te:
+- Inserisce l'annotazione corretta con `fetch = FetchType.LAZY`.
+- Configura `@JoinColumn(name = "autore_id")` sul lato proprietario.
+- Configura il lato inverso con `mappedBy` e lista già inizializzata (`= new ArrayList<>()`).
+- Aggiunge automaticamente tutti gli `import` necessari (`jakarta.persistence.*`, `java.util.List`, ecc.).
+- Con `UNIDIRECTIONAL=1` evita di aggiungere il campo inverso se ti serve unidirezionale.
 
 ---
 
