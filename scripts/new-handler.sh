@@ -63,8 +63,8 @@ mkdir -p "$CONTROLLER_DIR"
 
 HANDLER_FILE="$CONTROLLER_DIR/GlobalExceptionHandler.java"
 if [ -e "$HANDLER_FILE" ]; then
-  echo "C'e' gia' $HANDLER_FILE." >&2
-  exit 1
+  echo "  GlobalExceptionHandler gia' presente in $SERVICE."
+  exit 0
 fi
 
 cat > "$HANDLER_FILE" <<EOF

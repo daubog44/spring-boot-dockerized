@@ -391,6 +391,17 @@ Genera le classi canoniche nello standard del progetto:
 - `OrdineService.java` con il CRUD pronto (e mapper Entity <-> DTO).
 - `OrdineController.java` con gli endpoint REST documentati in OpenAPI/Swagger.
 
+> 💡 **Nota sui moduli con database e UI ibridi**:
+> `task new-entity` elenca e accetta solo i moduli che contengono `spring-boot-starter-data-jpa` nel proprio `pom.xml`.
+> Se hai creato un modulo UI (`UI=1`) o senza DB (`NODB=1`) e la traccia richiede che gestisca tabelle proprie (es. `cup-ui` con slot e medici locali), puoi abilitare JPA e H2 in un attimo:
+> ```bash
+> task add-dep SERVICE=cup-ui DEPS=data-jpa,h2
+> ```
+> Appena eseguito, il modulo comparirà automaticamente nell'elenco di `task new-entity`.
+
+> 💡 **Gestione errori REST di default**:
+> Ogni volta che crei un nuovo microservizio REST con `task new-service`, viene generato automaticamente `GlobalExceptionHandler.java` (`@RestControllerAdvice`), pronto a intercettare errori `@Valid` (restituendo HTTP 400 con la mappa dettagliata dei campi), `ResponseStatusException` (es. 404) ed eccezioni generiche (500). Sui moduli UI (`UI=1`) non viene generato di default per non restituire JSON al posto dei template Thymeleaf.
+
 ### Collegare le relazioni JPA: task add-relation
 
 Per collegare due tabelle dello stesso database relazionale:

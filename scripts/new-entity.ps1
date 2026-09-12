@@ -67,13 +67,15 @@ if (-not $Service -or -not $Name) {
     } | Select-Object -ExpandProperty Name)
 
     if ($jpaModules.Count -eq 0) {
-        throw "Non ci sono moduli con JPA (database) in demo/. Creane uno con task new-service."
+        throw "Non ci sono moduli con JPA (database) in demo/. Creane uno con task new-service, oppure aggiungi JPA a un modulo esistente:`n" +
+              "  task add-dep SERVICE=<nome> DEPS=data-jpa,h2"
     }
 
     Write-Host ''
     Write-Host 'CREAZIONE ENTITY GUIDATA' -ForegroundColor Cyan
     if (-not $Service) {
-        Write-Host "Seleziona il microservizio con database:" -ForegroundColor DarkGray
+        Write-Host "Seleziona il microservizio con database (mostrati solo i moduli con spring-boot-starter-data-jpa):" -ForegroundColor DarkGray
+        Write-Host "  (Se manca un servizio UI o creato con NODB=1, abilitalo con: task add-dep SERVICE=<nome> DEPS=data-jpa,h2)" -ForegroundColor DarkGray
         for ($i = 0; $i -lt $jpaModules.Count; $i++) {
             Write-Host "  $($i + 1)) $($jpaModules[$i])"
         }
@@ -111,8 +113,9 @@ if (-not (Test-Path (Join-Path $moduleDir 'pom.xml'))) {
 }
 $pomText = Read-TextFile (Join-Path $moduleDir 'pom.xml')
 if ($pomText -notmatch 'spring-boot-starter-data-jpa') {
-    throw "'$Service' non ha un database (creato con NODB=1 o UI=1): niente JPA, niente entity. " +
-          "Rifallo senza NODB, o aggiungi a mano spring-boot-starter-data-jpa, h2, postgresql e validation al suo pom.xml."
+    throw "'$Service' non ha un database configurato (creato con NODB=1 o UI=1): niente JPA, niente entity.`n" +
+          "Per abilitare le Entity su questo servizio aggiungi JPA ed H2:`n" +
+          "  task add-dep SERVICE=$Service DEPS=data-jpa,h2"
 }
 
 $package = Get-ModulePackage -Module $Service
