@@ -26,7 +26,7 @@
 
 .EXAMPLE
     task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto
-    task new-client FROM=event-ui TO=store-service PATH=/api/suggerimenti
+    task new-client FROM=event-ui TO=store-service ROUTE=/api/suggerimenti
 #>
 param(
     [string]$From = '',
@@ -45,7 +45,7 @@ $demoDir = Join-Path $repoRoot 'demo'
 
 if (-not $From -or -not $To) {
     if ([Console]::IsInputRedirected) {
-        throw "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [PATH=<rotta>]`n" +
+        throw "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [ROUTE=<rotta>]`n" +
               "Esempio: task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto FIELDS=id:long,titolo:string:required"
     }
 

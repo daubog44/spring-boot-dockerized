@@ -32,7 +32,7 @@ done
 
 if [ -z "$FROM" ] || [ -z "$TO" ]; then
   if [ ! -t 0 ]; then
-    echo "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [PATH=<rotta>]" >&2
+    echo "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [ROUTE=<rotta>]" >&2
     exit 1
   fi
 
