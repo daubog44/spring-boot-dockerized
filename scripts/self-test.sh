@@ -707,6 +707,31 @@ printf '%s' "$TOOL_OUT" | grep -qE 'ordine_entity_etichette [1-9]' || fail "l'@E
 assert_out_contains "veicolo_entity 24"
 end_case
 
+start_case "seed-data SQL=1 scrive un data.sql vero, con INSERT semplici"
+run_tool new-service.sh --name sqlseed-service
+assert_ok "new-service sqlseed-service"
+run_tool new-entity.sh --service sqlseed-service --name Editore --fields 'nome:string(80):required'
+assert_ok "new-entity Editore"
+run_tool new-entity.sh --service sqlseed-service --name Volume --fields 'titolo:string(150):required,prezzo:decimal,uscita:date,attivo:bool:required'
+assert_ok "new-entity Volume"
+run_tool add-relation.sh --service sqlseed-service --from Volume --to Editore --type many-to-one
+assert_ok "add-relation Volume -> Editore"
+run_tool seed-data.sh --module sqlseed-service --rows 3 --sql
+assert_ok "seed-data SQL=1" &&
+  { case "$TOOL_OUT" in *"data.sql  scritto"*) : ;; *) fail "non conferma di aver scritto data.sql" ;; esac; }
+SQLSEED_SQL="$DEMO/sqlseed-service/src/main/resources/data.sql"
+SQLSEED_YML="$DEMO/sqlseed-service/src/main/resources/application.yml"
+[ -f "$SQLSEED_SQL" ] || fail "manca data.sql"
+head -n 1 "$SQLSEED_SQL" | grep -q "data.sql generato da task seed-data SQL=1" || fail "manca l'intestazione che lo marca come generato"
+[ "$(grep -c '^INSERT INTO editore' "$SQLSEED_SQL")" = "3" ] || fail "non ci sono 3 INSERT su editore"
+[ "$(grep -c '^INSERT INTO volume' "$SQLSEED_SQL")" = "3" ] || fail "non ci sono 3 INSERT su volume"
+[ "$(grep -n '^INSERT INTO editore' "$SQLSEED_SQL" | head -n 1 | cut -d: -f1)" -lt "$(grep -n '^INSERT INTO volume' "$SQLSEED_SQL" | head -n 1 | cut -d: -f1)" ] \
+  || fail "editore (a cui volume punta con una chiave esterna) non viene prima nel file"
+assert_contains "demo/sqlseed-service/src/main/resources/application.yml" "defer-datasource-initialization: true" "manca defer-datasource-initialization"
+assert_contains "demo/sqlseed-service/src/main/resources/application.yml" "mode: always" "manca sql.init.mode"
+assert_contains "demo/sqlseed-service/src/main/resources/application.yml" "rows: 0" "dev-data.rows non e' stato spento dopo aver scritto data.sql"
+end_case
+
 start_case "db-schema legge tabelle, chiavi e vincoli dal database"
 # Senza --no-build: sui branch svolti ci sono altri moduli con delle entity,
 # che seed-data (limitato ad alfa-service) non ha compilato.
@@ -825,6 +850,17 @@ else
   grep -q 'Scompatta ogni archivio' "$DEST/ISTRUZIONI-ESECUZIONE.md" && fail "le istruzioni chiedono ancora di ricomporre il progetto"
   rm -rf "$DEST"
 fi
+case "$TOOL_OUT" in *"ATTENZIONE"*"data.sql"*) : ;; *) fail "non avvisa che manca un data.sql, con le entity senza" ;; esac
+end_case
+
+start_case "consegna non avvisa per un modulo che ha gia' un data.sql"
+mkdir -p "$SANDBOX/demo/alfa-service/src/main/resources"
+printf -- '-- dati veri per la traccia\nINSERT INTO libro (titolo) VALUES (%s);\n' "'Prova'" >"$SANDBOX/demo/alfa-service/src/main/resources/data.sql"
+run_tool consegna.sh --nome ROSSI_MARIO
+assert_ok "consegna con data.sql" &&
+  { ATTN_LINE="$(printf '%s\n' "$TOOL_OUT" | grep 'ATTENZIONE: nessun data.sql' || true)";
+    case "$ATTN_LINE" in *alfa-service*) fail "avvisa anche per alfa-service, che ha gia' un data.sql" ;; *) : ;; esac; }
+rm -f "$SANDBOX/demo/alfa-service/src/main/resources/data.sql"
 end_case
 
 # Prima la consegna faceva l'archivio e poi diceva di riempire l'allegato:

@@ -180,7 +180,7 @@ final class SchemaWriter {
     // Modello logico: dal database
     // =========================================================================
 
-    private static final class Column {
+    static final class Column {
         String name;
         String type;
         boolean nullable;
@@ -194,7 +194,7 @@ final class SchemaWriter {
         final List<String> notes = new ArrayList<>();
     }
 
-    private static final class Table {
+    static final class Table {
         String name;
         String raw;
         final List<Column> columns = new ArrayList<>();
@@ -211,7 +211,7 @@ final class SchemaWriter {
     private record AttributeInfo(Class<?> javaType, boolean ordinal, int length, String generation, int order) {
     }
 
-    private List<Table> readDatabase(List<EntityType<?>> entities) throws SQLException {
+    List<Table> readDatabase(List<EntityType<?>> entities) throws SQLException {
         List<Table> tables = new ArrayList<>();
         try (Connection c = dataSource.getConnection()) {
             DatabaseMetaData md = c.getMetaData();

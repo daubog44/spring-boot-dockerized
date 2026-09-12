@@ -21,15 +21,24 @@ DEMO_DIR="$REPO_ROOT/demo"
 MODULE=""
 ROWS=5
 CHECK=1
+SQL=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -Module|--module) MODULE="$2"; shift 2 ;;
     -Rows|--rows) ROWS="$2"; shift 2 ;;
     -NoCheck|--no-check) CHECK=0; shift ;;
+    -Sql|--sql) SQL=1; shift ;;
     *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
   esac
 done
 case "$ROWS" in ''|*[!0-9]*) echo "ROWS deve essere un numero (0 spegne i dati di prova)." >&2; exit 1 ;; esac
+if [ "$SQL" = "1" ]; then
+  if [ "$ROWS" -eq 0 ]; then
+    echo "SQL=1 genera righe da scrivere in un data.sql: ROWS=0 non ha senso insieme." >&2
+    exit 1
+  fi
+  CHECK=1
+fi
 
 # "nome|entity|h2" dei moduli da configurare.
 TARGETS=()
@@ -107,6 +116,8 @@ if [ -z "$LIST" ]; then
   exit 0
 fi
 
+SQL_MARKER="-- data.sql generato da task seed-data SQL=1"
+
 echo "==> Prova su un database H2 usa-e-getta"
 echo "  compilo con Maven..."
 WORK="$(mktemp -d)"
@@ -129,9 +140,30 @@ for row in "${TARGETS[@]}"; do
     echo "    senza H2 non c'e' un database usa-e-getta per provare: la prova vera sara' al prossimo avvio"
     continue
   fi
-  devdata_run "$DEMO_DIR" "$name" 1 "$WORK/$name.log" "--dev-data.rows=$ROWS"
+  dataSqlPath="$DEMO_DIR/$name/src/main/resources/data.sql"
+  if [ "$SQL" = "1" ] && [ -f "$dataSqlPath" ] && ! head -n 1 "$dataSqlPath" | grep -qF "$SQL_MARKER"; then
+    echo "    ha gia' un data.sql scritto a mano: non lo tocco (SQL=1 rigenera solo quello che ha scritto lui)"
+    continue
+  fi
+  EXTRA_ARGS=()
+  [ "$SQL" = "1" ] && EXTRA_ARGS+=("--dev-data.sql-out=$(native_path "$WORK/$name-data.sql")")
+  devdata_run "$DEMO_DIR" "$name" 1 "$WORK/$name.log" "--dev-data.rows=$ROWS" "${EXTRA_ARGS[@]}"
   code=$?
-  devdata_report "$name" "$code" "$WORK/$name.log" || FAILED=$((FAILED + 1))
+  if devdata_report "$name" "$code" "$WORK/$name.log"; then
+    if [ "$SQL" = "1" ] && [ -s "$WORK/$name-data.sql" ]; then
+      {
+        echo "$SQL_MARKER: sopravvive a task consegna (che invece toglie devdata)."
+        echo "-- Rigeneralo con: task seed-data SQL=1 SERVICE=$name"
+        echo ""
+        cat "$WORK/$name-data.sql"
+      } >"$dataSqlPath"
+      ensure_sql_init "$DEMO_DIR/$name/src/main/resources/application.yml"
+      set_devdata_rows "$DEMO_DIR/$name/src/main/resources/application.yml" 0
+      echo "    $name/src/main/resources/data.sql  scritto (righe fisse: da qui devdata resta spento, dev-data.rows: 0)"
+    fi
+  else
+    FAILED=$((FAILED + 1))
+  fi
 done
 echo ""
 

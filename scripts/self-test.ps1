@@ -821,6 +821,34 @@ Test-Case 'seed-data riempie ogni tabella passando da Hibernate (Maven + H2)' {
     Assert-Contains $r.Output 'veicolo_entity 24' 'le due sottoclassi non hanno 12 righe ciascuna'
 }
 
+Test-Case 'seed-data SQL=1 scrive un data.sql vero, con INSERT semplici' {
+    Assert-Ok (Invoke-Tool 'new-service.ps1' @('-Name', 'sqlseed-service')) 'new-service sqlseed-service e'' fallito'
+    Assert-Ok (Invoke-Tool 'new-entity.ps1' @('-Service', 'sqlseed-service', '-Name', 'Editore', '-Fields', 'nome:string(80):required')) 'new-entity Editore e'' fallito'
+    Assert-Ok (Invoke-Tool 'new-entity.ps1' @('-Service', 'sqlseed-service', '-Name', 'Volume', '-Fields', 'titolo:string(150):required,prezzo:decimal,uscita:date,attivo:bool:required')) 'new-entity Volume e'' fallito'
+    Assert-Ok (Invoke-Tool 'add-relation.ps1' @('-Service', 'sqlseed-service', '-From', 'Volume', '-To', 'Editore', '-Type', 'many-to-one')) 'add-relation Volume -> Editore e'' fallito'
+
+    $r = Invoke-Tool 'seed-data.ps1' @('-Module', 'sqlseed-service', '-Rows', '3', '-Sql')
+    Assert-Ok $r 'seed-data SQL=1 e'' fallito'
+    Assert-Contains $r.Output 'data.sql  scritto' 'non conferma di aver scritto data.sql'
+
+    $sqlPath = Join-Path $demo 'sqlseed-service/src/main/resources/data.sql'
+    Assert-That (Test-Path $sqlPath) 'manca data.sql'
+    $sqlLines = @(Get-Content $sqlPath)
+    Assert-That ($sqlLines[0] -match 'data\.sql generato da task seed-data SQL=1') 'manca l''intestazione che lo marca come generato'
+    $editoreLines = @($sqlLines | Where-Object { $_ -match '^INSERT INTO editore' })
+    $volumeLines = @($sqlLines | Where-Object { $_ -match '^INSERT INTO volume' })
+    Assert-That ($editoreLines.Count -eq 3) 'non ci sono 3 INSERT su editore'
+    Assert-That ($volumeLines.Count -eq 3) 'non ci sono 3 INSERT su volume'
+    $editoreIdx = [array]::IndexOf($sqlLines, $editoreLines[0])
+    $volumeIdx = [array]::IndexOf($sqlLines, $volumeLines[0])
+    Assert-That ($editoreIdx -lt $volumeIdx) 'editore (a cui volume punta con una chiave esterna) non viene prima nel file'
+
+    $yml = Get-Text 'demo/sqlseed-service/src/main/resources/application.yml'
+    Assert-Contains $yml 'defer-datasource-initialization: true' 'manca defer-datasource-initialization'
+    Assert-Contains $yml 'mode: always' 'manca sql.init.mode'
+    Assert-Contains $yml 'rows: 0' 'dev-data.rows non e'' stato spento dopo aver scritto data.sql'
+}
+
 Test-Case 'db-schema legge tabelle, chiavi e vincoli dal database' {
     # Senza -NoBuild: sui branch svolti ci sono altri moduli con delle entity,
     # che seed-data (limitato ad alfa-service) non ha compilato.
@@ -913,7 +941,9 @@ Test-Case 'learn raccoglie lezioni, guide e moduli in contenuti.js' {
 }
 
 Test-Case 'consegna prepara un archivio che parte appena scompattato' {
-    Assert-Ok (Invoke-Tool 'consegna.ps1' @('-Nome', 'ROSSI_MARIO')) 'consegna e'' fallita'
+    $r = Invoke-Tool 'consegna.ps1' @('-Nome', 'ROSSI_MARIO')
+    Assert-Ok $r 'consegna e'' fallita'
+    Assert-Contains $r.Output 'ATTENZIONE: nessun data.sql trovato per' 'non avvisa che manca un data.sql, con le entity senza'
     $zip = Join-Path $sandbox 'consegna/ROSSI_MARIO.zip'
     Assert-That (Test-Path $zip) 'manca consegna/ROSSI_MARIO.zip'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -947,6 +977,19 @@ Test-Case 'consegna prepara un archivio che parte appena scompattato' {
         Assert-NotContains (Read-TextFile (Join-Path $dest 'ISTRUZIONI-ESECUZIONE.md')) 'Scompatta ogni archivio' 'le istruzioni chiedono ancora di ricomporre il progetto'
     } finally {
         Remove-Item -Recurse -Force $dest -ErrorAction SilentlyContinue
+    }
+}
+
+Test-Case 'consegna non avvisa per un modulo che ha gia'' un data.sql' {
+    $dataSql = Join-Path $demo 'alfa-service/src/main/resources/data.sql'
+    Write-TextFile -Path $dataSql -Text "-- dati veri per la traccia`nINSERT INTO libro (titolo) VALUES ('Prova');`n"
+    try {
+        $r = Invoke-Tool 'consegna.ps1' @('-Nome', 'ROSSI_MARIO')
+        Assert-Ok $r 'consegna con data.sql e'' fallita'
+        $attnLine = @($r.Output -split "`n" | Where-Object { $_ -match 'ATTENZIONE: nessun data.sql' })
+        Assert-That (($attnLine.Count -eq 0) -or ($attnLine[0] -notmatch 'alfa-service')) 'avvisa anche per alfa-service, che ha gia'' un data.sql'
+    } finally {
+        Remove-Item -Force $dataSql -ErrorAction SilentlyContinue
     }
 }
 

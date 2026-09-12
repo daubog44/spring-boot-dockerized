@@ -129,6 +129,12 @@ tasks:
       Chi corregge scompatta <NOME>.zip e lancia `docker compose up --build`:
       dentro non ci sono altri archivi da aprire.
 
+      Toglie anche ogni traccia del template (il pacchetto devdata di
+      task seed-data e la riga dev-data: rows: da ogni application.yml):
+      nella consegna deve restare solo codice tuo. Questo vuol dire che
+      senza un data.sql scritto da te, la consegna ha le tabelle vuote --
+      te lo segnala se lo dimentichi (vedi GIORNO-ESAME.md).
+
       Le parti da scrivere a mano (analisi, algoritmo, che cosa fa ogni
       modulo, risposte teoriche) stanno in allegato.md, nella cartella del
       progetto: la prima consegna lo crea con i titoli pronti, le altre ne
@@ -695,18 +701,39 @@ tasks:
         SERVICE=<modulo>   un modulo solo (default: tutti quelli con @Entity)
         ROWS=<numero>      quante righe per tabella (default 5; 0 = spento)
         CHECK=0            scrive solo la configurazione, senza la prova
+        SQL=1              scrive le righe in un data.sql vero (vedi sotto)
 
       Esempi:
         task seed-data
         task seed-data SERVICE=ordini-service ROWS=10
         task seed-data ROWS=0
+        task seed-data SQL=1
 
       Un data.sql scritto da te continua a valere: le tabelle che riempie lui
       non vengono toccate.
+
+      task consegna toglie devdata (nel zip finale deve restare solo codice
+      tuo): senza un data.sql, la consegna ha le tabelle vuote. SQL=1 genera
+      quel data.sql da solo -- stesse righe di sempre, ma come INSERT SQL
+      semplici (nessuna sintassi di un motore in particolare), lette dal
+      database dopo che Seeder le ha scritte: quello che sopravvive alla
+      consegna e' un file SQL indistinguibile da uno scritto a mano, non
+      codice del template. Spegne anche dev-data.rows sul modulo (le righe
+      ora sono fisse) e aggiunge le due chiavi che servono perche' il
+      data.sql giri dopo Hibernate, anche su PostgreSQL:
+
+        spring:
+          jpa:
+            defer-datasource-initialization: true
+          sql:
+            init:
+              mode: always
+
+      Se il modulo ha gia' un data.sql scritto a mano, SQL=1 non lo tocca.
     env:
       JAVA_HOME: '{{.JAVA_HOME_PATH}}'
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/seed-data.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .ROWS}} -Rows {{.ROWS}}{{end}}{{if .CHECK}}{{if eq .CHECK "0"}} -NoCheck{{end}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/seed-data.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .ROWS}} --rows {{.ROWS}}{{end}}{{if .CHECK}}{{if eq .CHECK "0"}} --no-check{{end}}{{end}} {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/seed-data.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .ROWS}} -Rows {{.ROWS}}{{end}}{{if .CHECK}}{{if eq .CHECK "0"}} -NoCheck{{end}}{{end}}{{if .SQL}} -Sql{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/seed-data.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .ROWS}} --rows {{.ROWS}}{{end}}{{if .CHECK}}{{if eq .CHECK "0"}} --no-check{{end}}{{end}}{{if .SQL}} --sql{{end}} {{.CLI_ARGS}}{{end}}'
 
   ide-sync:
     desc: "Riallinea VS Code e Zed ai moduli veri del progetto (task ide-sync)"

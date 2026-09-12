@@ -30,16 +30,26 @@
 .PARAMETER NoCheck
     Scrive solo la configurazione, senza compilare ne' provare.
 
+.PARAMETER Sql
+    Scrive le righe generate in un data.sql vero e proprio (invece che solo
+    in dev-data.rows): quello sopravvive a task consegna, che toglie devdata.
+
 .EXAMPLE
     task seed-data
     task seed-data SERVICE=ordini-service ROWS=10
     task seed-data ROWS=0
+    task seed-data SQL=1
 #>
 param(
     [string]$Module = '',
     [int]$Rows = 5,
-    [switch]$NoCheck
+    [switch]$NoCheck,
+    [switch]$Sql
 )
+if ($Sql) {
+    if ($Rows -le 0) { throw "SQL=1 genera righe da scrivere in un data.sql: ROWS=0 non ha senso insieme." }
+    $NoCheck = $false
+}
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'scaffold-lib.ps1')
@@ -123,6 +133,7 @@ if ($build.ExitCode -ne 0) {
     exit 1
 }
 
+$sqlMarker = '-- data.sql generato da task seed-data SQL=1'
 $failed = 0
 foreach ($target in $toCheck) {
     Write-Host ''
@@ -131,8 +142,33 @@ foreach ($target in $toCheck) {
         Write-Host '    senza H2 non c''e'' un database usa-e-getta per provare: la prova vera sara'' al prossimo avvio' -ForegroundColor Yellow
         continue
     }
-    $result = Invoke-DevDataRun -Module $target -Arguments @("--dev-data.rows=$Rows")
-    if (-not (Write-DevDataResult -Result $result)) { $failed++ }
+    $dataSqlPath = Join-Path $target.Dir 'src/main/resources/data.sql'
+    if ($Sql -and (Test-Path $dataSqlPath) -and ((Read-TextFile $dataSqlPath) -notmatch [regex]::Escape($sqlMarker))) {
+        Write-Host '    ha gia'' un data.sql scritto a mano: non lo tocco (SQL=1 rigenera solo quello che ha scritto lui)' -ForegroundColor Yellow
+        continue
+    }
+    $extraArgs = @("--dev-data.rows=$Rows")
+    $sqlOutPath = ''
+    if ($Sql) {
+        $sqlOutPath = Join-Path ([System.IO.Path]::GetTempPath()) ('devdata-sql-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.sql')
+        $extraArgs += "--dev-data.sql-out=$sqlOutPath"
+    }
+    $result = Invoke-DevDataRun -Module $target -Arguments $extraArgs
+    $ok = Write-DevDataResult -Result $result
+    if (-not $ok) { $failed++ }
+    if ($ok -and $Sql -and (Test-Path $sqlOutPath) -and ((Get-Item $sqlOutPath).Length -gt 0)) {
+        $generated = Read-TextFile $sqlOutPath
+        $header = @(
+            "${sqlMarker}: sopravvive a task consegna (che invece toglie devdata)."
+            "-- Rigeneralo con: task seed-data SQL=1 SERVICE=$($target.Name)"
+            ''
+        ) -join "`n"
+        Write-TextFile -Path $dataSqlPath -Text ($header + $generated)
+        Remove-Item $sqlOutPath -Force -ErrorAction SilentlyContinue
+        Ensure-SqlInit -YmlPath (Join-Path $target.Dir 'src/main/resources/application.yml')
+        Set-DevDataRows -YmlPath (Join-Path $target.Dir 'src/main/resources/application.yml') -Rows 0
+        Write-Step ($target.Name + '/src/main/resources/data.sql  scritto (righe fisse: da qui devdata resta spento, dev-data.rows: 0)')
+    }
 }
 Write-Host ''
 

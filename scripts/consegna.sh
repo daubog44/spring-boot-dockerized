@@ -127,6 +127,28 @@ for yml in "$OUT_DIR"/*/src/main/resources/application.yml; do
 done
 echo "  pulizia consegna: rimosse classi del template (devdata) e configurazioni interne"
 
+# --- Avviso: senza un data.sql tuo, questa consegna ha le tabelle vuote -------
+# seed-data (devdata) e' uno strumento di sviluppo: sopra lo abbiamo appena
+# tolto apposta. Se nessun modulo ha un data.sql scritto a mano, chi apre
+# questa consegna vede tabelle vuote -- e i dati di prova valgono punti.
+MISSING_DATA=""
+for m in $MODULES; do
+  src="$OUT_DIR/$m/src/main/java"
+  [ -d "$src" ] || continue
+  grep -rlE '^[[:space:]]*@(jakarta\.persistence\.)?Entity\b' "$src" >/dev/null 2>&1 || continue
+  [ -f "$OUT_DIR/$m/src/main/resources/data.sql" ] || MISSING_DATA="$MISSING_DATA $m"
+done
+if [ -n "$MISSING_DATA" ]; then
+  echo ""
+  echo "ATTENZIONE: nessun data.sql trovato per:$MISSING_DATA"
+  echo "  task seed-data (senza SQL=1) e' solo per te, mentre sviluppi: i dati che"
+  echo "  genera NON sono in questa consegna (rimossi qui sopra, di proposito)."
+  echo "  task seed-data SQL=1        genera lui il data.sql, non serve scriverlo a mano"
+  echo "  Senza un data.sql, chi apre questo progetto vede tabelle vuote. Vedi"
+  echo "  GIORNO-ESAME.md, sezione \"Riempire il database di dati di prova\"."
+  echo ""
+fi
+
 # --- Quello che serve a farlo girare -----------------------------------------
 
 for file in docker-compose.yml Dockerfile .dockerignore pom.xml mvnw mvnw.cmd; do

@@ -155,6 +155,26 @@ foreach ($module in $modules) {
 }
 Write-Step 'pulizia consegna: rimosse classi del template (devdata) e configurazioni interne'
 
+# --- Avviso: senza un data.sql tuo, questa consegna ha le tabelle vuote -------
+# seed-data (devdata) e' uno strumento di sviluppo: sopra lo abbiamo appena
+# tolto apposta. Se nessun modulo ha un data.sql scritto a mano, chi apre
+# questa consegna vede tabelle vuote -- e i dati di prova valgono punti.
+$entityModules = @(Get-JpaModules -RepoRoot $repoRoot | Where-Object { $_.HasEntities })
+$modulesWithoutData = @($entityModules | Where-Object {
+    -not (Test-Path (Join-Path $OutDir "$($_.Name)/src/main/resources/data.sql"))
+})
+if ($modulesWithoutData.Count -gt 0) {
+    Write-Host ''
+    Write-Host 'ATTENZIONE: nessun data.sql trovato per: ' -NoNewline -ForegroundColor Yellow
+    Write-Host (($modulesWithoutData | ForEach-Object { $_.Name }) -join ', ') -ForegroundColor Yellow
+    Write-Host '  task seed-data (senza SQL=1) e'' solo per te, mentre sviluppi: i dati che' -ForegroundColor Yellow
+    Write-Host '  genera NON sono in questa consegna (rimossi qui sopra, di proposito).' -ForegroundColor Yellow
+    Write-Host '  task seed-data SQL=1        genera lui il data.sql, non serve scriverlo a mano' -ForegroundColor Yellow
+    Write-Host '  Senza un data.sql, chi apre questo progetto vede tabelle vuote. Vedi' -ForegroundColor Yellow
+    Write-Host '  GIORNO-ESAME.md, sezione "Riempire il database di dati di prova".' -ForegroundColor Yellow
+    Write-Host ''
+}
+
 # --- Quello che serve a farlo girare -----------------------------------------
 
 foreach ($file in @('docker-compose.yml', 'Dockerfile', '.dockerignore', 'pom.xml', 'mvnw', 'mvnw.cmd')) {

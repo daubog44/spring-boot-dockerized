@@ -381,3 +381,30 @@ function Set-DevDataRows {
     }
     Write-TextFile -Path $YmlPath -Text $text
 }
+
+function Ensure-SqlInit {
+    # Le due chiavi che servono perche' un data.sql giri dopo Hibernate, anche
+    # su PostgreSQL (senza, Spring lo esegue subito, prima che le tabelle
+    # esistano): spring.jpa.defer-datasource-initialization e
+    # spring.sql.init.mode. Le aggiunge sotto spring: se mancano; se ci sono
+    # gia' non tocca niente.
+    param([Parameter(Mandatory = $true)][string]$YmlPath)
+    $text = Read-TextFile $YmlPath
+    if ($text -match 'defer-datasource-initialization') { return }
+    $lines = @(Split-TextLines $text)
+    $springIdx = Find-LineIndex -Lines $lines -Pattern '^spring:\s*$'
+    if ($springIdx -lt 0) { return }
+    $endIdx = $lines.Count
+    for ($i = $springIdx + 1; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^[^ \t\r]') { $endIdx = $i; break }
+    }
+    $jpaIdx = -1
+    for ($i = $springIdx + 1; $i -lt $endIdx; $i++) {
+        if ($lines[$i] -match '^  jpa:\s*$') { $jpaIdx = $i; break }
+    }
+    if ($jpaIdx -ge 0) {
+        Add-LinesAt -Path $YmlPath -Index ($jpaIdx + 1) -NewLines @('    defer-datasource-initialization: true')
+        $endIdx++
+    }
+    Add-LinesAt -Path $YmlPath -Index $endIdx -NewLines @('  sql:', '    init:', '      mode: always', '')
+}

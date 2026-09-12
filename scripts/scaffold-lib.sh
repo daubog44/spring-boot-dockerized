@@ -167,6 +167,42 @@ devdata_report() { # modulo, exit code, file di log
   return 1
 }
 
+# Le due chiavi che servono perche' un data.sql giri dopo Hibernate, anche su
+# PostgreSQL (senza, Spring lo esegue subito, prima che le tabelle esistano):
+# spring.jpa.defer-datasource-initialization e spring.sql.init.mode. Le
+# aggiunge sotto spring: se mancano; se ci sono gia' non tocca niente.
+ensure_sql_init() { # application.yml
+  local yml="$1" cr=""
+  grep -q 'defer-datasource-initialization' "$yml" && return 0
+  grep -q $'\r' "$yml" && cr=$'\r'
+  awk -v cr="$cr" '
+    BEGIN { in_spring=0 }
+    /^spring:\r?$/ { in_spring=1; print; next }
+    in_spring && /^[^ \t\r]/ {
+      print "  sql:" cr
+      print "    init:" cr
+      print "      mode: always" cr
+      print ""
+      in_spring=0
+      print
+      next
+    }
+    in_spring && /^  jpa:\r?$/ {
+      print
+      print "    defer-datasource-initialization: true" cr
+      next
+    }
+    { print }
+    END {
+      if (in_spring) {
+        print "  sql:" cr
+        print "    init:" cr
+        print "      mode: always" cr
+      }
+    }
+  ' "$yml" >"$yml.tmp" && mv "$yml.tmp" "$yml"
+}
+
 # dev-data.rows nell'application.yml: lo aggiorna se c'e', se no lo aggiunge in fondo.
 set_devdata_rows() { # application.yml, righe
   local yml="$1" rows="$2" cr=""

@@ -25,6 +25,7 @@ import java.util.List;
  * <pre>
  *   dev-data.rows=5              riempie con 5 righe le tabelle ancora vuote
  *   dev-data.schema-out=file.md  scrive lo schema del database in markdown
+ *   dev-data.sql-out=data.sql    scrive le righe generate come INSERT SQL
  *   dev-data.exit=true           finito il lavoro, chiude l'applicazione
  * </pre>
  *
@@ -62,8 +63,9 @@ public class DevData implements ApplicationListener<ContextRefreshedEvent>, Appl
 
         int rows = env.getProperty("dev-data.rows", Integer.class, 0);
         String schemaOut = env.getProperty("dev-data.schema-out", "");
+        String sqlOut = env.getProperty("dev-data.sql-out", "");
         boolean exit = env.getProperty("dev-data.exit", Boolean.class, false);
-        if (rows <= 0 && schemaOut.isBlank() && !exit) return;
+        if (rows <= 0 && schemaOut.isBlank() && sqlOut.isBlank() && !exit) return;
 
         int status = 0;
         EntityManagerFactory factory = emf.getIfAvailable();
@@ -85,6 +87,13 @@ public class DevData implements ApplicationListener<ContextRefreshedEvent>, Appl
                     if (path.getParent() != null) Files.createDirectories(path.getParent());
                     Files.writeString(path, markdown, StandardCharsets.UTF_8);
                     say("schema scritto in " + path);
+                }
+                if (!sqlOut.isBlank()) {
+                    String sql = new DataSqlWriter(factory, dataSource.getObject()).write();
+                    Path path = Path.of(sqlOut).toAbsolutePath();
+                    if (path.getParent() != null) Files.createDirectories(path.getParent());
+                    Files.writeString(path, sql, StandardCharsets.UTF_8);
+                    say("data.sql scritto in " + path);
                 }
             }
         } catch (Exception | LinkageError e) {
