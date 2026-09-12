@@ -118,8 +118,8 @@ che trova in `JAVA_HOME` o, se manca, nel `PATH`.
 **Pubblicare una versione nuova** (dopo il push di `main` e dei branch):
 
 ```bash
-git tag v1.2.1
-git push origin v1.2.1
+git tag v1.2.3
+git push origin v1.2.3
 ```
 
 Il resto lo fa la GitHub Action [`release.yml`](./.github/workflows/release.yml):
