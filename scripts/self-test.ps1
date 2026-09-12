@@ -419,6 +419,17 @@ Test-Case 'new-view genera controller e template thymeleaf nel modulo UI' {
     Assert-Contains $tpl 'xmlns:th="http://www.thymeleaf.org"' 'manca namespace thymeleaf'
 }
 
+Test-Case 'new-view ricava automaticamente i campi dal Feign client se FIELDS e'' omesso' {
+    Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'beta-ui', '-To', 'epsilon-service', '-Name', 'VolumiClient', '-Dto', 'VolumeDto')) 'new-client in beta-ui fallito'
+    Assert-Ok (Invoke-Tool 'new-view.ps1' @('-Service', 'beta-ui', '-Name', 'Volumi', '-Client', 'VolumiClient')) 'new-view con campi auto-rilevati fallito'
+    $ctrlFile = Join-Path $demo ('beta-ui/src/main/java/' + (Get-SandboxPackagePath 'beta-ui') + '/controller/VolumiUiController.java')
+    Assert-That (Test-Path $ctrlFile) 'VolumiUiController.java non trovato'
+    $ctrl = Read-TextFile $ctrlFile
+    Assert-Contains $ctrl 'private String titolo;' 'titolo non presente nel form generato'
+    Assert-Contains $ctrl 'private Boolean disponibile;' 'disponibile non presente nel form generato'
+    Assert-Contains $ctrl 'volumiClient.create(new ' 'chiamata create non collegata'
+}
+
 Test-Case 'new-client crea automaticamente il DTO in common-dto se sono passati FIELDS' {
     Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'beta-ui', '-Name', 'BetaClient', '-Dto', 'AutoreDto', '-Fields', 'nome:string:required')) 'new-client con FIELDS fallito'
     $basePkgPath = (Get-BasePackage -RepoRoot $sandbox) -replace '\.', '/'

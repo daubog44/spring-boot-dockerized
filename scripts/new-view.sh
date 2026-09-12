@@ -199,6 +199,41 @@ if [ -n "$CLIENT" ]; then
     if [ -n "$TARGET_DTO_NAME" ] && [ "$TARGET_DTO_NAME" != "Object" ] && [ -d "$DEMO_DIR/common-dto/src/main/java" ]; then
       DTO_FILE="$(find "$DEMO_DIR/common-dto/src/main/java" -name "$TARGET_DTO_NAME.java" 2>/dev/null | head -n 1 || true)"
       if [ -n "$DTO_FILE" ] && [ -f "$DTO_FILE" ]; then
+        if [ -z "${FIELDS:-}" ]; then
+          AUTO_FIELDS="$(python3 -c "
+with open('$DTO_FILE', 'r', encoding='utf-8') as f:
+    c = f.read()
+import re
+m = re.search(r'public\s+record\s+\w+\s*\(([\s\S]*?)\)\s*\{', c)
+if m:
+    raw_params = m.group(1).split(',')
+    out = []
+    for p in raw_params:
+        p = p.strip()
+        if not p: continue
+        clean_p = re.sub(r'@\w+(\([^)]*\))?', '', p).strip()
+        tokens = clean_p.split()
+        if len(tokens) < 2: continue
+        ptype, pname = tokens[-2].strip(), tokens[-1].strip()
+        if pname == 'id': continue
+        ftype = 'string'
+        fmod = ':required'
+        if ptype in ['int', 'Integer']: ftype = 'int'
+        elif ptype in ['long', 'Long']: ftype = 'long'
+        elif ptype == 'BigDecimal': ftype = 'decimal'
+        elif ptype in ['boolean', 'Boolean']: ftype = 'bool'; fmod = ''
+        elif ptype == 'LocalDate': ftype = 'date'
+        elif ptype == 'String': ftype = 'string'
+        else: ftype = 'string'; fmod = ''
+        out.append(f'{pname}:{ftype}{fmod}')
+    print(','.join(out))
+" 2>/dev/null || true)"
+          if [ -n "$AUTO_FIELDS" ]; then
+            FIELDS="$AUTO_FIELDS"
+            echo "  -> Campi ricavati automaticamente da $TARGET_DTO_NAME: $FIELDS"
+          fi
+        fi
+
         DTO_ARGS="$(python3 -c "
 with open('$DTO_FILE', 'r', encoding='utf-8') as f:
     c = f.read()
@@ -361,7 +396,7 @@ $CLIENT_CALL_GET_ALL
                        Model model) {
 $CLIENT_ERROR_CATCH
 $CLIENT_CALL_CREATE
-        return "redirect:$ROUTE_PATH?success";
+        return "redirect:${ROUTE_PATH}?success";
     }
 }
 EOF

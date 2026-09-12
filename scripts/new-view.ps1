@@ -113,6 +113,90 @@ if (Test-Path $templateFile) {
     throw "C'e' gia' $templateFile. Cancellalo prima o scegli un altro nome."
 }
 
+# --- Rilevamento / Configurazione Client Feign ---
+if (-not $Client -and -not [Console]::IsInputRedirected) {
+    $existingClients = @(Get-ChildItem -Path (Join-Path $javaDir 'client') -Filter '*Client.java' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty BaseName)
+    if ($existingClients.Count -eq 1) {
+        $cName = $existingClients[0]
+        $ans = Read-Host "  Trovato Feign Client '$cName'. Vuoi collegarlo automaticamente alla vista? [S/n] >"
+        if ($ans -match '^(s|si|y|yes)?$' -or -not $ans) { $Client = $cName }
+    } elseif ($existingClients.Count -gt 1) {
+        Write-Host "  Trovati $($existingClients.Count) Feign Client nel modulo. Scegli quale collegare:" -ForegroundColor Cyan
+        for ($i = 0; $i -lt $existingClients.Count; $i++) {
+            Write-Host "    $($i + 1)) $($existingClients[$i])"
+        }
+        $cIdx = Read-Host "    [1] (premi Invio per primo, o 'n' per nessuno) >"
+        if ($cIdx -match '^\d+$') {
+            $Client = $existingClients[[int]$cIdx - 1]
+        } elseif ($cIdx -ne 'n') {
+            $Client = $existingClients[0]
+        }
+    }
+}
+
+$targetDtoName = $null
+$targetDtoPkg = $null
+$targetDtoRawParams = $null
+$clientFile = $null
+
+if ($Client) {
+    $clientFile = Join-Path $javaDir "client/$Client.java"
+    if (-not (Test-Path $clientFile)) {
+        $candidates = @(Get-ChildItem -Path (Join-Path $javaDir 'client') -Filter "${Client}*.java" -ErrorAction SilentlyContinue)
+        if ($candidates.Count -gt 0) { $clientFile = $candidates[0].FullName; $Client = $candidates[0].BaseName }
+    }
+
+    if (Test-Path $clientFile) {
+        $cContent = Read-TextFile $clientFile
+        if ($cContent -match 'create\s*\(\s*@RequestBody\s*(\w+)\s+body\)') {
+            $targetDtoName = $Matches[1]
+        } elseif ($cContent -match 'List<(\w+)>\s+getAll\(') {
+            $targetDtoName = $Matches[1]
+        }
+
+        if ($targetDtoName -and $targetDtoName -ne 'Object') {
+            $commonDtoDir = Join-Path $demoDir 'common-dto/src/main/java'
+            $dtoFiles = @(Get-ChildItem -Path $commonDtoDir -Recurse -Filter "$targetDtoName.java" -ErrorAction SilentlyContinue)
+            if ($dtoFiles.Count -gt 0) {
+                $dtoContent = Read-TextFile $dtoFiles[0].FullName
+                $targetDtoPkg = [regex]::Match($dtoContent, '(?m)^\s*package\s+([\w.]+)\s*;').Groups[1].Value
+                if (-not $targetDtoPkg) { $targetDtoPkg = (Get-BasePackage) + '.common.dto' }
+                $m = [regex]::Match($dtoContent, 'public\s+record\s+\w+\s*\(([\s\S]*?)\)\s*\{')
+                if ($m.Success) {
+                    $targetDtoRawParams = $m.Groups[1].Value -split ','
+                    if (-not $Fields) {
+                        $autoFields = @()
+                        foreach ($rp in $targetDtoRawParams) {
+                            $rp = $rp.Trim()
+                            if (-not $rp) { continue }
+                            $cleanP = ($rp -replace '@\w+(\([^)]*\))?', '').Trim()
+                            $pTokens = $cleanP -split '\s+'
+                            if ($pTokens.Count -lt 2) { continue }
+                            $pType = $pTokens[-2].Trim()
+                            $pName = $pTokens[-1].Trim()
+                            if ($pName -eq 'id') { continue }
+                            $fType = 'string'
+                            $fMod = ':required'
+                            if ($pType -match '^(int|Integer)$') { $fType = 'int' }
+                            elseif ($pType -match '^(long|Long)$') { $fType = 'long' }
+                            elseif ($pType -match '^(BigDecimal)$') { $fType = 'decimal' }
+                            elseif ($pType -match '^(boolean|Boolean)$') { $fType = 'bool'; $fMod = '' }
+                            elseif ($pType -match '^(LocalDate)$') { $fType = 'date' }
+                            elseif ($pType -match '^(String)$') { $fType = 'string' }
+                            else { $fType = 'string'; $fMod = '' }
+                            $autoFields += "${pName}:${fType}${fMod}"
+                        }
+                        if ($autoFields.Count -gt 0) {
+                            $Fields = $autoFields -join ','
+                            Write-Host "  -> Campi ricavati automaticamente da ${targetDtoName}: $Fields" -ForegroundColor Green
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 # --- Parsing dei campi ---
 $fieldList = @()
 if ($Fields) {
@@ -147,27 +231,6 @@ if ($fieldList.Count -eq 0) {
     $fieldList += [pscustomobject]@{ Name = 'descrizione'; JavaType = 'String'; InputType = 'text'; Required = $false }
 }
 
-# --- Rilevamento / Configurazione Client Feign ---
-if (-not $Client -and -not [Console]::IsInputRedirected) {
-    $existingClients = @(Get-ChildItem -Path (Join-Path $javaDir 'client') -Filter '*Client.java' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty BaseName)
-    if ($existingClients.Count -eq 1) {
-        $cName = $existingClients[0]
-        $ans = Read-Host "  Trovato Feign Client '$cName'. Vuoi collegarlo automaticamente alla vista? [S/n] >"
-        if ($ans -match '^(s|si|y|yes)?$' -or -not $ans) { $Client = $cName }
-    } elseif ($existingClients.Count -gt 1) {
-        Write-Host "  Trovati $($existingClients.Count) Feign Client nel modulo. Scegli quale collegare:" -ForegroundColor Cyan
-        for ($i = 0; $i -lt $existingClients.Count; $i++) {
-            Write-Host "    $($i + 1)) $($existingClients[$i])"
-        }
-        $cIdx = Read-Host "    [1] (premi Invio per primo, o 'n' per nessuno) >"
-        if ($cIdx -match '^\d+$') {
-            $Client = $existingClients[[int]$cIdx - 1]
-        } elseif ($cIdx -ne 'n') {
-            $Client = $existingClients[0]
-        }
-    }
-}
-
 $hasClient = $false
 $clientInject = ''
 $clientCallGetAll = @"
@@ -186,18 +249,11 @@ $clientErrorCatch = @"
         }
 "@
 
-if ($Client) {
-    $clientFile = Join-Path $javaDir "client/$Client.java"
-    if (-not (Test-Path $clientFile)) {
-        $candidates = @(Get-ChildItem -Path (Join-Path $javaDir 'client') -Filter "${Client}*.java" -ErrorAction SilentlyContinue)
-        if ($candidates.Count -gt 0) { $clientFile = $candidates[0].FullName; $Client = $candidates[0].BaseName }
-    }
-
-    if (Test-Path $clientFile) {
-        $hasClient = $true
-        $clientCamel = $Client.Substring(0, 1).ToLowerInvariant() + $Client.Substring(1)
-        $clientInject = "    private final $package.client.$Client $clientCamel;`n"
-        $clientCallGetAll = @"
+if ($Client -and $clientFile -and (Test-Path $clientFile)) {
+    $hasClient = $true
+    $clientCamel = $Client.Substring(0, 1).ToLowerInvariant() + $Client.Substring(1)
+    $clientInject = "    private final $package.client.$Client $clientCamel;`n"
+    $clientCallGetAll = @"
         try {
             model.addAttribute("items", ${clientCamel}.getAll());
         } catch (Exception e) {
@@ -206,51 +262,33 @@ if ($Client) {
         }
 "@
 
-        $clientErrorCatch = @"
+    $clientErrorCatch = @"
         if (bindingResult.hasErrors()) {
             try { model.addAttribute("items", ${clientCamel}.getAll()); } catch (Exception e) { model.addAttribute("items", new ArrayList<>()); }
             return "$slug";
         }
 "@
 
-        # Cerca DTO target
-        $cContent = Read-TextFile $clientFile
-        $targetDtoName = $null
-        if ($cContent -match 'create\s*\(\s*@RequestBody\s*(\w+)\s+body\)') {
-            $targetDtoName = $Matches[1]
-        } elseif ($cContent -match 'List<(\w+)>\s+getAll\(') {
-            $targetDtoName = $Matches[1]
+    if ($targetDtoName -and $targetDtoRawParams) {
+        $argExprs = @()
+        foreach ($rp in $targetDtoRawParams) {
+            $rp = $rp.Trim()
+            if (-not $rp) { continue }
+            $pTokens = ($rp -replace '@\w+(\([^)]*\))?', '').Trim() -split '\s+'
+            $pName = $pTokens[-1].Trim()
+            $pPascal = $pName.Substring(0, 1).ToUpperInvariant() + $pName.Substring(1)
+            if ($pName -eq 'id') {
+                $argExprs += 'null'
+            } elseif ($fieldList | Where-Object { $_.Name -eq $pName }) {
+                $argExprs += "form.get$pPascal()"
+            } elseif ($pName -in @('disponibile', 'attivo')) {
+                $argExprs += 'true'
+            } else {
+                $argExprs += 'null'
+            }
         }
-
-        if ($targetDtoName -and $targetDtoName -ne 'Object') {
-            $commonDtoDir = Join-Path $demoDir 'common-dto/src/main/java'
-            $dtoFiles = @(Get-ChildItem -Path $commonDtoDir -Recurse -Filter "$targetDtoName.java" -ErrorAction SilentlyContinue)
-            if ($dtoFiles.Count -gt 0) {
-                $dtoContent = Read-TextFile $dtoFiles[0].FullName
-                $targetDtoPkg = [regex]::Match($dtoContent, '(?m)^\s*package\s+([\w.]+)\s*;').Groups[1].Value
-                if (-not $targetDtoPkg) { $targetDtoPkg = (Get-BasePackage) + '.common.dto' }
-                $m = [regex]::Match($dtoContent, 'public\s+record\s+\w+\s*\(([\s\S]*?)\)\s*\{')
-                if ($m.Success) {
-                    $rawParams = $m.Groups[1].Value -split ','
-                    $argExprs = @()
-                    foreach ($rp in $rawParams) {
-                        $rp = $rp.Trim()
-                        if (-not $rp) { continue }
-                        $pTokens = ($rp -replace '@\w+(\([^)]*\))?', '').Trim() -split '\s+'
-                        $pName = $pTokens[-1].Trim()
-                        $pPascal = $pName.Substring(0, 1).ToUpperInvariant() + $pName.Substring(1)
-                        if ($pName -eq 'id') {
-                            $argExprs += 'null'
-                        } elseif ($fieldList | Where-Object { $_.Name -eq $pName }) {
-                            $argExprs += "form.get$pPascal()"
-                        } elseif ($pName -in @('disponibile', 'attivo')) {
-                            $argExprs += 'true'
-                        } else {
-                            $argExprs += 'null'
-                        }
-                    }
-                    $dtoArgsStr = ($argExprs | ForEach-Object { "                $_" }) -join ",`n"
-                    $clientCallCreate = @"
+        $dtoArgsStr = ($argExprs | ForEach-Object { "                $_" }) -join ",`n"
+        $clientCallCreate = @"
         try {
             ${clientCamel}.create(new ${targetDtoPkg}.$targetDtoName(
 $dtoArgsStr
@@ -261,9 +299,6 @@ $dtoArgsStr
             return "$slug";
         }
 "@
-                }
-            }
-        }
     }
 }
 
@@ -317,7 +352,7 @@ $clientCallGetAll
                        Model model) {
 $clientErrorCatch
 $clientCallCreate
-        return "redirect:$routePath?success";
+        return "redirect:${routePath}?success";
     }
 }
 "@
