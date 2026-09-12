@@ -239,14 +239,45 @@ tasks:
                             Modificatori: required, unique, min(N), max(N)
         TABLE=<nome>       facoltativa: di default il nome dell'entity in
                             minuscolo (niente plurali indovinati)
+        DTO=1              facoltativa: crea anche il DTO in common-dto e
+                            configura Service e Controller su DTO
 
       Esempio:
-        task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):unique,annoPubblicazione:int:min(1450):max(2100),disponibile:bool:required,genere:enum(ROMANZO|SAGGIO|GIALLO)
+        task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):unique,annoPubblicazione:int:min(1450):max(2100),disponibile:bool:required,genere:enum(ROMANZO|SAGGIO|GIALLO) DTO=1
 
       Dopo serve `task dev` (non `task compile`): l'entity nuova non e'
       ancora nel classpath del servizio acceso.
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-entity.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .TABLE}} -Table {{.TABLE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-entity.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .TABLE}} --table {{.TABLE}}{{end}} {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-entity.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .TABLE}} -Table {{.TABLE}}{{end}}{{if .DTO}} -Dto{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-entity.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .TABLE}} --table {{.TABLE}}{{end}}{{if .DTO}} --dto{{end}} {{.CLI_ARGS}}{{end}}'
+
+  add-relation:
+    desc: "Aggiunge una relazione JPA fra due entity dello stesso servizio (task add-relation SERVICE=... FROM=... TO=... TYPE=...)"
+    interactive: true
+    summary: |
+      Configura una relazione JPA (@ManyToOne, @OneToMany, @OneToOne, @ManyToMany)
+      fra due entity dello stesso microservizio:
+        - Inserisce l'annotazione con fetch = LAZY
+        - Configura la foreign key (@JoinColumn) sul lato proprietario
+        - Se non unidirezionale, inserisce il campo inverso (mappedBy) sull'altra entity
+        - Aggiunge tutti gli import necessari (jakarta.persistence, java.util.List, ecc.)
+
+      Se lanciato senza argomenti (`task add-relation`), si apre un menu interattivo
+      guidato nel terminale che rileva i servizi e le entity disponibili!
+
+      Variabili:
+        SERVICE=<modulo>       modulo contenente le entity (es. catalogo-service)
+        FROM=<EntityOwner>     entity che possiede la chiave esterna (es. Libro)
+        TO=<EntityTarget>      entity target collegata (es. Categoria)
+        TYPE=<tipo>            many-to-one (default) | one-to-many | one-to-one | many-to-many
+        FIELD=<nomeCampo>      nome del campo Java (default: to in camelCase o plurale)
+        UNIDIRECTIONAL=1       non aggiungere il campo inverso nell'altra entity
+
+      Esempi:
+        task add-relation
+        task add-relation SERVICE=catalogo-service FROM=Libro TO=Categoria TYPE=many-to-one
+        task add-relation SERVICE=catalogo-service FROM=Ordine TO=RigaOrdine TYPE=one-to-many
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/add-relation.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .FROM}} -From {{.FROM}}{{end}}{{if .TO}} -To {{.TO}}{{end}}{{if .TYPE}} -Type {{.TYPE}}{{end}}{{if .FIELD}} -Field {{.FIELD}}{{end}}{{if .UNIDIRECTIONAL}} -Unidirectional{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/add-relation.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .FROM}} --from {{.FROM}}{{end}}{{if .TO}} --to {{.TO}}{{end}}{{if .TYPE}} --type {{.TYPE}}{{end}}{{if .FIELD}} --field {{.FIELD}}{{end}}{{if .UNIDIRECTIONAL}} --unidirectional{{end}} {{.CLI_ARGS}}{{end}}'
 
   new-dto:
     desc: "Genera un DTO/Record in common-dto (task new-dto NAME=Libro FIELDS=...)"

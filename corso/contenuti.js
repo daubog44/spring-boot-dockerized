@@ -1,13 +1,17 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 13:06',
+  generato: '2026-09-12 13:42',
   progetto: {
     cartella: 'demo',
-    pacchetto: 'esame',
+    pacchetto: 'com.example.ttfcloud_esame',
     java: '25',
     moduli: [
-    { nome: 'common-dto', tipo: 'libreria', porta: '', applicazione: '', database: '', entity: [], feign: [], classi: [] },
-    { nome: 'naming-server', tipo: 'eureka', porta: '8761', applicazione: 'eureka-server', database: '', entity: [], feign: [], classi: [] }
+    { nome: 'common-dto', tipo: 'libreria', porta: '', applicazione: '', database: '', entity: [], feign: [], classi: ['EventSearchResponse', 'EventSuggestion', 'RandomNumberResponse', 'StoredSuggestionResponse'] },
+    { nome: 'naming-server', tipo: 'eureka', porta: '8761', applicazione: 'eureka-server', database: '', entity: [], feign: [], classi: [] },
+    { nome: 'tourist-service', tipo: 'rest', porta: '8081', applicazione: 'tourist-service', database: '', entity: [], feign: ['openDataHubEventClient'], classi: [] },
+    { nome: 'random-service', tipo: 'rest', porta: '8082', applicazione: 'random-service', database: '', entity: [], feign: [], classi: [] },
+    { nome: 'store-service', tipo: 'rest', porta: '8083', applicazione: 'store-service', database: 'PostgreSQL event_suggestions', entity: ['SuggestionEntity'], feign: [], classi: [] },
+    { nome: 'event-ui', tipo: 'ui', porta: '8080', applicazione: 'event-ui', database: '', entity: [], feign: [], classi: [] }
     ]
   },
   lezioni: [
@@ -1061,6 +1065,17 @@ In un solo colpo questo comando genera quattro file sincronizzati:
 | \`:required\` | vincolo | \`@NotNull\` / \`@NotBlank\` + \`nullable = false\` |
 | \`:unique\` | vincolo | \`unique = true\` sul database |
 
+### Generazione automatica con DTO (\`DTO=1\`)
+
+Se aggiungi \`DTO=1\`:
+\`\`\`bash
+task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,prezzo:decimal,disponibile:bool DTO=1
+\`\`\`
+Il comando:
+1. Crea automaticamente il record immutabile \`LibroDto\` in \`common-dto\` con tutte le validazioni.
+2. Genera in \`LibroService\` i metodi mapper statici \`toDto(entity)\` e \`toEntity(dto)\`.
+3. Modifica \`LibroController\` in modo che riceva e restituisca \`LibroDto\` invece dell'Entity. In questo modo rispetti alla lettera la best practice "fuori dal service esce solo il DTO" ed eviti per sempre i loop di serializzazione Jackson con le relazioni bidirezionali!
+
 Dopo aver lanciato il comando, puoi aprire i file per aggiungere relazioni (\`@ManyToOne\`, \`@OneToMany\`), campi speciali (enum) o metodi di ricerca nel repository come vediamo qui sotto.
 
 ## Un'entity
@@ -1235,7 +1250,28 @@ private UtenteEntity utente;
    Usa solo \`@Getter\`, \`@Setter\`, \`@NoArgsConstructor\`.
 4. **Evita il loop JSON Jackson**: se serializzi un'entity con relazione bidirezionale,
    Jackson va in loop infinito. La soluzione pulita è **restituire sempre DTO** dai
-   controller (o mettere \`@JsonIgnore\` sul lato inverso).
+   controller (usa \`DTO=1\` in \`task new-entity\`!).
+
+### Configurare le relazioni in 5 secondi: \`task add-relation\`
+
+Invece di scrivere annotazioni, chiavi esterne e collezioni inverse a mano col rischio di dimenticare \`fetch = FetchType.LAZY\`, \`mappedBy\`, o gli import:
+
+\`\`\`bash
+task add-relation SERVICE=catalogo-service FROM=Libro TO=Autore TYPE=many-to-one
+\`\`\`
+
+Oppure lancialo **senza argomenti**:
+\`\`\`bash
+task add-relation
+\`\`\`
+Si aprirà una comoda procedura guidata nel terminale: ti chiederà in quale microservizio vuoi operare, elencherà tutte le entità rilevate e ti farà scegliere il tipo di relazione desiderata (\`many-to-one\`, \`one-to-many\`, \`one-to-one\`, \`many-to-many\`).
+
+Cosa fa per te:
+- Inserisce l'annotazione corretta con \`fetch = FetchType.LAZY\`.
+- Configura \`@JoinColumn(name = "autore_id")\` sul lato proprietario.
+- Configura il lato inverso con \`mappedBy\` e lista già inizializzata (\`= new ArrayList<>()\`).
+- Aggiunge automaticamente tutti gli \`import\` necessari (\`jakarta.persistence.*\`, \`java.util.List\`, ecc.).
+- Con \`UNIDIRECTIONAL=1\` evita di aggiungere il campo inverso se ti serve unidirezionale.
 
 ---
 
@@ -3184,22 +3220,98 @@ La domanda teorica A dell'esame include spesso concetti di sicurezza in architet
 ` }
   ],
   documenti: [
-    { file: 'README.md', testo: `# Spring Boot Dockerized — Template d'esame ITS
+    { file: 'README.md', testo: `# Spring Boot Dockerized - Esempio Eventi/Turismo
 
-Template **vuoto** per una prova finale a microservizi: c'è l'impalcatura già
-configurata e collaudata (Eureka, OpenFeign, OpenAPI/Swagger, PostgreSQL, Docker
-Compose, hot reload), **non** c'è nessun servizio d'esempio da smontare.
+Questo branch contiene un **esempio d'esame svolto** sulla traccia **Eventi/Turismo (OpenDataHub)**, costruito sul template multi-modulo Maven del branch [\`main\`](https://github.com/daubog44/spring-boot-dockerized/tree/main) con **Spring Boot**, **Spring Cloud Eureka**, **OpenFeign**, **OpenAPI/Swagger UI**, **PostgreSQL** e **Docker Compose**.
 
-I servizi della traccia li generi con un comando:
+Flusso applicativo: la UI riceve coordinate, raggio e numero di alternative, interroga \`TOURIST-SERVICE\` (wrapper Feign di OpenDataHub), estrae un indice tramite \`RANDOM-SERVICE\` e salva il suggerimento scelto su \`STORE-SERVICE\`, che lo persiste su PostgreSQL.
+
+---
+
+## 📚 Documentazione & Guide per l'Esame
+
+- **[🚨 Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. Parti da qui.
+- **[📓 Il corso: Dalla traccia alla consegna](./corso/index.html)** — diciassette lezioni dalla A alla Z: com'è fatto il template, come si parlano i servizi, \`common-dto\`, la rete dell'esame, e poi la traccia **Biblioteca** svolta pezzo per pezzo col suo codice, fino al collaudo, a Docker e alla consegna. Dentro ci sono anche tutte le guide, con la ricerca, e la mappa dei moduli di questo progetto. Si apre con **\`task learn\`**: pagina statica, senza server e senza rete.
+- [La giornata alla lavagna](./corso/giornata.html) — la stessa giornata in nove fasi, con una lavagna che le legge ad alta voce; il video lo registra \`powershell -File corso/genera-video.ps1\`.
+- [📖 Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
+- [📘 Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — con il **cheat sheet di Thymeleaf** (§ 6.7)
+- [🛠️ Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
+- [📝 Documentazione Specifica Esame (README-ESAME-TTFCLOUD.md)](./README-ESAME-TTFCLOUD.md)
+
+---
+
+## 🌿 Branch del Repository
+
+- **[\`main\`](https://github.com/daubog44/spring-boot-dockerized/tree/main)**: Template d'Esame pulito e neutro, adattabile a qualsiasi traccia.
+- **[\`solution/wms\`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: Soluzione completa della traccia WMS Magazzino "Spostati S.r.l." con script di collaudo automatizzato.
+- **\`example/tourist-events\`** (questo branch): Esempio svolto della traccia Eventi/Turismo.
+
+---
+
+## 🏗️ Architettura dei Servizi
+
+Il progetto è un aggregatore Multi-Module Maven dentro la cartella \`demo\`:
+
+1. **\`naming-server\`**: Eureka Naming Server (Porta \`8761\`).
+2. **\`common-dto\`**: Modulo libreria con i DTO condivisi tra i microservizi.
+3. **\`tourist-service\`** (Porta \`8081\`): Wrapper REST dell'endpoint OpenDataHub \`/v1/Event\` (\`TouristController\`, \`OpenDataHubEventClient\` via OpenFeign). Base URL configurabile con \`TOURIST_API_BASE_URL\`.
+4. **\`random-service\`** (Porta \`8082\`): Generatore di indici casuali (\`RandomController\`).
+5. **\`store-service\`** (Porta \`8083\`): Storico dei suggerimenti (\`SuggestionController\`), persistenza JPA/Hibernate su PostgreSQL.
+6. **\`event-ui\`** (Porta \`8080\`): Web UI Thymeleaf (\`UiController\`), consuma gli altri tre servizi via OpenFeign (\`TouristServiceClient\`, \`RandomServiceClient\`, \`StoreServiceClient\`) risolti tramite Eureka.
+
+> ⚠️ Il container Docker della UI si chiama \`ui-service\` nel \`docker-compose.yml\`, mentre il modulo Maven è \`event-ui\`.
+
+Nomi con cui i servizi si registrano su Eureka: \`TOURIST-SERVICE\`, \`RANDOM-SERVICE\`, \`STORE-SERVICE\`, \`EVENT-UI\`.
+
+### 🗄️ Database
+
+\`store-service\` è collegato a PostgreSQL tramite le variabili d'ambiente già impostate nel \`docker-compose.yml\` (\`STORE_DB_URL\`, \`STORE_DB_USERNAME\`, \`STORE_DB_PASSWORD\`). Gli altri servizi non hanno persistenza.
+
+---
+
+## ⚡ Come lavorare
+
+**Per sviluppare, un comando solo:**
+
+\`\`\`bash
+task dev
+\`\`\`
+
+Prima **libera le porte**: ferma i servizi di un avvio precedente, spegne i container dell'esame se sono loro a tenerle e chiude le applicazioni estranee rimaste in ascolto (non tocca i processi di sistema né l'infrastruttura di Docker). Poi avvia PostgreSQL su Docker, compila tutti i moduli una volta sola, lancia Eureka, ne attende la porta e infine avvia gli altri quattro servizi.
+
+**Un terminale solo, nessuna finestra sparsa**: i servizi girano in background e scrivono in \`.dev-logs/\`. Per vedere cosa fanno:
+
+\`\`\`bash
+task logs
+\`\`\`
+
+Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (\`store | ...\`) e di un colore diverso. \`Ctrl+C\` chiude solo la vista, i servizi restano su. Per seguirne uno solo: \`task logs SERVICE=store\`.
+
+**Hot reload**: ogni servizio gira con \`spring-boot-devtools\`. Dopo aver modificato del codice, \`task compile\` ricompila e il servizio interessato si riavvia da solo.
+
+**Per fermare tutto**: \`task dev-down\`. Libera le porte esattamente come fa \`task dev\` all'avvio (stessa funzione, quindi non possono divergere) e ferma il container PostgreSQL avviato da \`task dev\`, conservando il volume.
+
+**Quando qualcosa non risponde**: \`task status\` dice chi occupa ognuna delle porte (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
+
+> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: \`task dev KEEPFOREIGN=1 UI_PORT=9080\`. Senza \`KEEPFOREIGN=1\` viene chiusa.
+
+**Per la demo**, usa lo stack containerizzato:
+
+\`\`\`bash
+task docker-up
+\`\`\`
+
+Locale e Docker usano le stesse porte, ma non devi ricordartene: \`task docker-up\` ferma da solo lo stack locale prima di partire, e \`task dev\` spegne da solo i container (con \`docker compose down\`, i dati del database restano).
+
+### Quando cambia la struttura
+
+Aggiungere un modulo o una dipendenza, o spostare una porta, tocca piu' file
+che devono restare d'accordo. Un comando per ognuna di queste cose — tutti con
+variabili \`NOME=valore\`, mai con trattini:
 
 \`\`\`bash
 task new-service NAME=ordini-service
 \`\`\`
-
-che crea il modulo *e* lo collega dove serve — pom aggregatore, Dockerfile,
-docker-compose, lista di avvio — senza che tu debba ricordarti nessuno dei sei
-posti. Dentro un modulo, ogni tabella si scrive con lo stesso schema (entity,
-repository, service, controller): anche quello lo genera un comando,
 
 \`\`\`bash
 task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
@@ -3215,118 +3327,97 @@ task new-auth SERVICE=ordini-service TYPE=db
 task new-handler SERVICE=ordini-service
 \`\`\`
 
-e ti lascia aggiungere solo quello che conta davvero: le relazioni fra entity
-e le regole della tua traccia.
-
----
-
-## La prima cosa da fare
+\`\`\`bash
+task add-dep SERVICE=store-service DEPS=security,mail
+\`\`\`
 
 \`\`\`bash
-task learn
+task set-port SERVICE=event-ui PORT=9080
 \`\`\`
-
-Apre il corso: una pagina statica (niente server, niente rete) con diciotto
-lezioni dalla A alla Z — com'è fatto **questo** template (che parti da qui è
-vuoto: nessun modulo oltre a Eureka e \`common-dto\`), come si parlano i
-servizi, \`common-dto\`, le entity e i repository JPA con tutti gli esempi, la
-rete dell'esame — e poi una traccia vera svolta per intero, la **Biblioteca**
-(branch a parte, non qualcosa che hai già in questa cartella: la lezione 1 lo
-spiega), per vedere del codice funzionante prima di scrivere il tuo. Dentro ci
-sono anche tutte le guide, con la ricerca, e la mappa dei moduli del **tuo**
-progetto, letta dai file veri.
-
-## Documentazione
-
-- **[Il corso: Dalla traccia alla consegna](./corso/index.html)** — si apre con \`task learn\`, vedi sopra.
-- **[Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo.
-- [La giornata alla lavagna](./corso/giornata.html) — la stessa giornata in nove fasi, con l'orologio dell'esame e una lavagna che legge le fasi ad alta voce. Il video lo registra la macchina: \`powershell -File corso/genera-video.ps1\` (voce italiana di Windows, Edge e ffmpeg) scrive \`corso/quaderno-esame.mp4\`, che resta fuori dal repository.
-- [Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
-- [Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — c'è anche **come funziona il tutto insieme**: il giro di una richiesta da browser a database, chi accende cosa (Lombok, Swagger, Feign, JPA/Hibernate) e come si usa \`common-dto\`, più il **cheat sheet di Thymeleaf** (§ 6.7: espressioni, attributi, form con validazione, frammenti, errori tipici)
-- [Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
-
-Dal terminale, la guida ai comandi è \`task help\` (o \`task\` da solo); il
-dettaglio di un comando singolo, con le sue variabili, è
-\`task --summary <comando>\`.
-
----
-
-## Branch
-
-- **\`main\`** (questo): il template vuoto. È da qui che si parte a ogni traccia.
-- **[\`solution/wms\`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: soluzione completa della traccia **WMS magazzino** (product, crm, wms, wms-ui, calcolo distanza Manhattan, DTO condivisi, collaudo end-to-end).
-- **[\`example/tourist-events\`](https://github.com/daubog44/spring-boot-dockerized/tree/example/tourist-events)**: esempio svolto della traccia **eventi/turismo** (wrapper OpenFeign di OpenDataHub, estrazione casuale, storico su PostgreSQL).
-- **[\`example/biblioteca\`](https://github.com/daubog44/spring-boot-dockerized/tree/example/biblioteca)**: la traccia **Biblioteca di quartiere** svolta per intero, ed è il filo del corso (catalogo e prestiti con due database, Feign nei due sensi, penale per ritardo con i suoi test, interfaccia con form e restituzioni, collaudo end-to-end).
-
-I branch svolti servono da riferimento: non serve copiarli, serve guardarli
-quando non ricordi come si fa una cosa.
-
----
-
-## Scaricarlo senza git
-
-Ogni versione è una [release](https://github.com/daubog44/spring-boot-dockerized/releases/latest)
-con quattro zip, pronti da scaricare e da passare a chi ti pare:
-
-| Archivio | Cosa c'è |
-| :--- | :--- |
-| \`spring-boot-dockerized.zip\` | il template vuoto: è da qui che si parte a ogni traccia |
-| \`soluzione-wms.zip\` | la traccia WMS svolta (branch \`solution/wms\`) |
-| \`esempio-tourist-events.zip\` | l'esempio eventi/turismo (branch \`example/tourist-events\`) |
-| \`esempio-biblioteca.zip\` | la traccia Biblioteca svolta, quella del corso (branch \`example/biblioteca\`) |
-
-Il link al template dell'ultima versione non cambia mai, si può condividere
-così com'è:
-
-\`\`\`text
-https://github.com/daubog44/spring-boot-dockerized/releases/latest/download/spring-boot-dockerized.zip
-\`\`\`
-
-Scompatti, apri la cartella nel terminale, \`task help\`. Servono un JDK (dal 17
-in su), Docker e go-task, come col clone. Il template nasce su Java 25: se il
-tuo è un altro, \`task wizard\` (o \`task set-java\`) allinea il progetto al JDK
-che trova in \`JAVA_HOME\` o, se manca, nel \`PATH\`.
-
-**Pubblicare una versione nuova** (dopo il push di \`main\` e dei branch):
 
 \`\`\`bash
-git tag v1.2.5
-git push origin v1.2.5
+task remove-service SERVICE=ordini-service
 \`\`\`
 
-Il resto lo fa la GitHub Action [\`release.yml\`](./.github/workflows/release.yml):
-prepara i quattro zip dai branch e crea la release col tag.
+Dopo una dipendenza o un modulo nuovo ci vuole \`task dev\`: \`task compile\` non
+basta, perche' il classpath di un servizio e' fissato quando parte.
+
+E due controlli: \`task check\` verifica che moduli, porte, Dockerfile, compose e
+liste di avvio dicano la stessa cosa; \`task test\` collauda gli strumenti su una
+copia usa-e-getta del progetto.
+
+### Elenco completo dei task
+
+\`task help\` (o \`task\` da solo) stampa la guida; \`task --summary <comando>\` il
+dettaglio di uno.
+
+Sviluppo:
+
+- \`task wizard\`: Fa le domande e monta il progetto (\`SERVICE=<modulo>\` per uno solo).
+- \`task new-service NAME=<nome>\`: Genera un nuovo microservizio Spring Boot collegato.
+- \`task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=...\`: Genera Entity, Repository, Service e Controller.
+- \`task new-dto NAME=<Nome> FIELDS=...\`: Genera un DTO con validazione in common-dto.
+- \`task new-client FROM=<da> TO=<a> DTO=<NomeDto> [FIELDS=...]\`: Genera FeignClient (e DTO correlato se specificato).
+- \`task new-view SERVICE=<modulo> NAME=<Nome> FIELDS=...\`: Genera Controller e template Thymeleaf per UI.
+- \`task new-auth SERVICE=<modulo> TYPE=db|inmemory|form\`: Configura Spring Security con zero boilerplate.
+- \`task new-handler SERVICE=<modulo>\`: Genera GlobalExceptionHandler (@RestControllerAdvice).
+- \`task consegna NOME=COGNOME_NOME\`: Prepara la cartella da consegnare.
+- \`task seed-data\`: Dati di prova ricavati dalle \`@Entity\`.
+- \`task db-schema\`: Schema concettuale e logico ricavato dalle \`@Entity\`.
+- \`task db-config\`: Stampa o cambia le credenziali del database.
+- \`task rename-project NAME=<nome>\`: Rinomina la cartella dei moduli Maven.
+- \`task ide-sync\`: Riallinea VS Code e Zed ai moduli veri.
+- \`task learn\`: Il corso nel browser, dalla traccia alla consegna.
+- \`task rete\`: Quali domini passano dalla rete dell'aula (all'esame e' filtrata: Maven Central passa).
+- \`task offline-prep\` / \`task offline\`: Scarica la sera prima, e verifica, quello che la rete potrebbe non far passare.
+- \`task dev\`: Pulisce, compila e avvia l'intero stack in locale con hot reload.
+- \`task dev-down\`: Ferma i servizi locali e libera le porte.
+- \`task logs\`: Segue i log di tutti i servizi in un terminale solo (\`task logs SERVICE=store\` per uno).
+- \`task status\`: Chi occupa le porte, quali container girano, cosa è registrato su Eureka.
+- \`task compile\`: Ricompila e fa ripartire i servizi già avviati.
+- \`task build\`: Compila e impacchetta tutti i moduli Maven tramite wrapper (\`mvnw\`).
+
+Container:
+
+- \`task docker-up\`: Avvia l'intero cluster di microservizi su Docker Compose con healthcheck.
+- \`task docker-down\`: Ferma i container. **I dati del database restano.**
+- \`task docker-reset\`: Ferma i container **ed elimina i volumi**: database ricreato da zero.
+- \`task docker-logs\`: Monitora i log di tutti i microservizi.
+
+Pulizia:
+
+- \`task clean-ports\`: Come \`dev-down\`, libera le porte dello stack.
+- \`task kill-java\`: Ultima spiaggia, termina **tutti** i processi Java della macchina, anche quelli estranei al progetto.
+
+Avvio manuale di un modulo solo, in primo piano: \`task run SERVICE=<modulo>\` (o \`task run-eureka\`, \`task run-db\`).
 
 ---
 
-## Cosa c'è nel template
+### L'editor
 
-Aggregatore Maven multi-modulo dentro \`demo/\`:
+Apri **la cartella del repository**, non quella di un singolo servizio: e' un
+progetto Maven multi-modulo.
 
-| Modulo | A cosa serve |
-| :--- | :--- |
-| \`naming-server\` | Eureka Server, porta \`8761\`. I servizi si registrano qui e si chiamano per nome. |
-| \`common-dto\` | Le classi condivise fra i servizi (DTO). Un modulo solo, così non si duplicano. |
+- **VS Code**: \`F5\` -> **Stack completo** avvia tutti i servizi in debug, Eureka
+  per primo. Serve l'*Extension Pack for Java*; le altre estensioni consigliate
+  te le propone VS Code stesso (\`.vscode/extensions.json\`).
+- **Zed**: \`F4\` → il servizio da avviare in debug (\`.zed/debug.json\`); palette
+  → *task: Spawn* per i comandi \`task\`. Serve l'estensione *Java*, che al primo
+  file \`.java\` scarica jdtls, Lombok e il debugger: la prima volta, con la rete.
+- **IntelliJ IDEA**: niente da configurare, apri il pom aggregatore.
 
-E, già pronto e configurato per i moduli che creerai:
+\`launch.json\` e i due \`tasks.json\` sono generati: li riscrivono \`new-service\`,
+\`remove-service\` e \`set-port\`. Se l'elenco dei servizi non torna:
 
-- **Spring Boot 4.0.5** e **Spring Cloud 2025.1.1** con le versioni gestite dal pom padre: nei moduli le dipendenze si scrivono senza versione.
-- **spring-boot-devtools** ereditato da tutti i moduli: hot reload dopo \`task compile\`.
-- **springdoc-openapi**: ogni modulo creato da \`task new-service\` espone \`/swagger-ui.html\` dal primo avvio, senza configurazione (per gli altri c'è \`task enable-swagger\`).
-- **PostgreSQL** in \`docker-compose.yml\` (database \`esame\`, utente e password \`exam\`): c'è un container, **non collegato a niente** finché non lo chiedi. I moduli generati partono con H2 in memoria; \`task use-postgres SERVICE=<modulo>\` sposta un modulo sul database vero, e con \`DBNAME=\` gliene dà uno tutto suo dentro lo stesso container.
-- **Dockerfile unico** parametrico sul modulo: un'immagine per servizio, senza un Dockerfile per cartella.
-- **Configurazione degli editor** gia' pronta e **mantenuta dai comandi**: \`.vscode/launch.json\` (un profilo di debug per servizio, piu' il compound *Stack completo*), \`.vscode/tasks.json\` e \`.zed/tasks.json\` (i comandi \`task\` dalla palette), piu' \`settings.json\`, \`extensions.json\` e \`.editorconfig\`. Li riscrivono \`new-service\`, \`remove-service\` e \`set-port\`; se restano indietro lo dice \`task check\`.
-- **Pacchetto Java corto**: i sorgenti di un modulo stanno in \`src/main/java/esame/<modulo>/\`, non in \`com/example/...\`. La base si cambia per tutti i moduli con \`task set-package PACKAGE=it.cognome\` (lo chiede anche il wizard), e \`new-service\` la segue.
-- **La versione di Java della macchina**: \`task set-java\` allinea pom, immagini Docker e VS Code al JDK installato (dal 17 in su); il wizard lo fa da solo all'inizio, e \`task check\` avvisa se il JDK è più vecchio del progetto.
+\`\`\`bash
+task ide-sync
+\`\`\`
 
----
+## Wizard, dati di prova e consegna
 
-## Come si lavora
-
-Il giorno dell'esame, letta la traccia, il modo più rapido per montare il
-progetto è il wizard: allinea Java al JDK della macchina, poi chiede come si
-chiama la cartella dei moduli, il pacchetto Java di base, se serve PostgreSQL
-e con quali credenziali, e i microservizi uno per uno.
+Il giorno dell'esame, letta la traccia, il modo piu' rapido per montare il
+progetto e' il wizard: chiede come si chiama la cartella dei moduli, se serve
+PostgreSQL e con quali credenziali, e poi i microservizi uno per uno.
 
 \`\`\`bash
 task wizard
@@ -3335,136 +3426,6 @@ task wizard
 Per un microservizio solo: \`task wizard SERVICE=<nome>\`. Non fa niente di
 magico: chiama \`set-java\`, \`rename-project\`, \`set-package\`, \`db-config\`,
 \`new-service\` e \`use-postgres\` nell'ordine giusto, e finisce con \`task check\`.
-
-Poi, una volta sola:
-
-\`\`\`bash
-task dev
-\`\`\`
-
-Libera le porte, compila e avvia in background quello che c'è, con hot reload.
-Restituisce il prompt: niente finestre sparse da inseguire.
-
-Poi il ciclo della giornata:
-
-> scrivi il codice → \`task compile\` → il servizio si riavvia da solo
-
-I log di tutti i servizi, in un terminale solo:
-
-\`\`\`bash
-task logs
-\`\`\`
-
-Quando qualcosa non risponde, prima di formulare ipotesi:
-
-\`\`\`bash
-task status
-\`\`\`
-
-Dice porta per porta chi è in ascolto — un tuo servizio, i container, o
-un'applicazione estranea — e cosa si è registrato su Eureka.
-
-### Quando cambia la struttura
-
-Aggiungere un modulo o una dipendenza, o spostare una porta, tocca più file che
-devono restare d'accordo. Un comando per ognuna di queste cose:
-
-\`\`\`bash
-task new-service NAME=ordini-service
-\`\`\`
-
-\`\`\`bash
-task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
-\`\`\`
-
-\`\`\`bash
-task new-dto NAME=Ordine FIELDS=id:long,numero:string:required,totale:decimal
-\`\`\`
-
-\`\`\`bash
-task new-client FROM=report-service TO=ordini-service DTO=OrdineDto
-\`\`\`
-
-\`\`\`bash
-task new-view SERVICE=store-ui NAME=Ordini FIELDS=numero:string:required,totale:decimal
-\`\`\`
-
-\`\`\`bash
-task new-auth SERVICE=ordini-service TYPE=db
-\`\`\`
-
-\`\`\`bash
-task new-handler SERVICE=ordini-service
-\`\`\`
-
-\`\`\`bash
-task add-dep SERVICE=ordini-service DEPS=security,mail
-\`\`\`
-
-\`\`\`bash
-task set-port SERVICE=ordini-service PORT=8090
-\`\`\`
-
-\`\`\`bash
-task remove-service SERVICE=ordini-service
-\`\`\`
-
-\`\`\`bash
-task use-postgres SERVICE=ordini-service
-\`\`\`
-
-\`\`\`bash
-task enable-swagger SERVICE=ordini-service
-\`\`\`
-
-\`\`\`bash
-task db-config DBNAME=magazzino USER=wms PASSWORD=wms123
-\`\`\`
-
-\`\`\`bash
-task rename-project NAME=wms
-\`\`\`
-
-Tutti si usano con variabili \`NOME=valore\`, mai con trattini. Dopo una
-dipendenza o un modulo nuovo ci vuole \`task dev\`: \`task compile\` non basta,
-perché il classpath di un servizio è fissato quando parte.
-
-Due comandi di controllo:
-
-\`\`\`bash
-task check
-\`\`\`
-
-Verifica, senza avviare niente, che moduli, porte, Dockerfile, compose e liste
-di avvio dicano la stessa cosa.
-
-\`\`\`bash
-task test
-\`\`\`
-
-Collauda gli strumenti stessi su una copia usa-e-getta del progetto. Lancialo
-appena ti siedi: se passa, sai che funzionano quando ti serviranno.
-
-### L'editor
-
-Apri **la cartella del repository**, non quella di un singolo servizio: e' un
-progetto Maven multi-modulo.
-
-- **VS Code**: \`F5\` → **Stack completo** avvia tutti i servizi in debug, Eureka
-  per primo. Serve l'*Extension Pack for Java*; le altre estensioni consigliate
-  te le propone VS Code stesso (\`.vscode/extensions.json\`).
-- **Zed**: \`F4\` → il servizio da avviare in debug (\`.zed/debug.json\`); palette
-  → *task: Spawn* per i comandi \`task\`. Serve l'estensione *Java*, che al primo
-  file \`.java\` scarica jdtls, Lombok e il debugger: la prima volta, con la rete.
-- **IntelliJ IDEA**: niente da configurare, apri il pom aggregatore.
-
-Se l'elenco dei servizi non torna (hai toccato i moduli a mano):
-
-\`\`\`bash
-task ide-sync
-\`\`\`
-
-### Il database e la consegna
 
 Scritte le entity, due comandi le mettono al lavoro. Tutti e due passano dal
 database vero, non dalla lettura dei sorgenti: avviano l'applicazione, lasciano
@@ -3477,17 +3438,18 @@ task seed-data
 Accende i dati di prova: a ogni avvio le tabelle vuote si riempiono da sole
 con righe plausibili, salvate passando da Hibernate, quindi con id, relazioni,
 enum e vincoli di validazione rispettati. Prima prova su un H2 usa-e-getta e
-ti dice tabella per tabella com'è andata. Una demo su tabelle vuote non si
+ti dice tabella per tabella com'e' andata. Una demo su tabelle vuote non si
 vede.
 
 \`\`\`bash
 task db-schema
 \`\`\`
 
-Lo schema concettuale e logico della base dati — entità e relazioni, tabelle,
-colonne, tipi SQL, chiavi, vincoli e un diagramma ER — letto dal database dopo
-che Hibernate l'ha creato, non ricordato a memoria. È quello che chiede
-l'allegato tecnico.
+Lo schema concettuale e logico della base dati - entita' e relazioni, tabelle,
+colonne, tipi SQL, chiavi, vincoli e un diagramma ER - letto dal database dopo
+che Hibernate l'ha creato. E' quello che chiede l'allegato tecnico.
+
+E a fine giornata:
 
 \`\`\`bash
 task consegna NOME=COGNOME_NOME
@@ -3497,13 +3459,10 @@ Prepara \`consegna/\`: il progetto pronto da eseguire (i moduli senza \`target/\
 accanto a pom e compose), l'allegato tecnico già compilato con moduli, porte,
 endpoint e schema, le istruzioni di esecuzione, e un archivio unico da
 consegnare. Chi lo corregge lo scompatta e lancia \`docker compose up --build\`.
-Le parti da scrivere a mano (analisi, algoritmo, che cosa fa ogni modulo)
-stanno in \`allegato.md\`: la consegna le mette nell'allegato prima di fare
-l'archivio, e si può rilanciare quante volte si vuole.
 
 ### La rete all'esame
 
-All'esame la rete passa da una whitelist di domini: Maven Central sì, il
+All'esame la rete passa da una whitelist di domini: Maven Central si', il
 resto non si sa.
 
 \`\`\`bash
@@ -3518,35 +3477,19 @@ Docker, una prima build dei container e una copia di scorta del comando
 \`task\` stesso (in \`.tools/task\`, per quando GitHub non passa o la macchina
 dell'esame non ce l'ha: si attiva con \`scripts/usa-task-locale.ps1\`/\`.sh\`).
 \`task offline\` verifica. Portati la cartella del progetto e la \`~/.m2\` su una
-chiavetta: il template *è* la cartella, non serve altro.
-
-### Per la demo
-
-\`\`\`bash
-task docker-up
-\`\`\`
-
-Lo stack in container, che è quello che presenterai. Non devi fermare niente
-prima: \`docker-up\` spegne da solo lo stack locale, e \`task dev\` spegne da solo i
-container. Alla fine \`task docker-down\` (i dati del database restano;
-\`docker-reset\` invece li cancella).
+chiavetta: il template *e'* la cartella, non serve altro.
 
 ---
 
-## Porte
+## 🌐 Mappa delle Porte ed Interfacce OpenAPI / Swagger UI
 
-| Indirizzo | Cosa |
-| :--- | :--- |
-| \`http://localhost:8761\` | Dashboard Eureka |
-| \`localhost:5432\` | PostgreSQL (db \`esame\`, utente \`exam\`, password \`exam\`) |
-| \`http://localhost:<porta>/swagger-ui.html\` | Swagger di un servizio |
-
-Le porte dei servizi che crei le assegna \`task new-service\` (la prima libera
-dopo l'ultima usata) e le stampa \`task dev\` alla fine dell'avvio. Per cambiarne
-una: \`task set-port SERVICE=<modulo> PORT=<porta>\`.
-
-> Se su una porta gira un'applicazione che ti serve viva, dillo:
-> \`task dev KEEPFOREIGN=1 UI_PORT=9080\`. Senza \`KEEPFOREIGN=1\` viene chiusa.
+- **UI Applicativa**: \`http://localhost:8080\`
+- **Dashboard Eureka**: \`http://localhost:8761\`
+- **PostgreSQL**: \`localhost:5432\` (db \`event_suggestions\`, utente \`exam\`, password \`exam\`)
+- **Swagger UI Tourist Service**: \`http://localhost:8081/swagger-ui.html\`
+- **Swagger UI Random Service**: \`http://localhost:8082/swagger-ui.html\`
+- **Swagger UI Store Service**: \`http://localhost:8083/swagger-ui.html\`
+- **Swagger UI Event UI**: \`http://localhost:8080/swagger-ui.html\`
 
 ---
 
@@ -3585,13 +3528,13 @@ docker compose ps
 \`\`\`
 
 \`\`\`bash
-docker compose logs eureka-server --tail 50
+docker compose logs store-service --tail 50
 \`\`\`
 
-Per verificare quali servizi si sono effettivamente registrati su Eureka:
+Per verificare quali servizi si sono effettivamente registrati su Eureka, apri \`http://localhost:8761\` nel browser oppure, dall'host:
 
 \`\`\`bash
-docker compose exec eureka-server curl -s -H "Accept: application/json" http://localhost:8761/eureka/apps
+curl -s -H "Accept: application/json" http://localhost:8761/eureka/apps
 \`\`\`
 
 I container non hanno un nome fisso: Docker Compose li chiama \`<progetto>-<servizio>-1\`, e il progetto è la cartella del repository (lo impostano il Taskfile e gli script). Così la copia di prova e quella dell'esame hanno container e volume del database loro, anche con credenziali diverse. Per questo i comandi qui sopra usano il nome del **servizio** (\`eureka-server\`, \`postgres\`), e vanno lanciati dalla cartella dei moduli; fuori da \`task\`, \`docker compose\` usa il nome della cartella dei moduli, quindi aggiungi \`-p <cartella-del-repository>\`.
@@ -3839,21 +3782,15 @@ passare dai comandi; se il \`launch.json\` resta indietro, te lo dice \`task che
 
 ## Fase 1 — Sviluppo: il ciclo che ripeterai tutto il giorno
 
-Questo branch è il template vuoto: c'è Eureka, il modulo \`common-dto\` per le
-classi condivise, e nient'altro. I servizi della traccia li crei tu, un
-comando per uno:
+Questo branch è l'esempio svolto della traccia turismo: \`tourist-service\`,
+\`random-service\`, \`store-service\` e \`event-ui\` ci sono già. Se ti serve un
+servizio in più:
 
 \`\`\`bash
 task new-service NAME=ordini-service
 \`\`\`
 
-\`\`\`bash
-task new-service NAME=ordini-ui UI=1
-\`\`\`
-
-Il primo ti dà un servizio REST (con JPA, H2 e Swagger già collegati), il
-secondo una UI Thymeleaf. Entrambi si registrano su Eureka e possono chiamarsi
-per nome con Feign. Poi:
+Poi, una volta sola all'inizio:
 
 \`\`\`bash
 task dev
@@ -3870,7 +3807,7 @@ task logs
 
 Ogni riga è prefissata dal nome del servizio e colorata. \`Ctrl+C\` chiude solo
 questa vista: i servizi restano accesi. Per seguirne uno solo:
-\`task logs SERVICE=<nome>\`, con il nome breve che vedi in \`task status\`.
+\`task logs SERVICE=store\`.
 
 Poi il ciclo è **solo questo**:
 
@@ -3909,7 +3846,7 @@ dettaglio di uno.
 ### Aggiungere una dipendenza a un microservizio
 
 \`\`\`bash
-task add-dep SERVICE=ordini-service DEPS=security,mail
+task add-dep SERVICE=store-service DEPS=security,mail
 \`\`\`
 
 Le versioni **non si scrivono**: le decide il \`pom.xml\` padre, che eredita da
@@ -3924,7 +3861,7 @@ task add-dep LIST=1
 \`\`\`
 
 Se ti serve qualcosa che non è in elenco, passa le coordinate per esteso:
-\`task add-dep SERVICE=ordini-service DEPS=org.apache.commons:commons-lang3:3.17.0\`.
+\`task add-dep SERVICE=store-service DEPS=org.apache.commons:commons-lang3:3.17.0\`.
 
 > **Poi serve \`task dev\`, non \`task compile\`.** Il classpath di un servizio è
 > fissato quando parte: un jar nuovo lo vede solo un riavvio vero. Vale per
@@ -3936,7 +3873,7 @@ i moduli — è lui a dare l'hot reload dopo \`task compile\`.
 ### Cambiare una porta
 
 \`\`\`bash
-task set-port SERVICE=ordini-service PORT=8090
+task set-port SERVICE=event-ui PORT=9080
 \`\`\`
 
 Una porta è scritta in quattro punti: l'\`application.yml\` del modulo,
@@ -4131,7 +4068,7 @@ ti dice tabella per tabella quante righe sono entrate — o perché no, adesso e
 non davanti al docente.
 
 \`\`\`bash
-task seed-data SERVICE=ordini-service ROWS=10
+task seed-data SERVICE=tourist-service ROWS=10
 task seed-data ROWS=0      # spenti
 \`\`\`
 
@@ -4196,8 +4133,8 @@ averne bisogno. Con \`task test FULL=1\` compila anche il modulo generato.
 
 ### Rinominare la cartella dei moduli
 
-Si chiama \`demo\` perché così nasce da Spring Initializr. Se all'esame preferisci
-il nome del progetto:
+Si chiama \`demo\` perche' cosi' nasce da Spring Initializr. Se all'esame
+preferisci il nome del progetto:
 
 \`\`\`bash
 task rename-project NAME=wms
@@ -4241,12 +4178,12 @@ Non devi fermare niente prima: \`task docker-up\` spegne da solo lo stack locale
 task docker-up
 \`\`\`
 
-Aspetta che \`task status\` mostri i tuoi servizi registrati su Eureka, poi
+Aspetta che \`task status\` mostri i quattro servizi registrati su Eureka, poi
 apri nell'ordine:
 
-1. la tua UI — l'applicazione (l'indirizzo lo stampa \`task dev\`)
+1. \`http://localhost:8080\` — l'applicazione
 2. \`http://localhost:8761\` — la dashboard Eureka, per far vedere il discovery
-3. lo Swagger di un servizio — i contratti OpenAPI
+3. \`http://localhost:8081/swagger-ui.html\` — i contratti OpenAPI
 
 Se ti chiedono della **resilienza**, spegni un servizio davanti a loro e
 ricarica la pagina: resta in piedi con i segnaposto invece di andare in
@@ -4254,10 +4191,10 @@ errore. Dalla cartella dei moduli (quella con \`docker-compose.yml\`), col nome
 del servizio:
 
 \`\`\`bash
-docker compose stop <servizio>
+docker compose stop random-service
 \`\`\`
 
-e poi \`docker compose start <servizio>\` per riaccenderlo.
+e poi \`docker compose start random-service\` per riaccenderlo.
 
 Alla fine:
 
@@ -4819,7 +4756,7 @@ All'esame il tempo è prezioso: delega agli strumenti il lavoro meccanico e conc
 | Ambito | Cosa deleghi al Template / ai comandi \`task\` | Cosa spetta a TE (Candidato) |
 | :--- | :--- | :--- |
 | **Architettura & Moduli** | \`task new-service\` collega il modulo in tutti i 6 punti (pom aggregatore, Dockerfile, docker-compose, dev, VS Code, porte). | Scegliere i nomi dei moduli dalla traccia (es. \`catalogo-service\`, \`ordini-service\`, \`ui-service\`). |
-| **Persistenza & Entity** | \`task new-entity\` genera Entity, Repository, Service CRUD e Controller REST con Swagger. | Definire le **relazioni JPA** (@ManyToOne, @ManyToMany...) all'interno del modulo e i metodi custom del repository (tramite nome derivato \`findBy...\` o query esplicita \`@Query\`/\`nativeQuery\`). |
+| **Persistenza & Entity** | \`task new-entity\` genera Entity, Repository, Service CRUD e Controller REST (anche con DTO via \`DTO=1\`). \`task add-relation\` collega le entity tra loro in JPA (\`@ManyToOne\`, \`@OneToMany\`...) con \`fetch = LAZY\`. | I metodi custom del repository (tramite nome derivato \`findBy...\` o query esplicita \`@Query\`/\`nativeQuery\`) e la logica specifica. |
 | **Microservizi & Database** | Ogni modulo ha il suo database isolato (H2 in-memory o Postgres dedicato con \`task use-postgres\`). | **NON creare mai chiavi esterne tra moduli diversi!** Usare solo l'ID numerico (\`Long libroId\`) e OpenFeign. |
 | **Contratti DTO & Record** | \`task new-dto\` genera i record Java in \`common-dto\` con validazione Bean Validation. | Decidere quali campi esporre e scambiare tra i microservizi. |
 | **Chiamate tra Servizi** | \`task new-client\` crea l'interfaccia \`@FeignClient\` pronta con metodi CRUD risolti tramite Eureka. | Invocare il client nel \`@Service\` chiamante e gestire le eccezioni di business (es. 404 se un record non esiste). |
@@ -6588,7 +6525,7 @@ java --version
 
 ### A. Avvio Stack Completo Containerizzato (CONSIGLIATO PER LA DEMO)
 
-Esegue in container Docker isolati tutti i moduli del progetto — Eureka, i tuoi servizi — e il database PostgreSQL:
+Esegue tutti i 5 microservizi Spring Boot e il database PostgreSQL in container Docker isolati:
 
 \`\`\`bash
 # Entra nella cartella di progetto
@@ -6619,7 +6556,7 @@ task docker-reset
 
 ### B. Sviluppo Locale con Hot Reload (CONSIGLIATO MENTRE SVILUPPI)
 
-Un solo comando libera le porte (chiudendo chi le tiene occupate), compila tutto e lancia Eureka e i tuoi servizi, nell'ordine giusto (Eureka per primo, e ne aspetta la porta prima degli altri). Se un tuo servizio usa PostgreSQL, avvia anche quello: basta mettere \`$usesPostgres = $true\` in \`scripts/dev.ps1\` (\`USES_POSTGRES=1\` in \`dev.sh\`).
+Un solo comando libera le porte (chiudendo chi le tiene occupate), avvia PostgreSQL, compila tutto e lancia Eureka e i quattro servizi:
 
 \`\`\`bash
 task dev
@@ -6631,7 +6568,7 @@ I servizi girano in background: niente finestre sparse, un terminale solo. Per v
 task logs
 \`\`\`
 
-\`Ctrl+C\` chiude solo la vista, i servizi restano su. Per uno solo: \`task logs SERVICE=<nome>\`, col nome breve che vedi in \`task status\`. I log restano comunque su file in \`.dev-logs/\`.
+\`Ctrl+C\` chiude solo la vista, i servizi restano su. Per uno solo: \`task logs SERVICE=store\`. I log restano comunque su file in \`.dev-logs/\`.
 
 Dopo una modifica al codice, ricompila e i servizi interessati si riavviano da soli grazie a \`spring-boot-devtools\`:
 
@@ -6653,57 +6590,41 @@ task status
 
 Dice chi occupa ogni porta (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
 
-**Perché non usare \`task docker-up\` mentre sviluppi**: \`docker compose build\` ricostruisce un'immagine per servizio, e poiché il \`Dockerfile\` copia i sorgenti prima di compilare, ogni singola modifica invalida la cache e fa ricompilare tutto in ogni immagine. Un ciclo costa minuti contro i ~20 secondi del build locale.
+**Perché non usare \`task docker-up\` mentre sviluppi**: \`docker compose build\` ricostruisce tutte e cinque le immagini, e poiché il \`Dockerfile\` copia i sorgenti prima di compilare, ogni singola modifica invalida la cache e fa ricompilare tutto in ogni immagine. Un ciclo costa minuti contro i ~20 secondi del build locale.
 
 ---
 
 ### C. Avvio Manuale dei Singoli Moduli
 
-Se ti serve isolare un servizio e vederne l'output nel terminale:
+Se ti serve isolare un servizio, in terminali distinti:
 
 \`\`\`bash
 task run SERVICE=<modulo>
 \`\`\`
 
-Due scorciatoie per quello che c'è sempre:
-
-\`\`\`bash
-task run-eureka
-\`\`\`
+Le scorciatoie di questa traccia:
 
 \`\`\`bash
 task run-db
+task run-eureka
+task run-tourist
+task run-random
+task run-store
+task run-ui
 \`\`\`
-
-\`Ctrl+C\` ferma il modulo. Per lo stack intero, in background, resta \`task dev\`.
 
 ---
 
 ## 3. Mappa delle Porte ed Endpoint OpenAPI / Swagger UI
 
-Questo branch è il **template vuoto**: le uniche porte fisse sono quelle
-dell'infrastruttura. Le altre le assegna \`task new-service\` (la prima libera
-dopo l'ultima usata) e te le stampa \`task dev\` alla fine dell'avvio.
-
-| Servizio | Porta Host | Endpoint / Dashboard | Swagger UI |
+| Servizio | Porta Host | Endpoint Principal / Dashboard | Swagger UI (Contratti OpenAPI) |
 | :--- | :---: | :--- | :--- |
-| **Eureka Naming Server** | \`8761\` | \`http://localhost:8761\` | N/A (dashboard Eureka) |
-| **PostgreSQL** | \`5432\` | \`jdbc:postgresql://localhost:5432/esame\` (utente e password \`exam\`) | N/A |
-| **I tuoi servizi REST** | \`8081\`, \`8082\`, ... | \`http://localhost:<porta>/api/...\` | \`http://localhost:<porta>/swagger-ui.html\` |
-| **La tua UI** | la prima libera | \`http://localhost:<porta>\` | idem |
-
-Per sapere in ogni momento chi sta su quale porta, e chi è registrato su Eureka:
-
-\`\`\`bash
-task status
-\`\`\`
-
-Per spostare una porta ovunque sia scritta (\`application.yml\`, compose, liste
-di avvio):
-
-\`\`\`bash
-task set-port SERVICE=<modulo> PORT=<porta>
-\`\`\`
+| **Event UI** | \`8080\` | \`http://localhost:8080\` | \`http://localhost:8080/swagger-ui.html\` |
+| **Eureka Naming Server** | \`8761\` | \`http://localhost:8761\` | N/A (Dashboard Eureka) |
+| **Tourist Service** | \`8081\` | \`http://localhost:8081/api/events/nearby\` | \`http://localhost:8081/swagger-ui.html\` |
+| **Random Service** | \`8082\` | \`http://localhost:8082/api/random\` | \`http://localhost:8082/swagger-ui.html\` |
+| **Store Service** | \`8083\` | \`http://localhost:8083/api/suggestions\` | \`http://localhost:8083/swagger-ui.html\` |
+| **PostgreSQL DB** | \`5432\` | \`jdbc:postgresql://localhost:5432/event_suggestions\` | N/A (Postgres Native) |
 
 ### Il database
 
@@ -6717,6 +6638,8 @@ task use-postgres SERVICE=<modulo>
 
 Con \`DBNAME=<nome>\` quel modulo ottiene un database tutto suo, sempre dentro
 lo stesso container. Vedi GIORNO-ESAME.md, "Collegare un servizio a PostgreSQL".
+
+
 
 Le credenziali non sono scolpite nella pietra:
 
@@ -6750,7 +6673,8 @@ Per non perdere ore a scrivere codice boilerplate e classi ripetitive durante l'
 | :--- | :--- | :--- |
 | **\`task wizard\`** | \`task wizard\` | Crea l'intera architettura a microservizi guidandoti passo passo. |
 | **\`task new-service\`** | \`task new-service NAME=ordini-service [UI=1] [NODB=1]\` | Crea un nuovo microservizio e lo collega a pom, Dockerfile, compose, porte ed editor. |
-| **\`task new-entity\`** | \`task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=cliente:string(100):required,quantita:int:required,totale:decimal,data:date\` | Genera in blocco **Entity JPA**, **Repository**, **Service CRUD** e **Controller REST** con Swagger. |
+| **\`task new-entity\`** | \`task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=... [DTO=1]\` | Genera in blocco **Entity JPA**, **Repository**, **Service CRUD** e **Controller REST** (anche basati su DTO se \`DTO=1\`). |
+| **\`task add-relation\`** | \`task add-relation SERVICE=ordini-service FROM=Ordine TO=Cliente TYPE=many-to-one\` | Configura una relazione JPA (\`@ManyToOne\`, \`@OneToMany\`, \`@OneToOne\`, \`@ManyToMany\`) con \`fetch = LAZY\`, \`@JoinColumn\` e campo inverso. Interattivo se lanciato senza argomenti (\`task add-relation\`). |
 | **\`task new-client\`** | \`task new-client FROM=ordini-ui TO=ordini-service DTO=OrdineDto [FIELDS=...]\` | Genera interfaccia \`@FeignClient(name="ORDINI-SERVICE")\` e, con \`FIELDS=\`, anche il DTO in \`common-dto\`. |
 | **\`task new-dto\`** | \`task new-dto NAME=OrdineDto FIELDS=id:long,cliente:string:required [CLASS=1]\` | Genera un Java record DTO immutabile con validazioni in \`common-dto\`. |
 | **\`task new-view\`** | \`task new-view SERVICE=ordini-ui NAME=Ordini FIELDS=cliente:string:required,quantita:int\` | Genera controller Spring MVC (\`OrdiniUiController\`) e template Thymeleaf (\`ordini.html\`) con form e tabella. |
@@ -6780,43 +6704,29 @@ Per non perdere ore a scrivere codice boilerplate e classi ripetitive durante l'
 
 ---
 
-## 4. Collaudo Rapido
+## 4. Collaudo Rapido & Coordinate Demo (Bolzano)
 
-### Prima: il progetto è coerente?
+Per dimostrare il funzionamento durante la presentazione della prova finale, inserisci nella UI o nei test HTTP le seguenti coordinate testate:
 
-\`\`\`bash
-task check
-\`\`\`
+### Coordinate Bolzano Centro:
+- **Latitudine**: \`46.4983\`
+- **Longitudine**: \`11.3548\`
+- **Raggio**: \`10000\` (metri)
+- **Limit**: \`5\` (eventi)
+- **Lingua**: \`it\`
 
-Non avvia niente: verifica che moduli, porte, \`Dockerfile\`, \`docker-compose.yml\`
-e liste di avvio dicano la stessa cosa, e che le porte siano davvero usabili su
-questa macchina. Se qualcosa non torna te lo dice qui, non a demo iniziata.
-
-### Poi: i servizi si vedono fra loro?
-
-\`\`\`bash
-task status
-\`\`\`
-
-Nella sezione **REGISTRO EUREKA** devono comparire tutti i tuoi servizi. Se uno
-manca, o è partito da pochi secondi, o non parte affatto: \`task logs
-SERVICE=<nome>\`.
-
-### Infine: gli endpoint rispondono?
-
-Ogni servizio creato con \`task new-service\` nasce con un endpoint di prova e
-con Swagger già collegato:
+### Test Rapido via \`curl\` (API Direct Check)
 
 \`\`\`bash
-curl http://localhost:<porta>/api/ping
+# 1. Test Tourist Service via OpenDataHub Wrapper
+curl "http://localhost:8081/api/events/nearby?latitude=46.4983&longitude=11.3548&limit=5&radius=10000&language=it"
+
+# 2. Test Random Service
+curl "http://localhost:8082/api/random?upperBound=5"
+
+# 3. Test Store Service (Storico)
+curl "http://localhost:8083/api/suggestions?limit=10"
 \`\`\`
-
-Swagger UI (\`http://localhost:<porta>/swagger-ui.html\`) è il modo più comodo
-per provare gli endpoint veri: mostra lo schema esatto delle richieste e le
-esegue dal browser, senza scrivere \`curl\` a mano.
-
-L'ultimo collaudo, quello che conta, è percorrere il flusso completo dalla UI
-come lo mostrerai alla commissione.
 
 ---
 
@@ -6846,6 +6756,12 @@ Se su una di quelle porte gira qualcosa che ti serve viva, dillo e sposta la UI:
 task dev KEEPFOREIGN=1 UI_PORT=9080
 \`\`\`
 
+### 🚨 Emergenza 1-bis: "container ...-eureka-server-1 is unhealthy"
+\`task docker-up\` si interrompe con \`dependency failed to start: container <cartella>-eureka-server-1 is unhealthy\`, ma nei log Eureka scrive \`Started Eureka Server\`. L'healthcheck usa \`curl\`, che l'immagine \`eclipse-temurin:25-jre\` non contiene. Il \`demo/Dockerfile\` di questo repo lo installa già; se aggiungi un healthcheck HTTP a un altro servizio vale la stessa regola. Per leggere l'esito delle probe, dalla cartella dei moduli:
+\`\`\`bash
+docker inspect $(docker compose ps -q eureka-server) --format "{{json .State.Health}}"
+\`\`\`
+
 ### 🚨 Emergenza 1-ter: "porta occupata da processo sconosciuto"
 
 \`task dev\` dice che una porta è occupata, \`task status\` la segna **RISERVATA** e
@@ -6870,12 +6786,6 @@ net stop winnat
 \`\`\`
 \`\`\`bash
 net start winnat
-\`\`\`
-
-### 🚨 Emergenza 1-bis: "container ...-eureka-server-1 is unhealthy"
-\`task docker-up\` si interrompe con \`dependency failed to start: container <cartella>-eureka-server-1 is unhealthy\`, ma nei log Eureka scrive \`Started Eureka Server\`. L'healthcheck usa \`curl\`, che l'immagine \`eclipse-temurin:25-jre\` non contiene. Il \`demo/Dockerfile\` di questo repo lo installa già; se aggiungi un healthcheck HTTP a un altro servizio vale la stessa regola. Per leggere l'esito delle probe, dalla cartella dei moduli:
-\`\`\`bash
-docker inspect $(docker compose ps -q eureka-server) --format "{{json .State.Health}}"
 \`\`\`
 
 ### 🚨 Emergenza 2: "Docker Compose non aggiorna il codice modificato"
@@ -6943,7 +6853,7 @@ Se restano indietro lo segnala \`task check\`, alla voce *editor (launch.json)*.
 
 ---
 
-## 7. Prima e dopo: la rete dell'esame e la consegna
+## Prima e dopo: la rete dell'esame e la consegna
 
 All'esame la rete passa da una whitelist di domini: Maven Central sì, il resto
 non si sa. \`task rete\` dice, dominio per dominio, che cosa passa e che cosa
@@ -6976,6 +6886,384 @@ archivio unico da consegnare: scompattato, parte con \`docker compose up --build
 Le parti dell'allegato da scrivere a mano (analisi, algoritmo, che cosa fa ogni
 modulo) stanno in \`allegato.md\`: la consegna le mette al loro posto prima di
 fare l'archivio, quindi si può rilanciare quante volte si vuole.
+` },
+    { file: 'README-ESAME-TTFCLOUD.md', testo: `# Documentazione Esame Spring Cloud
+
+## Obiettivo
+
+Questa soluzione realizza una UI che suggerisce un evento locale vicino alla posizione inserita dall'utente.
+
+Flusso richiesto dalla traccia:
+
+1. la UI riceve coordinate geografiche, raggio e numero di alternative
+2. la UI interroga \`TOURIST-SERVICE\` tramite Eureka
+3. \`TOURIST-SERVICE\` usa OpenFeign come wrapper dell'endpoint OpenDataHub \`/v1/Event\`
+4. la UI interroga \`RANDOM-SERVICE\` per ottenere un indice casuale
+5. la UI salva il suggerimento scelto su \`STORE-SERVICE\`
+6. \`STORE-SERVICE\` persiste lo storico su PostgreSQL tramite Hibernate/JPA
+7. la UI mostra evento estratto e storico suggerimenti
+
+## Architettura
+
+Applicazioni Spring Boot presenti:
+
+- \`eureka-server\`
+- \`tourist-service\`
+- \`random-service\`
+- \`store-service\`
+- \`event-ui\`
+
+Package principali:
+
+- \`com.example.ttfcloud_esame.namingserver\`
+- \`com.example.ttfcloud_esame.touristservice\`
+- \`com.example.ttfcloud_esame.randomservice\`
+- \`com.example.ttfcloud_esame.storeservice\`
+- \`com.example.ttfcloud_esame.ui\`
+- \`com.example.ttfcloud_esame.common.dto\`
+
+## Multi-Module Maven
+
+Il progetto ora usa un parent Maven aggregatore in [demo/pom.xml](./demo/pom.xml) e sei moduli separati:
+
+- [common-dto](./demo/common-dto)
+- [naming-server](./demo/naming-server)
+- [tourist-service](./demo/tourist-service)
+- [random-service](./demo/random-service)
+- [store-service](./demo/store-service)
+- [event-ui](./demo/event-ui)
+
+Cosa cambia davvero:
+
+- le dipendenze non sono piu\` condivise da tutto il progetto
+- ogni servizio compila solo con gli starter che gli servono
+- i DTO comuni stanno in un jar separato
+- Docker e \`spring-boot:run\` lavorano sul singolo modulo, non su un monolite con piu\` main class
+
+Funziona bene?
+
+- si\`, per questo caso e\` piu\` pulito del single-module
+- il comportamento applicativo non cambia
+- migliora isolamento e leggibilita\`
+- l'unico costo e\` avere piu\` \`pom.xml\` e una struttura leggermente piu\` articolata
+
+## Tecnologie
+
+- Spring Boot 4.0.5
+- Spring Cloud Netflix Eureka
+- Spring Cloud 2025.1.1
+- Spring Cloud OpenFeign
+- Spring Data JPA / Hibernate
+- PostgreSQL 18.3
+- Lombok 1.18.44
+- Apache Maven Wrapper 3.9.14
+- Thymeleaf
+- Tailwind CSS compilato localmente
+- Docker / Docker Compose
+- Taskfile
+
+Versioni GA verificate al 10/04/2026.
+Nota: esiste anche Spring Boot \`4.1.0-M4\`, ma e\` una milestone e non una release GA; per l'esame e\` piu\` sensato restare sulla latest stabile \`4.0.5\`.
+
+## Installazioni necessarie
+
+Per eseguire il progetto servono questi strumenti sull'host:
+
+- Git
+- Docker Desktop oppure Docker Engine + Docker Compose
+- Task (\`go-task\`)
+
+Per i task locali \`run-*\` servono anche:
+
+- Java 25
+- una shell con \`mvnw\` eseguibile
+
+Installazioni minime consigliate:
+
+- Docker: deve supportare \`docker compose\`
+- Task: [https://taskfile.dev/installation/](https://taskfile.dev/installation/)
+- Java: JDK 25 se vuoi usare esattamente lo stesso setup del progetto
+
+Verifica rapida ambiente:
+
+\`\`\`bash
+git --version
+docker --version
+docker compose version
+task --version
+java --version
+\`\`\`
+
+Se vuoi usare solo Docker con \`task docker-up\`, Java non e\` strettamente necessaria sull'host per l'esecuzione finale dell'app, ma resta utile per \`task build\` e per i \`run-*\`.
+
+## Setup host
+
+### Setup minimo per la demo
+
+1. clona il repository
+2. entra nella root del progetto
+3. verifica che Docker sia avviato
+4. esegui \`task docker-up\`
+5. apri UI ed Eureka nel browser
+
+Comandi:
+
+\`\`\`bash
+git clone <url-repository>
+cd spring-boot-dockerized
+task docker-up
+\`\`\`
+
+Nota:
+al primo avvio \`task docker-up\` puo\` richiedere alcuni minuti per scaricare dipendenze Maven e immagini Docker.
+
+URL da aprire:
+
+- \`http://localhost:8080\`
+- \`http://localhost:8761\`
+
+### Setup per usare tutti i task
+
+Se vuoi usare anche i task locali oltre a Docker:
+
+1. installa Java 25
+2. installa Task
+3. verifica che il percorso configurato in [Taskfile.yml](./Taskfile.yml) per \`JAVA_HOME_PATH\` sia valido sul tuo host
+
+Sul mio setup il Taskfile usa:
+
+\`\`\`text
+C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot
+\`\`\`
+
+Se sul tuo PC Java e\` installato altrove, aggiorna \`JAVA_HOME_PATH\` nel Taskfile.
+
+## Porte e URL
+
+Con stack Docker avviato:
+
+- UI applicativa: \`http://localhost:8080\`
+- Eureka dashboard: \`http://localhost:8761\`
+- PostgreSQL: \`localhost:5432\`
+
+Porte interne servizi:
+
+- \`tourist-service\`: \`8081\`
+- \`random-service\`: \`8082\`
+- \`store-service\`: \`8083\`
+
+## Persistenza
+
+Database PostgreSQL:
+
+- DB: \`event_suggestions\`
+- user: \`exam\`
+- password: \`exam\`
+
+Tabella usata:
+
+- \`event_suggestions\`
+
+## Wrapper OpenDataHub
+
+Il wrapper usa:
+
+- base URL: \`https://tourism.opendatahub.com\`
+- endpoint: \`/v1/Event\`
+
+Filtri principali usati:
+
+- \`latitude\`
+- \`longitude\`
+- \`radius\`
+- \`pagesize = limit\`
+- \`begindate = oggi\`
+- \`active = true\`
+- \`odhactive = true\`
+- \`sort = upcoming\`
+- \`language\`
+
+## Eureka
+
+Per chiarezza d'esame i servizi client dichiarano \`@EnableDiscoveryClient\`.
+
+Servizi registrati:
+
+- \`TOURIST-SERVICE\`
+- \`RANDOM-SERVICE\`
+- \`STORE-SERVICE\`
+- \`EVENT-UI\`
+
+## Task disponibili
+
+Sviluppo con hot reload:
+
+- \`task dev\` — libera le porte (chiudendo chi le tiene occupate), avvia PostgreSQL, compila una volta e lancia Eureka e i quattro servizi, in background
+- \`task logs\` — segue i log di tutti i servizi in un terminale solo (\`task logs SERVICE=store\` per uno)
+- \`task status\` — chi occupa le porte, quali container girano, cosa è registrato su Eureka
+- \`task compile\` — ricompila: i servizi toccati si riavviano da soli grazie a \`spring-boot-devtools\`
+- \`task dev-down\` — ferma lo stack locale e il PostgreSQL avviato da \`task dev\`, liberando le porte
+
+Stack containerizzato:
+
+- \`task docker-up\` (ferma da solo lo stack locale, prima di partire)
+- \`task docker-down\` (i dati del database restano)
+- \`task docker-reset\` (elimina anche i volumi: database da zero)
+- \`task docker-logs\`
+
+Utilità:
+
+- \`task\` — elenca tutti i task
+- \`task build\`
+- \`task run-db\`
+- \`task clean-ports\` (come \`dev-down\`, libera le porte dello stack)
+- \`task kill-java\` (ultima spiaggia: termina **tutti** i processi Java della macchina)
+
+Task per singolo servizio:
+
+- \`task run-eureka\`
+- \`task run-tourist\`
+- \`task run-random\`
+- \`task run-store\`
+- \`task run-ui\`
+
+Nota:
+I task \`run-*\` avviano processi foreground con \`spring-boot:run\` sul singolo modulo, quindi vanno lanciati in terminali separati. \`task dev\` fa già questo lavoro per tutti e cinque in un colpo solo, in background e senza aprire finestre.
+
+## Avvio rapido
+
+### Stack completo Docker
+
+\`\`\`bash
+task docker-up
+\`\`\`
+
+Apri poi:
+
+- \`http://localhost:8080\`
+- \`http://localhost:8761\`
+
+Per spegnere tutto:
+
+\`\`\`bash
+task docker-down
+\`\`\`
+
+### Build
+
+\`\`\`bash
+task build
+\`\`\`
+
+### Coordinate demo consigliate
+
+Per una demo veloce a Bolzano puoi usare questi esempi:
+
+- Bolzano centro: \`latitude=46.4983\`, \`longitude=11.3548\`, \`radius=10000\`, \`limit=5\`, \`language=it\`
+- Piazza Walther / centro storico: \`latitude=46.4981\`, \`longitude=11.3540\`, \`radius=5000\`, \`limit=5\`, \`language=it\`
+
+Sono coordinate pratiche per ottenere eventi nell'area urbana di Bolzano senza dover cambiare altro nella UI.
+
+### Tutorial rapido multi-module
+
+1. entra nel parent Maven:
+
+\`\`\`bash
+cd demo
+\`\`\`
+
+2. build di tutti i moduli:
+
+\`\`\`bash
+./mvnw clean package -Dmaven.test.skip=true
+\`\`\`
+
+3. avvio di un solo modulo:
+
+\`\`\`bash
+./mvnw -pl event-ui -am spring-boot:run
+\`\`\`
+
+4. esempio per il tourist wrapper:
+
+\`\`\`bash
+./mvnw -pl tourist-service -am spring-boot:run
+\`\`\`
+
+5. build Docker di un solo servizio tramite argomento di build:
+
+\`\`\`bash
+docker build --build-arg MODULE=event-ui -t exam-ui .
+\`\`\`
+
+6. stack completo:
+
+\`\`\`bash
+task docker-up
+\`\`\`
+
+### Avvio locale senza stack completo Docker
+
+Un comando solo, che avvia anche PostgreSQL:
+
+\`\`\`bash
+task dev
+\`\`\`
+
+Se preferisci controllare i servizi uno per uno, prima il DB:
+
+\`\`\`bash
+task run-db
+\`\`\`
+
+Poi in terminali separati:
+
+\`\`\`bash
+task run-eureka
+task run-tourist
+task run-random
+task run-store
+task run-ui
+\`\`\`
+
+In alternativa, da VS Code la configurazione di avvio **Stack completo** in [.vscode/launch.json](./.vscode/launch.json) lancia i cinque servizi in ordine con il debugger collegato.
+
+## Verifiche eseguite
+
+Verifiche completate nel workspace:
+
+1. \`task build\` eseguito con successo
+2. \`task docker-up\` eseguito con successo
+3. Eureka raggiungibile su \`http://localhost:8761\`
+4. UI raggiungibile su \`http://localhost:8080\`
+5. submit della form riuscita con evento reale da OpenDataHub
+6. persistenza verificata su PostgreSQL con incremento dei record
+7. console browser pulita senza errori o warning
+
+Nota tecnica:
+Con Java 25 e Lombok 1.18.44 la build mostra ancora un warning interno su \`sun.misc.Unsafe\` proveniente da Lombok. La compilazione e l'esecuzione restano corrette; per eliminarlo del tutto servirebbe rinunciare a Lombok oppure scendere a una LTS piu\` conservativa come Java 21.
+
+## UI senza reload
+
+La UI non ricarica piu\` la pagina quando premi il bottone:
+
+- il submit viene intercettato da \`fetch\`
+- il server restituisce solo i frammenti HTML aggiornati
+- vengono sostituiti solo feedback, evento estratto e storico
+
+In piu\` il fallback server-side usa \`Post/Redirect/Get\`, quindi il refresh del browser non ripete il \`POST\` e non salva suggerimenti duplicati.
+
+File coinvolti:
+
+- [UiController.java](./demo/event-ui/src/main/java/com/example/ttfcloud_esame/ui/UiController.java)
+- [event-suggestion.html](./demo/event-ui/src/main/resources/templates/event-suggestion.html)
+- [event-roulette.js](./demo/event-ui/src/main/resources/static/js/event-roulette.js)
+
+## Note da dire all'esame
+
+- Maven non isola le dipendenze per package, ma per modulo.
+- Per questo motivo il refactoring a multi-module e\` il modo corretto per dare a ogni servizio solo le dipendenze che usa davvero.
+- Il parent centralizza versioni e plugin, mentre ogni modulo dichiara solo i propri starter.
 ` }
   ],
 };
