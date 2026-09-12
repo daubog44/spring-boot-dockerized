@@ -31,13 +31,11 @@ LOG_DIR="$(dev_log_dir)"
 # Ordine di avvio: Eureka per primo, poi i servizi che vi si registrano.
 SERVICES=(
   "eureka:naming-server:8761"
-  "product:product-service:8081"
-  "crm:crm-service:8082"
-  "wms:wms-service:8083"
-  "wms-ui:wms-ui:$UI_PORT"
 )
 
-# I servizi di questa traccia usano H2 in memoria: nessun database da avviare.
+# Metti 1 se un tuo servizio punta a jdbc:postgresql://localhost:5432: `task dev`
+# avviera' il PostgreSQL di docker-compose.yml e ne aspettera' la porta. I
+# servizi creati da `task new-service` usano H2 in memoria.
 USES_POSTGRES=0
 
 mkdir -p "$LOG_DIR"
@@ -211,7 +209,7 @@ done
 cat <<EOF
 
   task logs         segue i log di tutti i servizi (Ctrl+C per uscire)
-  task logs SERVICE=wms   solo quel servizio
+  task logs SERVICE=<nome>   solo quel servizio
   task status       chi occupa le porte
   task dev-down     ferma tutto
 

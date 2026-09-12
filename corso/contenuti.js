@@ -1,17 +1,13 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 14:04',
+  generato: '2026-09-12 14:31',
   progetto: {
     cartella: 'demo',
-    pacchetto: 'com.example.ttfcloud_esame',
+    pacchetto: 'esame',
     java: '25',
     moduli: [
-    { nome: 'common-dto', tipo: 'libreria', porta: '', applicazione: '', database: '', entity: [], feign: [], classi: ['CabinetDTO', 'CustomerDTO', 'EventSearchResponse', 'EventSuggestion', 'LocationDTO', 'NearestLocationRequest', 'NearestLocationResponse', 'ProductDTO', 'RandomNumberResponse', 'StockMovementRequest', 'StockMovementResult', 'StoredSuggestionResponse'] },
-    { nome: 'naming-server', tipo: 'eureka', porta: '8761', applicazione: 'eureka-server', database: '', entity: [], feign: [], classi: [] },
-    { nome: 'product-service', tipo: 'rest', porta: '8081', applicazione: 'PRODUCT-SERVICE', database: 'H2 in memoria', entity: ['ProductEntity'], feign: [], classi: [] },
-    { nome: 'crm-service', tipo: 'rest', porta: '8082', applicazione: 'CRM-SERVICE', database: '', entity: [], feign: [], classi: [] },
-    { nome: 'wms-service', tipo: 'rest', porta: '8083', applicazione: 'WMS-SERVICE', database: 'H2 in memoria', entity: ['CabinetEntity', 'LocationEntity'], feign: ['CRM-SERVICE', 'PRODUCT-SERVICE'], classi: [] },
-    { nome: 'wms-ui', tipo: 'ui', porta: '8080', applicazione: 'WMS-UI', database: '', entity: [], feign: ['WMS-SERVICE'], classi: [] }
+    { nome: 'common-dto', tipo: 'libreria', porta: '', applicazione: '', database: '', entity: [], feign: [], classi: [] },
+    { nome: 'naming-server', tipo: 'eureka', porta: '8761', applicazione: 'eureka-server', database: '', entity: [], feign: [], classi: [] }
     ]
   },
   lezioni: [
@@ -1448,7 +1444,6 @@ L'API REST risponde con un JSON pulito e senza campi superflui:
 | **Rischio LazyInitException** | Possibile se accedi all'oggetto fuori da transazione senza \`JOIN FETCH\`. | Nessuno: il mapping avviene dentro il Service. |
 | **Documentazione Swagger** | Mostra l'intera Entity con tutti i dettagli interni. | Mostra solo lo schema esatto dei dati esposti. |
 | **Flessibilità per Feign/UI** | I client devono importare le annotazioni di serializzazione. | I client usano direttamente il record DTO condiviso. |
->>>>>>> c99fe42 (docs: documentazione JsonIgnoreProperties e pattern DTO-in-DTO per join completi)
 
 ### Configurare le relazioni in 5 secondi: \`task add-relation\`
 
@@ -1468,8 +1463,13 @@ Cosa fa per te:
 - Inserisce l'annotazione corretta con \`fetch = FetchType.LAZY\`.
 - Configura \`@JoinColumn(name = "autore_id")\` sul lato proprietario.
 - Configura il lato inverso con \`mappedBy\` e lista già inizializzata (\`= new ArrayList<>()\`).
-- Aggiunge automaticamente tutti gli \`import\` necessari (\`jakarta.persistence.*\`, \`java.util.List\`, ecc.).
+- Inserisce automaticamente \`@JsonIgnoreProperties\` su entrambi i lati per spezzare i cicli Jackson ed evitare a monte \`StackOverflowError\`!
+- Aggiunge automaticamente tutti gli \`import\` necessari (\`jakarta.persistence.*\`, \`java.util.List\`, \`com.fasterxml.jackson.annotation.JsonIgnoreProperties\`).
 - Con \`UNIDIRECTIONAL=1\` evita di aggiungere il campo inverso se ti serve unidirezionale.
+
+> 💡 **Tutti i comandi hanno il Wizard Interattivo**:
+> Non ricordi la sintassi di un comando? Lancialo **senza argomenti**!
+> \`task new-entity\`, \`task add-relation\`, \`task new-dto\`, \`task new-client\`, \`task new-view\`, \`task new-auth\`, \`task new-handler\`, \`task add-dep\`, \`task set-port\`, \`task use-postgres\`, \`task remove-service\`, \`task consegna\`: **tutti** ti fanno domande guidate passo-passo nel terminale!
 
 ---
 
@@ -1781,7 +1781,7 @@ HTTP.
 Un controller sottile e un service che non sa niente di HTTP: così le regole
 stanno in un posto solo, e si provano senza avviare un server.
 
-> 💡 **Scorciatoia d'esame**: Ricorda che eseguendo \`task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=...\` hai già ottenuto sia il \`Service\` che il \`Controller\` REST con le operazioni CRUD complete, la validazione e la documentazione Swagger! Qui vediamo come sono composti per personalizzarli.
+> 💡 **Scorciatoia d'esame**: Ricorda che eseguendo \`task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=... DTO=1\` hai già ottenuto sia il \`Service\` che il \`Controller\` REST già impostati sui DTO (con \`toDto\` e \`toEntity\` automatici), le operazioni CRUD complete, la validazione e la documentazione Swagger! Qui vediamo come sono composti per personalizzarli.
 
 ## Il service
 
@@ -3428,182 +3428,149 @@ La domanda teorica A dell'esame include spesso concetti di sicurezza in architet
 ` }
   ],
   documenti: [
-    { file: 'README.md', testo: `# Spring Boot Dockerized - Soluzione d'Esame WMS
+    { file: 'README.md', testo: `# Spring Boot Dockerized — Template d'esame ITS
 
-Questo branch contiene la **soluzione d'esame completa e collaudata** per la traccia **WMS Magazzino "Spostati S.r.l."**, costruita sul template multi-modulo Maven del branch [\`main\`](https://github.com/daubog44/spring-boot-dockerized/tree/main) con **Spring Boot**, **Spring Cloud Eureka**, **OpenFeign**, **OpenAPI/Swagger UI**, **PostgreSQL** e **Docker Compose**.
+Template **vuoto** per una prova finale a microservizi: c'è l'impalcatura già
+configurata e collaudata (Eureka, OpenFeign, OpenAPI/Swagger, PostgreSQL, Docker
+Compose, hot reload), **non** c'è nessun servizio d'esempio da smontare.
+
+I servizi della traccia li generi con un comando:
+
+\`\`\`bash
+task new-service NAME=ordini-service
+\`\`\`
+
+che crea il modulo *e* lo collega dove serve — pom aggregatore, Dockerfile,
+docker-compose, lista di avvio — senza che tu debba ricordarti nessuno dei sei
+posti. Dentro un modulo, ogni tabella si scrive con lo stesso schema (entity,
+repository, service, controller): anche quello lo genera un comando,
+
+\`\`\`bash
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
+\`\`\`
+
+e per i DTO condivisi, i client Feign, le viste Thymeleaf, la sicurezza e la gestione errori:
+
+\`\`\`bash
+task new-dto NAME=Ordine FIELDS=id:long,numero:string:required,totale:decimal
+task new-client FROM=report-service TO=ordini-service DTO=OrdineDto FIELDS=id:long,numero:string:required
+task new-view SERVICE=store-ui NAME=Ordini FIELDS=numero:string:required,totale:decimal
+task new-auth SERVICE=ordini-service TYPE=db
+task new-handler SERVICE=ordini-service
+\`\`\`
+
+e ti lascia aggiungere solo quello che conta davvero: le relazioni fra entity
+e le regole della tua traccia.
 
 ---
 
-## 📚 Documentazione & Guide per l'Esame
+## La prima cosa da fare
 
-- **[🚨 Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo. Parti da qui.
-- **[📓 Il corso: Dalla traccia alla consegna](./corso/index.html)** — diciassette lezioni dalla A alla Z: com'è fatto il template, come si parlano i servizi, \`common-dto\`, la rete dell'esame, e poi la traccia **Biblioteca** svolta pezzo per pezzo col suo codice, fino al collaudo, a Docker e alla consegna. Dentro ci sono anche tutte le guide, con la ricerca, e la mappa dei moduli di questo progetto. Si apre con **\`task learn\`**: pagina statica, senza server e senza rete.
-- [La giornata alla lavagna](./corso/giornata.html) — la stessa giornata in nove fasi, con una lavagna che le legge ad alta voce; il video lo registra \`powershell -File corso/genera-video.ps1\`.
-- [📖 Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
-- [📘 Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — con il **cheat sheet di Thymeleaf** (§ 6.7)
-- [🛠️ Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
-- [📝 Documentazione Specifica Esame (README-ESAME-TTFCLOUD.md)](./README-ESAME-TTFCLOUD.md)
+\`\`\`bash
+task learn
+\`\`\`
+
+Apre il corso: una pagina statica (niente server, niente rete) con diciotto
+lezioni dalla A alla Z — com'è fatto **questo** template (che parti da qui è
+vuoto: nessun modulo oltre a Eureka e \`common-dto\`), come si parlano i
+servizi, \`common-dto\`, le entity e i repository JPA con tutti gli esempi, la
+rete dell'esame — e poi una traccia vera svolta per intero, la **Biblioteca**
+(branch a parte, non qualcosa che hai già in questa cartella: la lezione 1 lo
+spiega), per vedere del codice funzionante prima di scrivere il tuo. Dentro ci
+sono anche tutte le guide, con la ricerca, e la mappa dei moduli del **tuo**
+progetto, letta dai file veri.
+
+## Documentazione
+
+- **[Il corso: Dalla traccia alla consegna](./corso/index.html)** — si apre con \`task learn\`, vedi sopra.
+- **[Il giorno dell'esame: procedura operativa](./GIORNO-ESAME.md)** — le quattro fasi, dal clone alla demo.
+- [La giornata alla lavagna](./corso/giornata.html) — la stessa giornata in nove fasi, con l'orologio dell'esame e una lavagna che legge le fasi ad alta voce. Il video lo registra la macchina: \`powershell -File corso/genera-video.ps1\` (voce italiana di Windows, Edge e ffmpeg) scrive \`corso/quaderno-esame.mp4\`, che resta fuori dal repository.
+- [Guida 1: Setup & Cheat Sheet Emergenze](./guida_setup_e_cheatsheet.md)
+- [Guida 2: Manuale Omnicomprensivo Prova Finale Spring Boot](./guida_prova_finale_spring_boot.md) — c'è anche **come funziona il tutto insieme**: il giro di una richiesta da browser a database, chi accende cosa (Lombok, Swagger, Feign, JPA/Hibernate) e come si usa \`common-dto\`, più il **cheat sheet di Thymeleaf** (§ 6.7: espressioni, attributi, form con validazione, frammenti, errori tipici)
+- [Guida 3: Multi-Modulo Maven e Funzionamento](./guida_multi_modulo_maven.md)
+
+Dal terminale, la guida ai comandi è \`task help\` (o \`task\` da solo); il
+dettaglio di un comando singolo, con le sue variabili, è
+\`task --summary <comando>\`.
 
 ---
 
-## 🌿 Branch del Repository
+## Branch
 
-- **[\`main\`](https://github.com/daubog44/spring-boot-dockerized/tree/main)**: Template d'Esame pulito e neutro, adattabile a qualsiasi traccia.
-- **\`solution/wms\`** (questo branch): Soluzione completa della traccia **WMS Magazzino "Spostati S.r.l."** con algoritmo di calcolo distanza Manhattan, DTO condivisi e script di collaudo automatizzato PowerShell.
-- **[\`example/tourist-events\`](https://github.com/daubog44/spring-boot-dockerized/tree/example/tourist-events)**: Esempio svolto della traccia Eventi/Turismo (OpenDataHub).
+- **\`main\`** (questo): il template vuoto. È da qui che si parte a ogni traccia.
+- **[\`solution/wms\`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: soluzione completa della traccia **WMS magazzino** (product, crm, wms, wms-ui, calcolo distanza Manhattan, DTO condivisi, collaudo end-to-end).
+- **[\`example/tourist-events\`](https://github.com/daubog44/spring-boot-dockerized/tree/example/tourist-events)**: esempio svolto della traccia **eventi/turismo** (wrapper OpenFeign di OpenDataHub, estrazione casuale, storico su PostgreSQL).
+- **[\`example/biblioteca\`](https://github.com/daubog44/spring-boot-dockerized/tree/example/biblioteca)**: la traccia **Biblioteca di quartiere** svolta per intero, ed è il filo del corso (catalogo e prestiti con due database, Feign nei due sensi, penale per ritardo con i suoi test, interfaccia con form e restituzioni, collaudo end-to-end).
 
----
-
-## 🏗️ Architettura dei Servizi WMS
-
-Il progetto è un aggregatore Multi-Module Maven dentro la cartella \`demo\`. I moduli **attivi in questa soluzione** sono:
-
-1. **\`naming-server\`**: Eureka Naming Server (Porta \`8761\`).
-2. **\`common-dto\`**: Modulo libreria con i DTO condivisi tra i microservizi.
-3. **\`product-service\`** (Porta \`8081\`): Anagrafica prodotti (\`ProductController\`), persistenza JPA/Hibernate.
-4. **\`crm-service\`** (Porta \`8082\`): Anagrafica clienti (\`CustomerController\`). Servizio mock: **nessuna persistenza**, dati in memoria.
-5. **\`wms-service\`** (Porta \`8083\`): Backend di magazzino (\`WmsController\`) con persistenza JPA/Hibernate. Consuma \`PRODUCT-SERVICE\` e \`CRM-SERVICE\` via OpenFeign (\`ProductClient\`, \`CrmClient\`) risolti tramite Eureka.
-6. **\`wms-ui\`** (Porta \`8080\`): Web UI Thymeleaf (\`WmsUiController\`), consuma \`WMS-SERVICE\` via OpenFeign (\`WmsClient\`).
-
-> 💡 Il branch conserva anche i moduli scheletro del template (\`tourist-service\`, \`random-service\`, \`store-service\`, \`event-ui\`): sono dichiarati nel \`pom.xml\` aggregatore ma **non fanno parte dello stack Docker WMS**.
-
-Nomi con cui i servizi si registrano su Eureka: \`PRODUCT-SERVICE\`, \`CRM-SERVICE\`, \`WMS-SERVICE\`, \`WMS-UI\`.
-
-### 🗄️ Database
-
-\`product-service\` e \`wms-service\` girano di default su **H2 in-memory**: i dati vengono ricreati a ogni riavvio del container. Entrambi hanno comunque il driver PostgreSQL a classpath e l'URL è parametrico, quindi si passa a Postgres senza toccare il codice, valorizzando le variabili d'ambiente nel \`docker-compose.yml\`:
-
-- \`product-service\`: \`PRODUCT_DB_URL\`, \`PRODUCT_DB_DRIVER\`
-- \`wms-service\`: \`WMS_DB_URL\`, \`WMS_DB_DRIVER\`
-
-> ⚠️ Il \`docker-compose.yml\` **avvia il container \`postgres\` ma non lo collega ad alcun servizio**: finché quelle variabili non sono impostate, PostgreSQL resta inutilizzato. Tienilo presente se la traccia richiede persistenza reale.
+I branch svolti servono da riferimento: non serve copiarli, serve guardarli
+quando non ricordi come si fa una cosa.
 
 ---
 
-## ⚡ Come lavorare durante l'esame
+## Scaricarlo senza git
 
-**Per sviluppare, un comando solo:**
+Ogni versione è una [release](https://github.com/daubog44/spring-boot-dockerized/releases/latest)
+con quattro zip, pronti da scaricare e da passare a chi ti pare:
 
-\`\`\`bash
-task dev
+| Archivio | Cosa c'è |
+| :--- | :--- |
+| \`spring-boot-dockerized.zip\` | il template vuoto: è da qui che si parte a ogni traccia |
+| \`soluzione-wms.zip\` | la traccia WMS svolta (branch \`solution/wms\`) |
+| \`esempio-tourist-events.zip\` | l'esempio eventi/turismo (branch \`example/tourist-events\`) |
+| \`esempio-biblioteca.zip\` | la traccia Biblioteca svolta, quella del corso (branch \`example/biblioteca\`) |
+
+Il link al template dell'ultima versione non cambia mai, si può condividere
+così com'è:
+
+\`\`\`text
+https://github.com/daubog44/spring-boot-dockerized/releases/latest/download/spring-boot-dockerized.zip
 \`\`\`
 
-Prima **libera le porte**: ferma i servizi di un avvio precedente, spegne i container dell'esame se sono loro a tenerle e chiude le applicazioni estranee rimaste in ascolto (non tocca i processi di sistema né l'infrastruttura di Docker). Poi compila tutti i moduli una volta sola, avvia Eureka, ne attende la porta e infine lancia gli altri quattro servizi.
+Scompatti, apri la cartella nel terminale, \`task help\`. Servono un JDK (dal 17
+in su), Docker e go-task, come col clone. Il template nasce su Java 25: se il
+tuo è un altro, \`task wizard\` (o \`task set-java\`) allinea il progetto al JDK
+che trova in \`JAVA_HOME\` o, se manca, nel \`PATH\`.
 
-**Un terminale solo, nessuna finestra sparsa**: i servizi girano in background e scrivono in \`.dev-logs/\`. Per vedere cosa fanno:
-
-\`\`\`bash
-task logs
-\`\`\`
-
-Mostra l'output di tutti i servizi insieme, ogni riga prefissata dal nome (\`wms | ...\`) e di un colore diverso. \`Ctrl+C\` chiude solo la vista, i servizi restano su. Per seguirne uno solo: \`task logs SERVICE=wms\`.
-
-**Hot reload**: ogni servizio gira con \`spring-boot-devtools\`. Dopo aver modificato del codice:
+**Pubblicare una versione nuova** (dopo il push di \`main\` e dei branch):
 
 \`\`\`bash
-task compile
+git tag v1.2.5
+git push origin v1.2.5
 \`\`\`
 
-Il servizio interessato si riavvia da solo in pochi secondi, senza rilanciare nulla. In VS Code, con la build automatica attiva, il riavvio parte già al salvataggio.
-
-**Per fermare tutto:**
-
-\`\`\`bash
-task dev-down
-\`\`\`
-
-Libera le porte esattamente come fa \`task dev\` all'avvio: usano la stessa funzione, quindi non possono comportarsi in modo diverso.
-
-**Quando qualcosa non risponde**, prima di ogni altra cosa:
-
-\`\`\`bash
-task status
-\`\`\`
-
-Dice chi occupa ognuna delle porte (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
-
-> 💡 Se su una delle porte gira un'applicazione che ti serve viva, dillo: \`task dev KEEPFOREIGN=1 UI_PORT=9080\`. Senza \`KEEPFOREIGN=1\` viene chiusa.
-
-**Per la demo finale**, usa lo stack containerizzato, che è quello che presenterai:
-
-\`\`\`bash
-task docker-up
-\`\`\`
-
-Locale e Docker usano le stesse porte, ma non devi ricordartene: \`task docker-up\` ferma da solo lo stack locale prima di partire, e \`task dev\` spegne da solo i container (con \`docker compose down\`, i dati del database restano).
-
-### Elenco completo dei task
-
-Il comando \`task\` da solo stampa questo elenco.
-
-Sviluppo:
-
-- \`task wizard\`: Fa le domande e monta il progetto (\`SERVICE=<modulo>\` per uno solo).
-- \`task new-service NAME=<nome>\`: Genera un nuovo microservizio Spring Boot collegato.
-- \`task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=...\`: Genera entity, repository, service e controller.
-- \`task new-dto NAME=<Nome> FIELDS=...\`: Genera un DTO con validazione in common-dto.
-- \`task new-client FROM=<da> TO=<a> DTO=<NomeDto> [FIELDS=...]\`: Genera FeignClient (e DTO correlato se specificato).
-- \`task new-view SERVICE=<modulo> NAME=<Nome> FIELDS=...\`: Genera Controller e template Thymeleaf per UI.
-- \`task new-auth SERVICE=<modulo> TYPE=db|inmemory|form\`: Configura Spring Security con zero boilerplate.
-- \`task new-handler SERVICE=<modulo>\`: Genera GlobalExceptionHandler (@RestControllerAdvice).
-- \`task consegna NOME=COGNOME_NOME\`: Prepara la cartella da consegnare.
-- \`task seed-data\`: Dati di prova ricavati dalle \`@Entity\`.
-- \`task db-schema\`: Schema concettuale e logico ricavato dalle \`@Entity\`.
-- \`task db-config\`: Stampa o cambia le credenziali del database.
-- \`task rename-project NAME=<nome>\`: Rinomina la cartella dei moduli Maven.
-- \`task ide-sync\`: Riallinea VS Code e Zed ai moduli veri.
-- \`task learn\`: Il corso nel browser, dalla traccia alla consegna.
-- \`task rete\`: Quali domini passano dalla rete dell'aula (all'esame e' filtrata: Maven Central passa).
-- \`task offline-prep\` / \`task offline\`: Scarica la sera prima, e verifica, quello che la rete potrebbe non far passare.
-- \`task dev\`: Pulisce, compila e avvia l'intero stack in locale con hot reload.
-- \`task dev-down\`: Ferma i servizi locali e libera le porte.
-- \`task logs\`: Segue i log di tutti i servizi in un terminale solo (\`task logs SERVICE=wms\` per uno).
-- \`task status\`: Chi occupa le porte, quali container girano, cosa è registrato su Eureka.
-- \`task compile\`: Ricompila e fa ripartire i servizi già avviati.
-- \`task build\`: Compila e impacchetta tutti i moduli Maven tramite wrapper (\`mvnw\`).
-
-Container:
-
-- \`task docker-up\`: Avvia l'intero stack WMS su Docker Compose con healthcheck.
-- \`task docker-down\`: Ferma i container. **I dati del database restano.**
-- \`task docker-reset\`: Ferma i container **ed elimina i volumi**: database ricreato da zero.
-- \`task docker-logs\`: Monitora i log di tutti i microservizi.
-
-Collaudo e pulizia:
-
-- \`task test-e2e\`: Esegue lo script di collaudo automatizzato [\`test_e2e_wms.ps1\`](./test_e2e_wms.ps1). Si può lanciare anche a stack acceso: se ne accorge e compila senza \`clean\`, per non far cadere i servizi.
-- \`task clean-ports\`: Come \`dev-down\`, libera le porte dello stack.
-- \`task kill-java\`: Ultima spiaggia, termina **tutti** i processi Java della macchina, anche quelli estranei al progetto.
-
-Avvio manuale dei singoli moduli, se ti serve isolarne uno: \`task run-eureka\`, \`task run-product\`, \`task run-crm\`, \`task run-wms\`, \`task run-wms-ui\`, \`task run-db\`.
+Il resto lo fa la GitHub Action [\`release.yml\`](./.github/workflows/release.yml):
+prepara i quattro zip dai branch e crea la release col tag.
 
 ---
 
-### L'editor
+## Cosa c'è nel template
 
-Apri **la cartella del repository**, non quella di un singolo servizio: e' un
-progetto Maven multi-modulo.
+Aggregatore Maven multi-modulo dentro \`demo/\`:
 
-- **VS Code**: \`F5\` -> **Stack completo** avvia tutti i servizi in debug, Eureka
-  per primo. Serve l'*Extension Pack for Java*; le altre estensioni consigliate
-  te le propone VS Code stesso (\`.vscode/extensions.json\`).
-- **Zed**: \`F4\` → il servizio da avviare in debug (\`.zed/debug.json\`); palette
-  → *task: Spawn* per i comandi \`task\`. Serve l'estensione *Java*, che al primo
-  file \`.java\` scarica jdtls, Lombok e il debugger: la prima volta, con la rete.
-- **IntelliJ IDEA**: niente da configurare, apri il pom aggregatore.
+| Modulo | A cosa serve |
+| :--- | :--- |
+| \`naming-server\` | Eureka Server, porta \`8761\`. I servizi si registrano qui e si chiamano per nome. |
+| \`common-dto\` | Le classi condivise fra i servizi (DTO). Un modulo solo, così non si duplicano. |
 
-\`launch.json\` e i due \`tasks.json\` sono generati: li riscrivono \`new-service\`,
-\`remove-service\` e \`set-port\`. Se l'elenco dei servizi non torna:
+E, già pronto e configurato per i moduli che creerai:
 
-\`\`\`bash
-task ide-sync
-\`\`\`
+- **Spring Boot 4.0.5** e **Spring Cloud 2025.1.1** con le versioni gestite dal pom padre: nei moduli le dipendenze si scrivono senza versione.
+- **spring-boot-devtools** ereditato da tutti i moduli: hot reload dopo \`task compile\`.
+- **springdoc-openapi**: ogni modulo creato da \`task new-service\` espone \`/swagger-ui.html\` dal primo avvio, senza configurazione (per gli altri c'è \`task enable-swagger\`).
+- **PostgreSQL** in \`docker-compose.yml\` (database \`esame\`, utente e password \`exam\`): c'è un container, **non collegato a niente** finché non lo chiedi. I moduli generati partono con H2 in memoria; \`task use-postgres SERVICE=<modulo>\` sposta un modulo sul database vero, e con \`DBNAME=\` gliene dà uno tutto suo dentro lo stesso container.
+- **Dockerfile unico** parametrico sul modulo: un'immagine per servizio, senza un Dockerfile per cartella.
+- **Configurazione degli editor** gia' pronta e **mantenuta dai comandi**: \`.vscode/launch.json\` (un profilo di debug per servizio, piu' il compound *Stack completo*), \`.vscode/tasks.json\` e \`.zed/tasks.json\` (i comandi \`task\` dalla palette), piu' \`settings.json\`, \`extensions.json\` e \`.editorconfig\`. Li riscrivono \`new-service\`, \`remove-service\` e \`set-port\`; se restano indietro lo dice \`task check\`.
+- **Pacchetto Java corto**: i sorgenti di un modulo stanno in \`src/main/java/esame/<modulo>/\`, non in \`com/example/...\`. La base si cambia per tutti i moduli con \`task set-package PACKAGE=it.cognome\` (lo chiede anche il wizard), e \`new-service\` la segue.
+- **La versione di Java della macchina**: \`task set-java\` allinea pom, immagini Docker e VS Code al JDK installato (dal 17 in su); il wizard lo fa da solo all'inizio, e \`task check\` avvisa se il JDK è più vecchio del progetto.
 
-## Wizard, dati di prova e consegna
+---
 
-Il giorno dell'esame, letta la traccia, il modo piu' rapido per montare il
-progetto e' il wizard: chiede come si chiama la cartella dei moduli, se serve
-PostgreSQL e con quali credenziali, e poi i microservizi uno per uno.
+## Come si lavora
+
+Il giorno dell'esame, letta la traccia, il modo più rapido per montare il
+progetto è il wizard: allinea Java al JDK della macchina, poi chiede come si
+chiama la cartella dei moduli, il pacchetto Java di base, se serve PostgreSQL
+e con quali credenziali, e i microservizi uno per uno.
 
 \`\`\`bash
 task wizard
@@ -3612,6 +3579,136 @@ task wizard
 Per un microservizio solo: \`task wizard SERVICE=<nome>\`. Non fa niente di
 magico: chiama \`set-java\`, \`rename-project\`, \`set-package\`, \`db-config\`,
 \`new-service\` e \`use-postgres\` nell'ordine giusto, e finisce con \`task check\`.
+
+Poi, una volta sola:
+
+\`\`\`bash
+task dev
+\`\`\`
+
+Libera le porte, compila e avvia in background quello che c'è, con hot reload.
+Restituisce il prompt: niente finestre sparse da inseguire.
+
+Poi il ciclo della giornata:
+
+> scrivi il codice → \`task compile\` → il servizio si riavvia da solo
+
+I log di tutti i servizi, in un terminale solo:
+
+\`\`\`bash
+task logs
+\`\`\`
+
+Quando qualcosa non risponde, prima di formulare ipotesi:
+
+\`\`\`bash
+task status
+\`\`\`
+
+Dice porta per porta chi è in ascolto — un tuo servizio, i container, o
+un'applicazione estranea — e cosa si è registrato su Eureka.
+
+### Quando cambia la struttura
+
+Aggiungere un modulo o una dipendenza, o spostare una porta, tocca più file che
+devono restare d'accordo. Un comando per ognuna di queste cose:
+
+\`\`\`bash
+task new-service NAME=ordini-service
+\`\`\`
+
+\`\`\`bash
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
+\`\`\`
+
+\`\`\`bash
+task new-dto NAME=Ordine FIELDS=id:long,numero:string:required,totale:decimal
+\`\`\`
+
+\`\`\`bash
+task new-client FROM=report-service TO=ordini-service DTO=OrdineDto
+\`\`\`
+
+\`\`\`bash
+task new-view SERVICE=store-ui NAME=Ordini FIELDS=numero:string:required,totale:decimal
+\`\`\`
+
+\`\`\`bash
+task new-auth SERVICE=ordini-service TYPE=db
+\`\`\`
+
+\`\`\`bash
+task new-handler SERVICE=ordini-service
+\`\`\`
+
+\`\`\`bash
+task add-dep SERVICE=ordini-service DEPS=security,mail
+\`\`\`
+
+\`\`\`bash
+task set-port SERVICE=ordini-service PORT=8090
+\`\`\`
+
+\`\`\`bash
+task remove-service SERVICE=ordini-service
+\`\`\`
+
+\`\`\`bash
+task use-postgres SERVICE=ordini-service
+\`\`\`
+
+\`\`\`bash
+task enable-swagger SERVICE=ordini-service
+\`\`\`
+
+\`\`\`bash
+task db-config DBNAME=magazzino USER=wms PASSWORD=wms123
+\`\`\`
+
+\`\`\`bash
+task rename-project NAME=wms
+\`\`\`
+
+Tutti si usano con variabili \`NOME=valore\`, mai con trattini. Dopo una
+dipendenza o un modulo nuovo ci vuole \`task dev\`: \`task compile\` non basta,
+perché il classpath di un servizio è fissato quando parte.
+
+Due comandi di controllo:
+
+\`\`\`bash
+task check
+\`\`\`
+
+Verifica, senza avviare niente, che moduli, porte, Dockerfile, compose e liste
+di avvio dicano la stessa cosa.
+
+\`\`\`bash
+task test
+\`\`\`
+
+Collauda gli strumenti stessi su una copia usa-e-getta del progetto. Lancialo
+appena ti siedi: se passa, sai che funzionano quando ti serviranno.
+
+### L'editor
+
+Apri **la cartella del repository**, non quella di un singolo servizio: e' un
+progetto Maven multi-modulo.
+
+- **VS Code**: \`F5\` → **Stack completo** avvia tutti i servizi in debug, Eureka
+  per primo. Serve l'*Extension Pack for Java*; le altre estensioni consigliate
+  te le propone VS Code stesso (\`.vscode/extensions.json\`).
+- **Zed**: \`F4\` → il servizio da avviare in debug (\`.zed/debug.json\`); palette
+  → *task: Spawn* per i comandi \`task\`. Serve l'estensione *Java*, che al primo
+  file \`.java\` scarica jdtls, Lombok e il debugger: la prima volta, con la rete.
+- **IntelliJ IDEA**: niente da configurare, apri il pom aggregatore.
+
+Se l'elenco dei servizi non torna (hai toccato i moduli a mano):
+
+\`\`\`bash
+task ide-sync
+\`\`\`
+
+### Il database e la consegna
 
 Scritte le entity, due comandi le mettono al lavoro. Tutti e due passano dal
 database vero, non dalla lettura dei sorgenti: avviano l'applicazione, lasciano
@@ -3624,18 +3721,17 @@ task seed-data
 Accende i dati di prova: a ogni avvio le tabelle vuote si riempiono da sole
 con righe plausibili, salvate passando da Hibernate, quindi con id, relazioni,
 enum e vincoli di validazione rispettati. Prima prova su un H2 usa-e-getta e
-ti dice tabella per tabella com'e' andata. Una demo su tabelle vuote non si
+ti dice tabella per tabella com'è andata. Una demo su tabelle vuote non si
 vede.
 
 \`\`\`bash
 task db-schema
 \`\`\`
 
-Lo schema concettuale e logico della base dati - entita' e relazioni, tabelle,
-colonne, tipi SQL, chiavi, vincoli e un diagramma ER - letto dal database dopo
-che Hibernate l'ha creato. E' quello che chiede l'allegato tecnico.
-
-E a fine giornata:
+Lo schema concettuale e logico della base dati — entità e relazioni, tabelle,
+colonne, tipi SQL, chiavi, vincoli e un diagramma ER — letto dal database dopo
+che Hibernate l'ha creato, non ricordato a memoria. È quello che chiede
+l'allegato tecnico.
 
 \`\`\`bash
 task consegna NOME=COGNOME_NOME
@@ -3645,10 +3741,13 @@ Prepara \`consegna/\`: il progetto pronto da eseguire (i moduli senza \`target/\
 accanto a pom e compose), l'allegato tecnico già compilato con moduli, porte,
 endpoint e schema, le istruzioni di esecuzione, e un archivio unico da
 consegnare. Chi lo corregge lo scompatta e lancia \`docker compose up --build\`.
+Le parti da scrivere a mano (analisi, algoritmo, che cosa fa ogni modulo)
+stanno in \`allegato.md\`: la consegna le mette nell'allegato prima di fare
+l'archivio, e si può rilanciare quante volte si vuole.
 
 ### La rete all'esame
 
-All'esame la rete passa da una whitelist di domini: Maven Central si', il
+All'esame la rete passa da una whitelist di domini: Maven Central sì, il
 resto non si sa.
 
 \`\`\`bash
@@ -3663,19 +3762,35 @@ Docker, una prima build dei container e una copia di scorta del comando
 \`task\` stesso (in \`.tools/task\`, per quando GitHub non passa o la macchina
 dell'esame non ce l'ha: si attiva con \`scripts/usa-task-locale.ps1\`/\`.sh\`).
 \`task offline\` verifica. Portati la cartella del progetto e la \`~/.m2\` su una
-chiavetta: il template *e'* la cartella, non serve altro.
+chiavetta: il template *è* la cartella, non serve altro.
+
+### Per la demo
+
+\`\`\`bash
+task docker-up
+\`\`\`
+
+Lo stack in container, che è quello che presenterai. Non devi fermare niente
+prima: \`docker-up\` spegne da solo lo stack locale, e \`task dev\` spegne da solo i
+container. Alla fine \`task docker-down\` (i dati del database restano;
+\`docker-reset\` invece li cancella).
 
 ---
 
-## 🌐 Mappa delle Porte ed Interfacce OpenAPI / Swagger UI
+## Porte
 
-- **UI Applicativa WMS**: \`http://localhost:8080\`
-- **Dashboard Eureka**: \`http://localhost:8761\`
-- **PostgreSQL**: \`localhost:5432\` (db \`event_suggestions\`, utente \`exam\`, password \`exam\`) — avviato ma non collegato ai servizi, vedi sezione Database
-- **Swagger UI Product Service**: \`http://localhost:8081/swagger-ui.html\`
-- **Swagger UI CRM Service**: \`http://localhost:8082/swagger-ui.html\`
-- **Swagger UI WMS Service**: \`http://localhost:8083/swagger-ui.html\`
-- **Swagger UI WMS UI**: \`http://localhost:8080/swagger-ui.html\`
+| Indirizzo | Cosa |
+| :--- | :--- |
+| \`http://localhost:8761\` | Dashboard Eureka |
+| \`localhost:5432\` | PostgreSQL (db \`esame\`, utente \`exam\`, password \`exam\`) |
+| \`http://localhost:<porta>/swagger-ui.html\` | Swagger di un servizio |
+
+Le porte dei servizi che crei le assegna \`task new-service\` (la prima libera
+dopo l'ultima usata) e le stampa \`task dev\` alla fine dell'avvio. Per cambiarne
+una: \`task set-port SERVICE=<modulo> PORT=<porta>\`.
+
+> Se su una porta gira un'applicazione che ti serve viva, dillo:
+> \`task dev KEEPFOREIGN=1 UI_PORT=9080\`. Senza \`KEEPFOREIGN=1\` viene chiusa.
 
 ---
 
@@ -3705,7 +3820,7 @@ Causa: un'altra applicazione della macchina è in ascolto su \`127.0.0.1:8080\`.
 task status
 \`\`\`
 
-Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. \`task dev\` chiude da solo quel processo al prossimo avvio; se invece ti serve tenerlo vivo, sposta la UI con \`task dev KEEPFOREIGN=1 UI_PORT=9080\` (e poi collauda con \`task test-e2e UI_PORT=9080\`).
+Elenca ogni processo in ascolto sulle porte dello stack e segnala esplicitamente questo caso. \`task dev\` chiude da solo quel processo al prossimo avvio; se invece ti serve tenerlo vivo, sposta la UI con \`task dev KEEPFOREIGN=1 UI_PORT=9080\`.
 
 ### Altri controlli utili
 
@@ -3714,7 +3829,7 @@ docker compose ps
 \`\`\`
 
 \`\`\`bash
-docker compose logs wms-service --tail 50
+docker compose logs eureka-server --tail 50
 \`\`\`
 
 Per verificare quali servizi si sono effettivamente registrati su Eureka:
@@ -3968,7 +4083,21 @@ passare dai comandi; se il \`launch.json\` resta indietro, te lo dice \`task che
 
 ## Fase 1 — Sviluppo: il ciclo che ripeterai tutto il giorno
 
-Una volta sola, all'inizio:
+Questo branch è il template vuoto: c'è Eureka, il modulo \`common-dto\` per le
+classi condivise, e nient'altro. I servizi della traccia li crei tu, un
+comando per uno:
+
+\`\`\`bash
+task new-service NAME=ordini-service
+\`\`\`
+
+\`\`\`bash
+task new-service NAME=ordini-ui UI=1
+\`\`\`
+
+Il primo ti dà un servizio REST (con JPA, H2 e Swagger già collegati), il
+secondo una UI Thymeleaf. Entrambi si registrano su Eureka e possono chiamarsi
+per nome con Feign. Poi:
 
 \`\`\`bash
 task dev
@@ -3985,7 +4114,7 @@ task logs
 
 Ogni riga è prefissata dal nome del servizio e colorata. \`Ctrl+C\` chiude solo
 questa vista: i servizi restano accesi. Per seguirne uno solo:
-\`task logs SERVICE=wms\`.
+\`task logs SERVICE=<nome>\`, con il nome breve che vedi in \`task status\`.
 
 Poi il ciclo è **solo questo**:
 
@@ -4018,13 +4147,18 @@ Queste cose non le copre il ciclo \`task compile\`, perché toccano più file ch
 devono restare d'accordo fra loro. Per ognuna c'è un comando, e tutti si usano
 allo stesso modo: **variabili \`NOME=valore\`, senza trattini**.
 
+> 💡 **MODALITÀ INTERATTIVA (WIZARD) PER TUTTI I COMANDI**:
+> Non ricordi la sintassi o i parametri esatti? **Lancia il comando da solo, senza argomenti!**
+> Per esempio: \`task new-service\`, \`task new-entity\`, \`task add-relation\`, \`task new-client\`, \`task new-dto\`, \`task new-view\`, \`task new-auth\`, \`task new-handler\`, \`task add-dep\`, \`task set-port\`, \`task remove-service\`, \`task use-postgres\`, \`task consegna\`.
+> Ognuno di essi aprirà un comodo menu interattivo guidato nel terminale che rileverà i moduli e le opzioni disponibili e ti farà le domande passo dopo passo.
+
 \`task help\` (o \`task\` da solo) stampa l'elenco; \`task --summary <comando>\` il
 dettaglio di uno.
 
 ### Aggiungere una dipendenza a un microservizio
 
 \`\`\`bash
-task add-dep SERVICE=wms-service DEPS=security,mail
+task add-dep SERVICE=ordini-service DEPS=security,mail
 \`\`\`
 
 Le versioni **non si scrivono**: le decide il \`pom.xml\` padre, che eredita da
@@ -4039,7 +4173,7 @@ task add-dep LIST=1
 \`\`\`
 
 Se ti serve qualcosa che non è in elenco, passa le coordinate per esteso:
-\`task add-dep SERVICE=wms-service DEPS=org.apache.commons:commons-lang3:3.17.0\`.
+\`task add-dep SERVICE=ordini-service DEPS=org.apache.commons:commons-lang3:3.17.0\`.
 
 > **Poi serve \`task dev\`, non \`task compile\`.** Il classpath di un servizio è
 > fissato quando parte: un jar nuovo lo vede solo un riavvio vero. Vale per
@@ -4051,7 +4185,7 @@ i moduli — è lui a dare l'hot reload dopo \`task compile\`.
 ### Cambiare una porta
 
 \`\`\`bash
-task set-port SERVICE=wms-ui PORT=9080
+task set-port SERVICE=ordini-service PORT=8090
 \`\`\`
 
 Una porta è scritta in quattro punti: l'\`application.yml\` del modulo,
@@ -4072,6 +4206,7 @@ Per una prova al volo, senza toccare i file, resta \`task dev UI_PORT=9080\`.
 task new-service NAME=ordini-service
 \`\`\`
 
+Oppure lancialo senza argomenti (\`task new-service\`) per farti guidare dal wizard!
 Crea il modulo (pom, \`Main\`, \`application.yml\`, un endpoint \`/api/ping\`) e lo
 collega dove serve: \`<modules>\` del pom aggregatore, \`COPY\` nel \`Dockerfile\`,
 blocco in \`docker-compose.yml\`, lista dei servizi di \`task dev\`. La porta è la
@@ -4087,14 +4222,31 @@ Poi \`task dev\`, e il servizio nuovo si registra su Eureka con gli altri.
 Invece di scrivere a mano le classi ripetitive di ogni tabella:
 
 \`\`\`bash
-task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal:required,data:date
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal:required,data:date DTO=1
 \`\`\`
 
-Genera le quattro classi canoniche nello standard del progetto:
+Oppure semplicemente \`task new-entity\` per la modalità interattiva!
+Genera le classi canoniche nello standard del progetto:
 - \`OrdineEntity.java\` con annotazioni JPA e validazione Jakarta.
 - \`OrdineRepository.java\` che estende \`JpaRepository\`.
-- \`OrdineService.java\` con il CRUD pronto.
+- \`OrdineDto.java\` in \`common-dto\` (se \`DTO=1\`).
+- \`OrdineService.java\` con il CRUD pronto (e mapper Entity <-> DTO).
 - \`OrdineController.java\` con gli endpoint REST documentati in OpenAPI/Swagger.
+
+### Collegare le relazioni JPA: task add-relation
+
+Per collegare due tabelle dello stesso database relazionale:
+
+\`\`\`bash
+task add-relation SERVICE=catalogo-service FROM=Libro TO=Categoria TYPE=many-to-one
+\`\`\`
+
+Oppure \`task add-relation\` senza parametri per scegliere entità e cardinalità dal menu interattivo!
+Il comando:
+- Inserisce \`@ManyToOne\`, \`@OneToMany\`, \`@OneToOne\` o \`@ManyToMany\` con \`fetch = FetchType.LAZY\`.
+- Configura \`@JoinColumn\` sul lato proprietario e \`mappedBy\` sul lato inverso.
+- Inserisce automaticamente \`@JsonIgnoreProperties\` su entrambi i lati per spezzare qualsiasi ciclo di serializzazione Jackson ed evitare lo \`StackOverflowError\` a monte!
+- Importa tutte le annotazioni e collezioni necessarie.
 
 ### Contratti DTO e Feign Client in un solo comando: task new-client e task new-dto
 
@@ -4246,7 +4398,7 @@ ti dice tabella per tabella quante righe sono entrate — o perché no, adesso e
 non davanti al docente.
 
 \`\`\`bash
-task seed-data SERVICE=wms-service ROWS=10
+task seed-data SERVICE=ordini-service ROWS=10
 task seed-data ROWS=0      # spenti
 \`\`\`
 
@@ -4311,8 +4463,8 @@ averne bisogno. Con \`task test FULL=1\` compila anche il modulo generato.
 
 ### Rinominare la cartella dei moduli
 
-Si chiama \`demo\` perche' cosi' nasce da Spring Initializr. Se all'esame
-preferisci il nome del progetto:
+Si chiama \`demo\` perché così nasce da Spring Initializr. Se all'esame preferisci
+il nome del progetto:
 
 \`\`\`bash
 task rename-project NAME=wms
@@ -4335,11 +4487,16 @@ non è codice ricompilato, quindi l'hot reload non lo rilegge.
 ## Fase 2 — Collaudo, prima di chiamare la commissione
 
 \`\`\`bash
-task test-e2e
+task check
 \`\`\`
 
-Si può lanciare a stack acceso: se ne accorge, compila senza \`clean\` e aspetta
-che i servizi si siano riavviati prima di interrogarli.
+Poi controlla che i servizi si vedano fra loro, non solo che siano accesi:
+\`task status\` deve elencarli tutti nel registro Eureka.
+
+Prova gli endpoint veri, uno per servizio: il modo più comodo è Swagger UI
+(\`http://localhost:<porta>/swagger-ui.html\`), che mostra lo schema esatto
+delle richieste. Infine percorri il flusso completo dalla UI, come lo mostrerai
+alla commissione: è l'unico collaudo che conta davvero.
 
 ---
 
@@ -4351,12 +4508,12 @@ Non devi fermare niente prima: \`task docker-up\` spegne da solo lo stack locale
 task docker-up
 \`\`\`
 
-Aspetta che \`task status\` mostri i quattro servizi registrati su Eureka, poi
+Aspetta che \`task status\` mostri i tuoi servizi registrati su Eureka, poi
 apri nell'ordine:
 
-1. \`http://localhost:8080\` — l'applicazione
+1. la tua UI — l'applicazione (l'indirizzo lo stampa \`task dev\`)
 2. \`http://localhost:8761\` — la dashboard Eureka, per far vedere il discovery
-3. \`http://localhost:8081/swagger-ui.html\` — i contratti OpenAPI
+3. lo Swagger di un servizio — i contratti OpenAPI
 
 Se ti chiedono della **resilienza**, spegni un servizio davanti a loro e
 ricarica la pagina: resta in piedi con i segnaposto invece di andare in
@@ -4364,10 +4521,10 @@ errore. Dalla cartella dei moduli (quella con \`docker-compose.yml\`), col nome
 del servizio:
 
 \`\`\`bash
-docker compose stop crm-service
+docker compose stop <servizio>
 \`\`\`
 
-e poi \`docker compose start crm-service\` per riaccenderlo.
+e poi \`docker compose start <servizio>\` per riaccenderlo.
 
 Alla fine:
 
@@ -4480,14 +4637,13 @@ Funziona a stack spento e senza rete: serve solo Maven.
 | \`task check\` | Moduli, porte, Docker e liste sono coerenti? |
 | \`task test\` | Collauda gli strumenti su una copia usa-e-getta |
 | \`task help\` | Questa guida, dal terminale |
-| \`task test-e2e\` | Collaudo end-to-end sui servizi accesi |
 | \`task docker-up\` | Costruisce le immagini e avvia lo stack in container |
 | \`task docker-down\` | Ferma i container, **conservando** i dati del database |
 | \`task docker-reset\` | Ferma i container **ed elimina** i volumi |
 | \`task docker-logs\` | Segue i log dei container |
 | \`task build\` | Compila e impacchetta tutti i moduli Maven |
 | \`task run SERVICE=<modulo>\` | Avvia un solo modulo, in primo piano |
-| \`task run-eureka\` · \`run-product\` · \`run-crm\` · \`run-wms\` · \`run-wms-ui\` | Le scorciatoie per i moduli di questa traccia |
+| \`task run-eureka\` | Avvia il solo Eureka, in primo piano |
 | \`task kill-java\` | Ultima spiaggia: termina **tutti** i java della macchina |
 
 ### Opzioni utili
@@ -4499,8 +4655,7 @@ Si passano come variabili, senza trattini.
 | \`task dev UI_PORT=9080\` | Vuoi la UI su un'altra porta |
 | \`task dev NOBUILD=1\` | Hai già compilato e vuoi solo riavviare |
 | \`task dev KEEPFOREIGN=1\` | Su una porta gira qualcosa che ti serve viva: non chiuderla |
-| \`task test-e2e UI_PORT=9080\` | Hai spostato la UI: dillo anche al collaudo |
-| \`task logs SERVICE=wms\` | Un servizio solo |
+| \`task logs SERVICE=<nome>\` | Un servizio solo |
 
 ---
 
@@ -6736,51 +6891,15 @@ java --version
 
 ## 2. Modalità d'Avvio Principali
 
-### A. Sviluppo Locale con Hot Reload (CONSIGLIATO MENTRE SVILUPPI)
+### A. Avvio Stack Completo Containerizzato (CONSIGLIATO PER LA DEMO)
 
-Un solo comando libera le porte (chiudendo chi le tiene occupate), compila tutto e avvia Eureka, \`product-service\`, \`crm-service\`, \`wms-service\` e \`wms-ui\`:
-
-\`\`\`bash
-task dev
-\`\`\`
-
-I servizi girano in background: niente finestre sparse, un terminale solo. Per vedere l'output di tutti insieme, ogni riga prefissata dal nome del servizio:
+Esegue in container Docker isolati tutti i moduli del progetto — Eureka, i tuoi servizi — e il database PostgreSQL:
 
 \`\`\`bash
-task logs
-\`\`\`
+# Entra nella cartella di progetto
+cd spring-boot-dockerized
 
-\`Ctrl+C\` chiude solo la vista, i servizi restano su. Per uno solo: \`task logs SERVICE=wms\`. I log restano comunque su file in \`.dev-logs/\`.
-
-Dopo una modifica al codice, ricompila e i servizi interessati si riavviano da soli grazie a \`spring-boot-devtools\`:
-
-\`\`\`bash
-task compile
-\`\`\`
-
-Per fermare lo stack locale e liberare le porte:
-
-\`\`\`bash
-task dev-down
-\`\`\`
-
-Quando qualcosa non risponde, il primo comando da lanciare è:
-
-\`\`\`bash
-task status
-\`\`\`
-
-Dice chi occupa ogni porta (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
-
-**Perché non usare \`task docker-up\` mentre sviluppi**: \`docker compose build\` ricostruisce tutte e cinque le immagini, e poiché il \`Dockerfile\` copia i sorgenti prima di compilare, ogni singola modifica invalida la cache e fa ricompilare tutto in ogni immagine. Un ciclo costa minuti contro i ~20 secondi del build locale.
-
----
-
-### B. Avvio Stack Completo Containerizzato (CONSIGLIATO PER LA DEMO)
-
-È lo stack che presenterai alla commissione. Esegue i 5 microservizi Spring Boot e PostgreSQL in container isolati:
-
-\`\`\`bash
+# Compila l'intero progetto e avvia i container
 task docker-up
 \`\`\`
 
@@ -6803,38 +6922,93 @@ task docker-reset
 
 ---
 
+### B. Sviluppo Locale con Hot Reload (CONSIGLIATO MENTRE SVILUPPI)
+
+Un solo comando libera le porte (chiudendo chi le tiene occupate), compila tutto e lancia Eureka e i tuoi servizi, nell'ordine giusto (Eureka per primo, e ne aspetta la porta prima degli altri). Se un tuo servizio usa PostgreSQL, avvia anche quello: basta mettere \`$usesPostgres = $true\` in \`scripts/dev.ps1\` (\`USES_POSTGRES=1\` in \`dev.sh\`).
+
+\`\`\`bash
+task dev
+\`\`\`
+
+I servizi girano in background: niente finestre sparse, un terminale solo. Per vedere l'output di tutti insieme, ogni riga prefissata dal nome del servizio:
+
+\`\`\`bash
+task logs
+\`\`\`
+
+\`Ctrl+C\` chiude solo la vista, i servizi restano su. Per uno solo: \`task logs SERVICE=<nome>\`, col nome breve che vedi in \`task status\`. I log restano comunque su file in \`.dev-logs/\`.
+
+Dopo una modifica al codice, ricompila e i servizi interessati si riavviano da soli grazie a \`spring-boot-devtools\`:
+
+\`\`\`bash
+task compile
+\`\`\`
+
+Per fermare lo stack locale e liberare le porte (ferma anche il PostgreSQL avviato da \`task dev\`, conservando i dati):
+
+\`\`\`bash
+task dev-down
+\`\`\`
+
+Quando qualcosa non risponde, il primo comando da lanciare è:
+
+\`\`\`bash
+task status
+\`\`\`
+
+Dice chi occupa ogni porta (un tuo servizio, i container, o un'applicazione estranea), quali container girano e cosa si è registrato su Eureka.
+
+**Perché non usare \`task docker-up\` mentre sviluppi**: \`docker compose build\` ricostruisce un'immagine per servizio, e poiché il \`Dockerfile\` copia i sorgenti prima di compilare, ogni singola modifica invalida la cache e fa ricompilare tutto in ogni immagine. Un ciclo costa minuti contro i ~20 secondi del build locale.
+
+---
+
 ### C. Avvio Manuale dei Singoli Moduli
 
-Se ti serve isolare un servizio, in terminali distinti:
+Se ti serve isolare un servizio e vederne l'output nel terminale:
 
 \`\`\`bash
 task run SERVICE=<modulo>
 \`\`\`
 
-Le scorciatoie di questa traccia:
+Due scorciatoie per quello che c'è sempre:
 
 \`\`\`bash
 task run-eureka
-task run-product
-task run-crm
-task run-wms
-task run-wms-ui
 \`\`\`
 
-\`task run-db\` avvia solo PostgreSQL su Docker. Su questo branch **non serve**: i servizi usano H2 in memoria (vedi il README).
+\`\`\`bash
+task run-db
+\`\`\`
+
+\`Ctrl+C\` ferma il modulo. Per lo stack intero, in background, resta \`task dev\`.
 
 ---
 
 ## 3. Mappa delle Porte ed Endpoint OpenAPI / Swagger UI
 
-| Servizio | Porta Host | Endpoint Principale / Dashboard | Swagger UI (Contratti OpenAPI) |
+Questo branch è il **template vuoto**: le uniche porte fisse sono quelle
+dell'infrastruttura. Le altre le assegna \`task new-service\` (la prima libera
+dopo l'ultima usata) e te le stampa \`task dev\` alla fine dell'avvio.
+
+| Servizio | Porta Host | Endpoint / Dashboard | Swagger UI |
 | :--- | :---: | :--- | :--- |
-| **WMS UI** | \`8080\` | \`http://localhost:8080\` | \`http://localhost:8080/swagger-ui.html\` |
-| **Eureka Naming Server** | \`8761\` | \`http://localhost:8761\` | N/A (Dashboard Eureka) |
-| **Product Service** | \`8081\` | \`http://localhost:8081\` | \`http://localhost:8081/swagger-ui.html\` |
-| **CRM Service** | \`8082\` | \`http://localhost:8082\` | \`http://localhost:8082/swagger-ui.html\` |
-| **WMS Service** | \`8083\` | \`http://localhost:8083\` | \`http://localhost:8083/swagger-ui.html\` |
-| **PostgreSQL DB** | \`5432\` | \`jdbc:postgresql://localhost:5432/esame\` | Avviato dal compose ma non collegato ai servizi |
+| **Eureka Naming Server** | \`8761\` | \`http://localhost:8761\` | N/A (dashboard Eureka) |
+| **PostgreSQL** | \`5432\` | \`jdbc:postgresql://localhost:5432/esame\` (utente e password \`exam\`) | N/A |
+| **I tuoi servizi REST** | \`8081\`, \`8082\`, ... | \`http://localhost:<porta>/api/...\` | \`http://localhost:<porta>/swagger-ui.html\` |
+| **La tua UI** | la prima libera | \`http://localhost:<porta>\` | idem |
+
+Per sapere in ogni momento chi sta su quale porta, e chi è registrato su Eureka:
+
+\`\`\`bash
+task status
+\`\`\`
+
+Per spostare una porta ovunque sia scritta (\`application.yml\`, compose, liste
+di avvio):
+
+\`\`\`bash
+task set-port SERVICE=<modulo> PORT=<porta>
+\`\`\`
 
 ### Il database
 
@@ -6848,8 +7022,6 @@ task use-postgres SERVICE=<modulo>
 
 Con \`DBNAME=<nome>\` quel modulo ottiene un database tutto suo, sempre dentro
 lo stesso container. Vedi GIORNO-ESAME.md, "Collegare un servizio a PostgreSQL".
-
-
 
 Le credenziali non sono scolpite nella pietra:
 
@@ -6929,43 +7101,41 @@ Quando definisci relazioni tra tabelle dello stesso microservizio (\`task add-re
 
 ## 4. Collaudo Rapido
 
-### Collaudo automatizzato (il modo più veloce)
+### Prima: il progetto è coerente?
 
 \`\`\`bash
-task test-e2e
+task check
 \`\`\`
 
-Esegue [\`test_e2e_wms.ps1\`](./test_e2e_wms.ps1), che percorre l'intero flusso sui servizi avviati. Si può lanciare anche a stack acceso: se ne accorge, compila senza \`clean\` (che cancellerebbe le classi sotto i piedi di devtools, facendo morire i servizi) e aspetta che il riavvio automatico sia completato prima di interrogare gli endpoint.
+Non avvia niente: verifica che moduli, porte, \`Dockerfile\`, \`docker-compose.yml\`
+e liste di avvio dicano la stessa cosa, e che le porte siano davvero usabili su
+questa macchina. Se qualcosa non torna te lo dice qui, non a demo iniziata.
 
-Se hai spostato la UI su un'altra porta, passala anche al collaudo, altrimenti il controllo sulla dashboard interroga qualunque applicazione occupi la 8080:
+### Poi: i servizi si vedono fra loro?
 
 \`\`\`bash
-task test-e2e UI_PORT=9080
+task status
 \`\`\`
 
-### Test manuale via \`curl\` (API Direct Check)
+Nella sezione **REGISTRO EUREKA** devono comparire tutti i tuoi servizi. Se uno
+manca, o è partito da pochi secondi, o non parte affatto: \`task logs
+SERVICE=<nome>\`.
+
+### Infine: gli endpoint rispondono?
+
+Ogni servizio creato con \`task new-service\` nasce con un endpoint di prova e
+con Swagger già collegato:
 
 \`\`\`bash
-# 1. Catalogo prodotti
-curl "http://localhost:8081/api/products"
+curl http://localhost:<porta>/api/ping
 \`\`\`
 
-\`\`\`bash
-# 2. Anagrafica clienti
-curl "http://localhost:8082/api/customers"
-\`\`\`
+Swagger UI (\`http://localhost:<porta>/swagger-ui.html\`) è il modo più comodo
+per provare gli endpoint veri: mostra lo schema esatto delle richieste e le
+esegue dal browser, senza scrivere \`curl\` a mano.
 
-\`\`\`bash
-# 3. Scaffali e ubicazioni di magazzino
-curl "http://localhost:8083/api/wms/cabinets"
-\`\`\`
-
-\`\`\`bash
-# 4. Ubicazioni (wms-service interroga product-service e crm-service via Feign)
-curl "http://localhost:8083/api/wms/locations"
-\`\`\`
-
-Gli endpoint \`POST /api/wms/movements\` e \`POST /api/wms/nearest-location\` accettano un corpo JSON: il modo più comodo per provarli è Swagger UI su \`http://localhost:8083/swagger-ui.html\`, che mostra lo schema esatto della richiesta.
+L'ultimo collaudo, quello che conta, è percorrere il flusso completo dalla UI
+come lo mostrerai alla commissione.
 
 ---
 
@@ -6994,13 +7164,6 @@ Se su una di quelle porte gira qualcosa che ti serve viva, dillo e sposta la UI:
 \`\`\`bash
 task dev KEEPFOREIGN=1 UI_PORT=9080
 \`\`\`
-Ricordati di passare la stessa porta al collaudo: \`task test-e2e UI_PORT=9080\`.
-
-### 🚨 Emergenza 1-bis: "container ...-eureka-server-1 is unhealthy"
-\`task docker-up\` si interrompe con \`dependency failed to start: container <cartella>-eureka-server-1 is unhealthy\`, ma nei log Eureka scrive \`Started Eureka Server\`. L'healthcheck usa \`curl\`, che l'immagine \`eclipse-temurin:25-jre\` non contiene. Il \`demo/Dockerfile\` di questo repo lo installa già; se aggiungi un healthcheck HTTP a un altro servizio vale la stessa regola. Per leggere l'esito delle probe, dalla cartella dei moduli:
-\`\`\`bash
-docker inspect $(docker compose ps -q eureka-server) --format "{{json .State.Health}}"
-\`\`\`
 
 ### 🚨 Emergenza 1-ter: "porta occupata da processo sconosciuto"
 
@@ -7026,6 +7189,12 @@ net stop winnat
 \`\`\`
 \`\`\`bash
 net start winnat
+\`\`\`
+
+### 🚨 Emergenza 1-bis: "container ...-eureka-server-1 is unhealthy"
+\`task docker-up\` si interrompe con \`dependency failed to start: container <cartella>-eureka-server-1 is unhealthy\`, ma nei log Eureka scrive \`Started Eureka Server\`. L'healthcheck usa \`curl\`, che l'immagine \`eclipse-temurin:25-jre\` non contiene. Il \`demo/Dockerfile\` di questo repo lo installa già; se aggiungi un healthcheck HTTP a un altro servizio vale la stessa regola. Per leggere l'esito delle probe, dalla cartella dei moduli:
+\`\`\`bash
+docker inspect $(docker compose ps -q eureka-server) --format "{{json .State.Health}}"
 \`\`\`
 
 ### 🚨 Emergenza 2: "Docker Compose non aggiorna il codice modificato"
@@ -7093,7 +7262,7 @@ Se restano indietro lo segnala \`task check\`, alla voce *editor (launch.json)*.
 
 ---
 
-## Prima e dopo: la rete dell'esame e la consegna
+## 7. Prima e dopo: la rete dell'esame e la consegna
 
 All'esame la rete passa da una whitelist di domini: Maven Central sì, il resto
 non si sa. \`task rete\` dice, dominio per dominio, che cosa passa e che cosa
@@ -7126,380 +7295,6 @@ archivio unico da consegnare: scompattato, parte con \`docker compose up --build
 Le parti dell'allegato da scrivere a mano (analisi, algoritmo, che cosa fa ogni
 modulo) stanno in \`allegato.md\`: la consegna le mette al loro posto prima di
 fare l'archivio, quindi si può rilanciare quante volte si vuole.
-` },
-    { file: 'README-ESAME-TTFCLOUD.md', testo: `# Documentazione Esame Spring Cloud — WMS Magazzino "Spostati S.r.l."
-
-## Obiettivo
-
-Questa soluzione realizza un sistema di gestione magazzino (WMS) distribuito su microservizi, con una UI che permette di consultare le giacenze, spostare merce fra ubicazioni e calcolare l'ubicazione compatibile più vicina.
-
-Flusso richiesto dalla traccia:
-
-1. il magazzino è una griglia di **armadi**, ognuno identificato da fila e colonna
-2. ogni armadio contiene **ubicazioni**, ciascuna con una capienza massima (\`maxIngombro\`)
-3. ogni ubicazione può contenere pezzi di **un solo prodotto** appartenente a **un solo cliente**
-4. la UI mostra armadi e ubicazioni interrogando \`WMS-SERVICE\` tramite Eureka
-5. \`WMS-SERVICE\` arricchisce i dati chiedendo nome prodotto a \`PRODUCT-SERVICE\` e ragione sociale a \`CRM-SERVICE\`, entrambi via OpenFeign
-6. la UI permette di **spostare Q pezzi** da un'ubicazione a un'altra, con validazione delle regole di magazzino
-7. la UI permette di calcolare l'**ubicazione idonea più vicina** usando la distanza di Manhattan sulla griglia degli armadi
-
-## Architettura
-
-Applicazioni Spring Boot presenti nello stack:
-
-- \`eureka-server\` (modulo \`naming-server\`)
-- \`product-service\`
-- \`crm-service\`
-- \`wms-service\`
-- \`wms-ui\`
-
-Package principali:
-
-- \`com.example.ttfcloud_esame.namingserver\`
-- \`com.example.ttfcloud_esame.productservice\`
-- \`com.example.ttfcloud_esame.crmservice\`
-- \`com.example.ttfcloud_esame.wmsservice\`
-- \`com.example.ttfcloud_esame.wmsui\`
-
-Catena delle chiamate:
-
-\`\`\`
-wms-ui  --Feign-->  WMS-SERVICE  --Feign-->  PRODUCT-SERVICE
-                         |
-                         +------Feign------>  CRM-SERVICE
-\`\`\`
-
-Nessun client conosce host o porta degli altri: i \`@FeignClient\` usano il **nome logico** registrato su Eureka (\`WMS-SERVICE\`, \`PRODUCT-SERVICE\`, \`CRM-SERVICE\`) e il load balancer risolve l'istanza.
-
-### Resilienza delle chiamate Feign
-
-\`WmsService\` non lascia propagare gli errori dei servizi remoti: se \`PRODUCT-SERVICE\` o \`CRM-SERVICE\` non rispondono, i metodi \`fetchProduct\` / \`fetchCustomer\` intercettano l'eccezione, scrivono un warning e restituiscono un oggetto segnaposto (\`Prodotto #101\`, \`Cliente #201\`, ingombro di default 10). La dashboard resta quindi consultabile anche con un servizio a valle spento — è un punto interessante da mostrare all'esame staccando un container.
-
-## Modello dati
-
-\`CabinetEntity\` — armadio nella griglia:
-
-| Campo | Significato |
-| :--- | :--- |
-| \`id\` | identificativo armadio |
-| \`row\` | indice di fila nella griglia |
-| \`col\` | indice di colonna nella griglia |
-| \`name\` | etichetta descrittiva |
-
-\`LocationEntity\` — ubicazione dentro un armadio:
-
-| Campo | Significato |
-| :--- | :--- |
-| \`id\` | identificativo ubicazione |
-| \`cabinetId\` | armadio di appartenenza |
-| \`maxIngombro\` | capienza massima |
-| \`currentIngombro\` | ingombro attualmente occupato |
-| \`productId\` | prodotto contenuto (\`null\` se vuota) |
-| \`customerId\` | cliente proprietario (\`null\` se vuota) |
-| \`quantity\` | numero di pezzi presenti |
-
-L'ingombro non è un conteggio di pezzi: ogni prodotto ha un **ingombro unitario** (\`ProductDTO.ingombro\`) e l'occupazione di uno spostamento vale \`quantità × ingombro unitario\`.
-
-### Dati di prova caricati all'avvio
-
-Ogni servizio popola i propri dati con un \`CommandLineRunner\` (o \`@PostConstruct\` nel CRM) solo se il repository è vuoto.
-
-**Prodotti** (\`product-service\`):
-
-| ID | Nome | Prezzo | Ingombro unitario |
-| :--- | :--- | :--- | :--- |
-| 101 | Scatola cartone standard | 15.00 | 10 |
-| 102 | Pallet legno pesante | 85.00 | 50 |
-| 103 | Contenitore plastico isolato | 45.00 | 25 |
-
-**Clienti** (\`crm-service\`):
-
-| ID | Referente | Azienda |
-| :--- | :--- | :--- |
-| 201 | Mario Rossi | Logistica Express Srl |
-| 202 | Giuseppe Verdi | Trasporti Nazionali Spa |
-| 203 | Elena Bianchi | Tech Distribution SpA |
-
-**Armadi e ubicazioni** (\`wms-service\`):
-
-| Armadio | Fila | Colonna | Ubicazioni |
-| :--- | :---: | :---: | :--- |
-| 1 | 1 | 1 | \`1\` (4 pz prod. 101, cliente 201, 40/100) · \`2\` (vuota, 0/120) |
-| 2 | 1 | 3 | \`3\` (2 pz prod. 102, cliente 202, 100/150) · \`4\` (vuota, 0/200) |
-| 3 | 4 | 2 | \`5\` (1 pz prod. 103, cliente 201, 25/80) · \`6\` (vuota, 0/100) |
-
-## Regole di movimentazione
-
-\`POST /api/wms/movements\` applica quattro controlli in ordine. Se uno fallisce, la risposta ha \`success: false\` e un messaggio esplicativo — **non** viene sollevata un'eccezione, così la UI può mostrare l'errore all'utente.
-
-1. **Pezzi disponibili**: l'ubicazione di partenza deve contenere almeno la quantità richiesta.
-2. **Coerenza prodotto**: se la destinazione non è vuota, deve contenere lo stesso \`productId\`.
-3. **Coerenza cliente**: se la destinazione non è vuota, deve contenere lo stesso \`customerId\`.
-4. **Ingombro libero**: \`maxIngombro − currentIngombro\` della destinazione deve coprire \`quantità × ingombro unitario\`.
-
-A movimentazione riuscita, sorgente e destinazione vengono aggiornate; se la sorgente si svuota completamente, \`productId\`, \`customerId\` e \`currentIngombro\` vengono azzerati, rendendola disponibile per qualsiasi altro prodotto.
-
-## Algoritmo dell'ubicazione più vicina
-
-\`POST /api/wms/nearest-location\` riceve un'ubicazione sorgente \`U\` e una quantità \`Q\`, e cerca l'ubicazione idonea più vicina.
-
-Per ogni ubicazione candidata (esclusa la sorgente) vengono applicati i filtri di idoneità:
-
-- deve avere ingombro libero sufficiente per \`Q × ingombro unitario\`
-- se non è vuota, deve contenere lo stesso prodotto **e** lo stesso cliente della sorgente
-
-Fra le candidate idonee si sceglie quella a **distanza di Manhattan** minima, calcolata sulle coordinate degli armadi:
-
-\`\`\`
-d = |fila_sorgente − fila_destinazione| + |colonna_sorgente − colonna_destinazione|
-\`\`\`
-
-Due ubicazioni nello stesso armadio hanno quindi \`d = 0\`. Se nessuna candidata supera i filtri, la risposta contiene il messaggio \`Nessuna ubicazione idonea disponibile\`.
-
-### Esempio da mostrare all'esame
-
-Sorgente ubicazione \`1\` (armadio 1, fila 1, colonna 1), quantità \`2\` di prodotto 101 (ingombro unitario 10 → servono 20):
-
-- ubicazione \`2\` — stesso armadio, vuota, 120 liberi → idonea, \`d = |1−1| + |1−1| = 0\`
-- ubicazione \`4\` — armadio 2 (fila 1, col 3), vuota, 200 liberi → idonea, \`d = 0 + 2 = 2\`
-- ubicazione \`3\` — contiene prodotto 102, diverso → **scartata**
-
-Risultato: ubicazione \`2\`, distanza \`0\`.
-
-Per far vedere un rifiuto, prova a spostare dall'ubicazione \`1\` alla \`3\`: contengono prodotti diversi e il servizio risponde \`Le due ubicazioni contengono prodotti diversi\`.
-
-## API
-
-**\`product-service\`** — \`/api/products\`
-
-| Metodo | Path | Descrizione |
-| :--- | :--- | :--- |
-| GET | \`/api/products\` | elenco prodotti |
-| GET | \`/api/products/{id}\` | dettaglio prodotto |
-| GET | \`/api/products/search?query=\` | ricerca per nome o descrizione |
-| POST | \`/api/products\` | crea o aggiorna un prodotto |
-| DELETE | \`/api/products/{id}\` | elimina un prodotto |
-
-**\`crm-service\`** — \`/api/customers\`
-
-| Metodo | Path | Descrizione |
-| :--- | :--- | :--- |
-| GET | \`/api/customers\` | elenco clienti |
-| GET | \`/api/customers/{id}\` | dettaglio cliente |
-
-**\`wms-service\`** — \`/api/wms\`
-
-| Metodo | Path | Descrizione |
-| :--- | :--- | :--- |
-| GET | \`/api/wms/cabinets\` | elenco armadi |
-| GET | \`/api/wms/locations?cabinetId=\` | ubicazioni, opzionalmente filtrate per armadio |
-| GET | \`/api/wms/locations/{id}\` | dettaglio ubicazione |
-| POST | \`/api/wms/movements\` | esegue una movimentazione |
-| POST | \`/api/wms/nearest-location\` | calcola l'ubicazione idonea più vicina |
-
-Ogni servizio espone la propria Swagger UI su \`/swagger-ui.html\`: è il modo più comodo per provare i due POST, perché mostra lo schema esatto del corpo JSON.
-
-## UI
-
-\`wms-ui\` è un'applicazione Thymeleaf con un unico template, \`wms-dashboard.html\`, servito da \`WmsUiController\` su \`/\`. Contiene:
-
-- il filtro per armadio (\`?cabinetId=\`)
-- la tabella delle ubicazioni con prodotto e cliente già risolti per nome
-- il form di movimentazione (\`POST /movement\`)
-- il form di calcolo dell'ubicazione più vicina (\`POST /nearest-location\`)
-
-Entrambi i form fanno redirect su \`/\` passando l'esito come flash attribute, così un refresh del browser non riesegue l'operazione. Se il cluster non risponde, il controller cattura l'eccezione e mostra un messaggio d'errore invece di una pagina di stack trace.
-
-Lo stile è CSS inline dentro il template: la dashboard non dipende da Tailwind né da asset esterni.
-
-## Persistenza
-
-\`product-service\` e \`wms-service\` usano JPA/Hibernate con \`ddl-auto: update\`.
-
-Di default girano su **H2 in memoria**: i dati vengono ricreati a ogni riavvio dai \`CommandLineRunner\`. \`crm-service\` non ha persistenza affatto, tiene i clienti in una \`ConcurrentHashMap\`.
-
-Entrambi hanno il driver PostgreSQL a classpath e l'URL parametrico, quindi si passa a Postgres senza toccare il codice valorizzando le variabili d'ambiente nel \`docker-compose.yml\`:
-
-- \`product-service\`: \`PRODUCT_DB_URL\`, \`PRODUCT_DB_DRIVER\`
-- \`wms-service\`: \`WMS_DB_URL\`, \`WMS_DB_DRIVER\`
-
-> ⚠️ Il \`docker-compose.yml\` avvia il container \`postgres\` ma **non lo collega ad alcun servizio**: finché quelle variabili non sono impostate, PostgreSQL resta inutilizzato. Se la commissione chiede persistenza reale, è il primo punto da sistemare.
-
-## Eureka
-
-\`naming-server\` espone la dashboard su \`http://localhost:8761\`. I quattro servizi si registrano con i nomi \`PRODUCT-SERVICE\`, \`CRM-SERVICE\`, \`WMS-SERVICE\` e \`WMS-UI\`.
-
-L'URL del registro è configurabile con \`EUREKA_SERVER_URL\`, impostato nel compose a \`http://eureka-server:8761/eureka/\`; in locale usa il default \`http://localhost:8761/eureka/\`.
-
-Ogni client tiene una copia del registro, e il load balancer di Feign una copia di quella: con i valori di Spring passano anche 30-60 secondi prima che un servizio appena acceso sia chiamabile, e nel frattempo i Feign client rispondono 500. Qui entrambe si rinfrescano ogni 5 secondi (\`registry-fetch-interval-seconds\` e \`spring.cloud.loadbalancer.cache.ttl\` negli \`application.yml\`), quindi dopo l'avvio bastano pochi secondi.
-
-## Porte e URL
-
-| Servizio | Porta | URL |
-| :--- | :---: | :--- |
-| WMS UI | \`8080\` | \`http://localhost:8080\` |
-| Eureka | \`8761\` | \`http://localhost:8761\` |
-| Product Service | \`8081\` | \`http://localhost:8081/swagger-ui.html\` |
-| CRM Service | \`8082\` | \`http://localhost:8082/swagger-ui.html\` |
-| WMS Service | \`8083\` | \`http://localhost:8083/swagger-ui.html\` |
-| PostgreSQL | \`5432\` | avviato dal compose, non collegato ai servizi |
-
-## Multi-Module Maven
-
-Il progetto usa un parent Maven aggregatore in [demo/pom.xml](./demo/pom.xml). I moduli attivi in questa soluzione sono:
-
-- [common-dto](./demo/common-dto) — DTO condivisi
-- [naming-server](./demo/naming-server)
-- [product-service](./demo/product-service)
-- [crm-service](./demo/crm-service)
-- [wms-service](./demo/wms-service)
-- [wms-ui](./demo/wms-ui)
-
-Il branch conserva anche i moduli scheletro del template (\`tourist-service\`, \`random-service\`, \`store-service\`, \`event-ui\`): sono dichiarati nel \`pom.xml\` aggregatore, quindi vengono compilati, ma non fanno parte dello stack Docker WMS.
-
-Cosa cambia rispetto a un progetto single-module:
-
-- le dipendenze non sono più condivise da tutto il progetto: ogni servizio compila solo con gli starter che gli servono
-- i DTO comuni stanno in un jar separato, così UI e servizi parlano lo stesso linguaggio senza duplicare classi
-- Docker e \`spring-boot:run\` lavorano sul singolo modulo, non su un monolite con più main class
-- il costo è avere più \`pom.xml\` e una struttura leggermente più articolata
-
-## Tecnologie
-
-- Spring Boot 4.0.5
-- Spring Cloud 2025.1.1 (Netflix Eureka, OpenFeign)
-- Spring Data JPA / Hibernate
-- H2 (runtime di default), driver PostgreSQL 18.3 disponibile
-- springdoc-openapi 2.8.5 (Swagger UI)
-- Lombok 1.18.44
-- Apache Maven Wrapper 3.9.14
-- Thymeleaf
-- Docker / Docker Compose
-- Taskfile (\`go-task\`)
-
-## Installazioni necessarie
-
-Sull'host servono:
-
-- Git
-- Docker Desktop oppure Docker Engine + Docker Compose
-- Task (\`go-task\`)
-- Java 25 (per \`task dev\`, \`task build\` e i \`run-*\`)
-
-Verifica rapida dell'ambiente:
-
-\`\`\`bash
-git --version
-\`\`\`
-
-\`\`\`bash
-docker compose version
-\`\`\`
-
-\`\`\`bash
-task --version
-\`\`\`
-
-\`\`\`bash
-java --version
-\`\`\`
-
-Il Taskfile usa come \`JAVA_HOME_PATH\` il percorso \`C:/Program Files/Microsoft/jdk-25.0.2.10-hotspot\`. Se sul tuo PC Java è installato altrove, aggiorna quella variabile in [Taskfile.yml](./Taskfile.yml) oppure imposta \`JAVA_HOME\` nell'ambiente: il Taskfile lo usa se presente.
-
-## Avvio
-
-### Sviluppo (consigliato mentre lavori)
-
-\`\`\`bash
-task dev
-\`\`\`
-
-Libera le porte da eventuali avanzi, compila tutti i moduli una volta sola, avvia Eureka, ne attende la porta e poi lancia gli altri quattro servizi. Girano in background, in un terminale solo: l'output va in \`.dev-logs/\`.
-
-Per seguire i log di tutti insieme, ogni riga prefissata dal nome del servizio:
-
-\`\`\`bash
-task logs
-\`\`\`
-
-\`Ctrl+C\` chiude solo la vista. Per uno solo: \`task logs SERVICE=wms\`.
-
-Dopo una modifica al codice:
-
-\`\`\`bash
-task compile
-\`\`\`
-
-Il servizio interessato si riavvia da solo grazie a \`spring-boot-devtools\`.
-
-Per fermare lo stack locale e liberare le porte:
-
-\`\`\`bash
-task dev-down
-\`\`\`
-
-Se qualcosa non risponde, \`task status\` dice chi occupa ogni porta, quali container girano e cosa si è registrato su Eureka.
-
-### Demo (quello che presenti alla commissione)
-
-\`\`\`bash
-task docker-up
-\`\`\`
-
-Per i log:
-
-\`\`\`bash
-task docker-logs
-\`\`\`
-
-Per arrestare i container conservando i dati del database:
-
-\`\`\`bash
-task docker-down
-\`\`\`
-
-Per ripartire da un database vuoto: \`task docker-reset\`.
-
-> ℹ️ Locale e Docker usano le stesse porte, ma non devi ricordartene: \`task docker-up\` ferma da solo lo stack locale, e \`task dev\` spegne da solo i container.
-
-### Collaudo automatizzato
-
-\`\`\`bash
-task test-e2e
-\`\`\`
-
-Esegue [\`test_e2e_wms.ps1\`](./test_e2e_wms.ps1), che percorre il flusso completo sui servizi avviati. Se hai spostato la UI su un'altra porta, passala anche qui: \`task test-e2e UI_PORT=9080\`.
-
-## Task disponibili
-
-| Task | Cosa fa |
-| :--- | :--- |
-| \`task\` | Elenca tutti i task disponibili |
-| \`task dev\` | Pulisce, compila e avvia l'intero stack in locale con hot reload |
-| \`task dev-down\` | Ferma i servizi locali e libera le porte |
-| \`task logs\` | Segue i log di tutti i servizi in un terminale solo |
-| \`task status\` | Chi occupa le porte, quali container girano, cosa è su Eureka |
-| \`task compile\` | Ricompila e fa ripartire i servizi già avviati |
-| \`task build\` | Compila tutti i moduli Maven |
-| \`task docker-up\` | Avvia lo stack containerizzato |
-| \`task docker-down\` | Arresta i container, conservando i dati del database |
-| \`task docker-reset\` | Arresta i container ed elimina i volumi |
-| \`task docker-logs\` | Segue i log dei container |
-| \`task test-e2e\` | Esegue lo script di collaudo |
-| \`task clean-ports\` | Come \`dev-down\`, libera le porte dello stack |
-| \`task kill-java\` | Ultima spiaggia: termina tutti i processi Java della macchina |
-| \`task run-eureka\` · \`run-product\` · \`run-crm\` · \`run-wms\` · \`run-wms-ui\` | Avvio manuale di un singolo modulo |
-| \`task run-db\` | Avvia solo PostgreSQL (non necessario: i servizi usano H2) |
-
-## Note da dire all'esame
-
-- **Perché Eureka**: i servizi si trovano per nome logico, non per host e porta. Si può scalare o spostare un servizio senza toccare la configurazione dei client.
-- **Perché OpenFeign**: il client REST è un'interfaccia dichiarativa; l'integrazione con il load balancer di Spring Cloud risolve il nome logico in un'istanza concreta.
-- **Perché \`common-dto\`**: UI e servizi condividono lo stesso contratto senza duplicare le classi, e un cambio di campo si propaga a compile time invece che a runtime.
-- **Gestione degli errori di dominio**: le violazioni delle regole di magazzino tornano come \`StockMovementResult\` con \`success: false\`, non come eccezioni HTTP. È una scelta deliberata: l'utente della UI deve leggere *perché* lo spostamento è stato rifiutato.
-- **Degradazione controllata**: se \`PRODUCT-SERVICE\` o \`CRM-SERVICE\` cadono, \`WMS-SERVICE\` continua a rispondere con dati segnaposto invece di restituire 500. Si può dimostrare fermando un container durante la demo.
-- **Distanza di Manhattan**: è la metrica giusta per una griglia di scaffalature, dove ci si muove lungo corsie ortogonali e non in diagonale.
-- **Healthcheck e ordine di avvio**: nel compose i servizi dipendono da \`eureka-server\` con \`condition: service_healthy\`, quindi non partono finché il registro non risponde. L'healthcheck usa \`curl\`, che il \`Dockerfile\` installa esplicitamente perché l'immagine \`eclipse-temurin:25-jre\` non lo include.
 ` }
   ],
 };

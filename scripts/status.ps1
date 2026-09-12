@@ -22,10 +22,6 @@ $portNames = Get-DevServiceMap -LogDir $logDir
 # Ripiego per quando .dev-logs non c'e' ancora (subito dopo un clone).
 $fallbackNames = [ordered]@{
     '8761' = 'eureka'
-    '8081' = 'product'
-    '8082' = 'crm'
-    '8083' = 'wms'
-    '8080' = 'wms-ui'
     '5432' = 'postgres'
 }
 foreach ($port in (Get-DevPorts -LogDir $logDir)) {

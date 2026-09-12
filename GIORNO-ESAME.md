@@ -241,7 +241,21 @@ passare dai comandi; se il `launch.json` resta indietro, te lo dice `task check`
 
 ## Fase 1 — Sviluppo: il ciclo che ripeterai tutto il giorno
 
-Una volta sola, all'inizio:
+Questo branch è il template vuoto: c'è Eureka, il modulo `common-dto` per le
+classi condivise, e nient'altro. I servizi della traccia li crei tu, un
+comando per uno:
+
+```bash
+task new-service NAME=ordini-service
+```
+
+```bash
+task new-service NAME=ordini-ui UI=1
+```
+
+Il primo ti dà un servizio REST (con JPA, H2 e Swagger già collegati), il
+secondo una UI Thymeleaf. Entrambi si registrano su Eureka e possono chiamarsi
+per nome con Feign. Poi:
 
 ```bash
 task dev
@@ -258,7 +272,7 @@ task logs
 
 Ogni riga è prefissata dal nome del servizio e colorata. `Ctrl+C` chiude solo
 questa vista: i servizi restano accesi. Per seguirne uno solo:
-`task logs SERVICE=wms`.
+`task logs SERVICE=<nome>`, con il nome breve che vedi in `task status`.
 
 Poi il ciclo è **solo questo**:
 
@@ -291,13 +305,18 @@ Queste cose non le copre il ciclo `task compile`, perché toccano più file che
 devono restare d'accordo fra loro. Per ognuna c'è un comando, e tutti si usano
 allo stesso modo: **variabili `NOME=valore`, senza trattini**.
 
+> 💡 **MODALITÀ INTERATTIVA (WIZARD) PER TUTTI I COMANDI**:
+> Non ricordi la sintassi o i parametri esatti? **Lancia il comando da solo, senza argomenti!**
+> Per esempio: `task new-service`, `task new-entity`, `task add-relation`, `task new-client`, `task new-dto`, `task new-view`, `task new-auth`, `task new-handler`, `task add-dep`, `task set-port`, `task remove-service`, `task use-postgres`, `task consegna`.
+> Ognuno di essi aprirà un comodo menu interattivo guidato nel terminale che rileverà i moduli e le opzioni disponibili e ti farà le domande passo dopo passo.
+
 `task help` (o `task` da solo) stampa l'elenco; `task --summary <comando>` il
 dettaglio di uno.
 
 ### Aggiungere una dipendenza a un microservizio
 
 ```bash
-task add-dep SERVICE=wms-service DEPS=security,mail
+task add-dep SERVICE=ordini-service DEPS=security,mail
 ```
 
 Le versioni **non si scrivono**: le decide il `pom.xml` padre, che eredita da
@@ -312,7 +331,7 @@ task add-dep LIST=1
 ```
 
 Se ti serve qualcosa che non è in elenco, passa le coordinate per esteso:
-`task add-dep SERVICE=wms-service DEPS=org.apache.commons:commons-lang3:3.17.0`.
+`task add-dep SERVICE=ordini-service DEPS=org.apache.commons:commons-lang3:3.17.0`.
 
 > **Poi serve `task dev`, non `task compile`.** Il classpath di un servizio è
 > fissato quando parte: un jar nuovo lo vede solo un riavvio vero. Vale per
@@ -324,7 +343,7 @@ i moduli — è lui a dare l'hot reload dopo `task compile`.
 ### Cambiare una porta
 
 ```bash
-task set-port SERVICE=wms-ui PORT=9080
+task set-port SERVICE=ordini-service PORT=8090
 ```
 
 Una porta è scritta in quattro punti: l'`application.yml` del modulo,
@@ -345,6 +364,7 @@ Per una prova al volo, senza toccare i file, resta `task dev UI_PORT=9080`.
 task new-service NAME=ordini-service
 ```
 
+Oppure lancialo senza argomenti (`task new-service`) per farti guidare dal wizard!
 Crea il modulo (pom, `Main`, `application.yml`, un endpoint `/api/ping`) e lo
 collega dove serve: `<modules>` del pom aggregatore, `COPY` nel `Dockerfile`,
 blocco in `docker-compose.yml`, lista dei servizi di `task dev`. La porta è la
@@ -360,14 +380,31 @@ Poi `task dev`, e il servizio nuovo si registra su Eureka con gli altri.
 Invece di scrivere a mano le classi ripetitive di ogni tabella:
 
 ```bash
-task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal:required,data:date
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal:required,data:date DTO=1
 ```
 
-Genera le quattro classi canoniche nello standard del progetto:
+Oppure semplicemente `task new-entity` per la modalità interattiva!
+Genera le classi canoniche nello standard del progetto:
 - `OrdineEntity.java` con annotazioni JPA e validazione Jakarta.
 - `OrdineRepository.java` che estende `JpaRepository`.
-- `OrdineService.java` con il CRUD pronto.
+- `OrdineDto.java` in `common-dto` (se `DTO=1`).
+- `OrdineService.java` con il CRUD pronto (e mapper Entity <-> DTO).
 - `OrdineController.java` con gli endpoint REST documentati in OpenAPI/Swagger.
+
+### Collegare le relazioni JPA: task add-relation
+
+Per collegare due tabelle dello stesso database relazionale:
+
+```bash
+task add-relation SERVICE=catalogo-service FROM=Libro TO=Categoria TYPE=many-to-one
+```
+
+Oppure `task add-relation` senza parametri per scegliere entità e cardinalità dal menu interattivo!
+Il comando:
+- Inserisce `@ManyToOne`, `@OneToMany`, `@OneToOne` o `@ManyToMany` con `fetch = FetchType.LAZY`.
+- Configura `@JoinColumn` sul lato proprietario e `mappedBy` sul lato inverso.
+- Inserisce automaticamente `@JsonIgnoreProperties` su entrambi i lati per spezzare qualsiasi ciclo di serializzazione Jackson ed evitare lo `StackOverflowError` a monte!
+- Importa tutte le annotazioni e collezioni necessarie.
 
 ### Contratti DTO e Feign Client in un solo comando: task new-client e task new-dto
 
@@ -519,7 +556,7 @@ ti dice tabella per tabella quante righe sono entrate — o perché no, adesso e
 non davanti al docente.
 
 ```bash
-task seed-data SERVICE=wms-service ROWS=10
+task seed-data SERVICE=ordini-service ROWS=10
 task seed-data ROWS=0      # spenti
 ```
 
@@ -584,8 +621,8 @@ averne bisogno. Con `task test FULL=1` compila anche il modulo generato.
 
 ### Rinominare la cartella dei moduli
 
-Si chiama `demo` perche' cosi' nasce da Spring Initializr. Se all'esame
-preferisci il nome del progetto:
+Si chiama `demo` perché così nasce da Spring Initializr. Se all'esame preferisci
+il nome del progetto:
 
 ```bash
 task rename-project NAME=wms
@@ -608,11 +645,16 @@ non è codice ricompilato, quindi l'hot reload non lo rilegge.
 ## Fase 2 — Collaudo, prima di chiamare la commissione
 
 ```bash
-task test-e2e
+task check
 ```
 
-Si può lanciare a stack acceso: se ne accorge, compila senza `clean` e aspetta
-che i servizi si siano riavviati prima di interrogarli.
+Poi controlla che i servizi si vedano fra loro, non solo che siano accesi:
+`task status` deve elencarli tutti nel registro Eureka.
+
+Prova gli endpoint veri, uno per servizio: il modo più comodo è Swagger UI
+(`http://localhost:<porta>/swagger-ui.html`), che mostra lo schema esatto
+delle richieste. Infine percorri il flusso completo dalla UI, come lo mostrerai
+alla commissione: è l'unico collaudo che conta davvero.
 
 ---
 
@@ -624,12 +666,12 @@ Non devi fermare niente prima: `task docker-up` spegne da solo lo stack locale.
 task docker-up
 ```
 
-Aspetta che `task status` mostri i quattro servizi registrati su Eureka, poi
+Aspetta che `task status` mostri i tuoi servizi registrati su Eureka, poi
 apri nell'ordine:
 
-1. `http://localhost:8080` — l'applicazione
+1. la tua UI — l'applicazione (l'indirizzo lo stampa `task dev`)
 2. `http://localhost:8761` — la dashboard Eureka, per far vedere il discovery
-3. `http://localhost:8081/swagger-ui.html` — i contratti OpenAPI
+3. lo Swagger di un servizio — i contratti OpenAPI
 
 Se ti chiedono della **resilienza**, spegni un servizio davanti a loro e
 ricarica la pagina: resta in piedi con i segnaposto invece di andare in
@@ -637,10 +679,10 @@ errore. Dalla cartella dei moduli (quella con `docker-compose.yml`), col nome
 del servizio:
 
 ```bash
-docker compose stop crm-service
+docker compose stop <servizio>
 ```
 
-e poi `docker compose start crm-service` per riaccenderlo.
+e poi `docker compose start <servizio>` per riaccenderlo.
 
 Alla fine:
 
@@ -753,14 +795,13 @@ Funziona a stack spento e senza rete: serve solo Maven.
 | `task check` | Moduli, porte, Docker e liste sono coerenti? |
 | `task test` | Collauda gli strumenti su una copia usa-e-getta |
 | `task help` | Questa guida, dal terminale |
-| `task test-e2e` | Collaudo end-to-end sui servizi accesi |
 | `task docker-up` | Costruisce le immagini e avvia lo stack in container |
 | `task docker-down` | Ferma i container, **conservando** i dati del database |
 | `task docker-reset` | Ferma i container **ed elimina** i volumi |
 | `task docker-logs` | Segue i log dei container |
 | `task build` | Compila e impacchetta tutti i moduli Maven |
 | `task run SERVICE=<modulo>` | Avvia un solo modulo, in primo piano |
-| `task run-eureka` · `run-product` · `run-crm` · `run-wms` · `run-wms-ui` | Le scorciatoie per i moduli di questa traccia |
+| `task run-eureka` | Avvia il solo Eureka, in primo piano |
 | `task kill-java` | Ultima spiaggia: termina **tutti** i java della macchina |
 
 ### Opzioni utili
@@ -772,8 +813,7 @@ Si passano come variabili, senza trattini.
 | `task dev UI_PORT=9080` | Vuoi la UI su un'altra porta |
 | `task dev NOBUILD=1` | Hai già compilato e vuoi solo riavviare |
 | `task dev KEEPFOREIGN=1` | Su una porta gira qualcosa che ti serve viva: non chiuderla |
-| `task test-e2e UI_PORT=9080` | Hai spostato la UI: dillo anche al collaudo |
-| `task logs SERVICE=wms` | Un servizio solo |
+| `task logs SERVICE=<nome>` | Un servizio solo |
 
 ---
 

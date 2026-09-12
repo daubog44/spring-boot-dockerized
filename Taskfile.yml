@@ -83,7 +83,7 @@ tasks:
 
       Esempi:
         task wizard
-        task wizard SERVICE=wms-service
+        task wizard SERVICE=ordini-service
 
       Serve un terminale vero: fa domande.
     cmds:
@@ -160,7 +160,7 @@ tasks:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-down.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/dev-down.sh {{.CLI_ARGS}}{{end}}'
 
   logs:
-    desc: "Segue i log dei servizi in un terminale solo (task logs SERVICE=wms per uno)"
+    desc: "Segue i log dei servizi in un terminale solo (task logs SERVICE=<nome> per uno)"
     summary: |
       Segue in tempo reale i log dei servizi avviati da `task dev`, tutti in un
       terminale solo, ogni riga prefissata dal nome del servizio.
@@ -172,8 +172,8 @@ tasks:
 
       Esempi:
         task logs
-        task logs SERVICE=wms
-        task logs SERVICE=wms TAIL=200
+        task logs SERVICE=<nome>
+        task logs SERVICE=<nome> TAIL=200
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/logs.ps1{{if .SERVICE}} {{.SERVICE}}{{end}}{{if .TAIL}} -Tail {{.TAIL}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/logs.sh{{if .SERVICE}} {{.SERVICE}}{{end}}{{if .TAIL}} --tail {{.TAIL}}{{end}} {{.CLI_ARGS}}{{end}}'
 
@@ -274,13 +274,14 @@ tasks:
         TYPE=<tipo>            many-to-one (default) | one-to-many | one-to-one | many-to-many
         FIELD=<nomeCampo>      nome del campo Java (default: to in camelCase o plurale)
         UNIDIRECTIONAL=1       non aggiungere il campo inverso nell'altra entity
+        DTO=1                  aggiorna anche i DTO in common-dto (pattern DTO-in-DTO) e il Service
 
       Esempi:
         task add-relation
         task add-relation SERVICE=catalogo-service FROM=Libro TO=Categoria TYPE=many-to-one
         task add-relation SERVICE=catalogo-service FROM=Ordine TO=RigaOrdine TYPE=one-to-many
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/add-relation.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .FROM}} -From {{.FROM}}{{end}}{{if .TO}} -To {{.TO}}{{end}}{{if .TYPE}} -Type {{.TYPE}}{{end}}{{if .FIELD}} -Field {{.FIELD}}{{end}}{{if .UNIDIRECTIONAL}} -Unidirectional{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/add-relation.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .FROM}} --from {{.FROM}}{{end}}{{if .TO}} --to {{.TO}}{{end}}{{if .TYPE}} --type {{.TYPE}}{{end}}{{if .FIELD}} --field {{.FIELD}}{{end}}{{if .UNIDIRECTIONAL}} --unidirectional{{end}} {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/add-relation.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .FROM}} -From {{.FROM}}{{end}}{{if .TO}} -To {{.TO}}{{end}}{{if .TYPE}} -Type {{.TYPE}}{{end}}{{if .FIELD}} -Field {{.FIELD}}{{end}}{{if .UNIDIRECTIONAL}} -Unidirectional{{end}}{{if .DTO}} -Dto{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/add-relation.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .FROM}} --from {{.FROM}}{{end}}{{if .TO}} --to {{.TO}}{{end}}{{if .TYPE}} --type {{.TYPE}}{{end}}{{if .FIELD}} --field {{.FIELD}}{{end}}{{if .UNIDIRECTIONAL}} --unidirectional{{end}}{{if .DTO}} --dto{{end}} {{.CLI_ARGS}}{{end}}'
 
   new-dto:
     desc: "Genera un DTO/Record in common-dto (task new-dto NAME=Libro FIELDS=...)"
@@ -334,17 +335,20 @@ tasks:
       Genera in un modulo UI:
         1. Il controller Spring MVC (@Controller) con GET (lista) e POST (salvataggio)
         2. Il template HTML (templates/<nome>.html) con tabella reattiva e form con validazione
+        3. Se specificato CLIENT o presente un Feign client nel modulo, collega automaticamente
+           i dati (getAll) e il salvataggio (create) via Feign!
 
       Variabili:
         SERVICE=<modulo>   OBBLIGATORIA: modulo UI (es. event-ui)
         NAME=<Nome>        OBBLIGATORIA: PascalCase (es. Libri, Eventi)
         ROUTE=<percorso>   facoltativa: default /<nome>
         FIELDS=<campi>     facoltativa: nome:tipo[:required]* (string, int, long, decimal, bool, date)
+        CLIENT=<client>    facoltativa: nome del Feign client da collegare alla vista
 
       Esempio:
         task new-view SERVICE=event-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-view.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .ROUTE}} -Route {{.ROUTE}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-view.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .ROUTE}} --route {{.ROUTE}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}} {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-view.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .ROUTE}} -Route {{.ROUTE}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .CLIENT}} -Client {{.CLIENT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-view.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .ROUTE}} --route {{.ROUTE}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .CLIENT}} --client {{.CLIENT}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   new-auth:
     desc: "Configura autenticazione Spring Security (task new-auth SERVICE=<modulo> [TYPE=inmemory|db|form])"
@@ -383,7 +387,7 @@ tasks:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-handler.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-handler.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   add-dep:
-    desc: "Aggiunge dipendenze al pom di un modulo (task add-dep SERVICE=wms-service DEPS=security,mail)"
+    desc: "Aggiunge dipendenze al pom di un modulo (task add-dep SERVICE=<modulo> DEPS=security,mail)"
     interactive: true
     summary: |
       Inserisce dipendenze nel pom.xml di un modulo. Le versioni non si
@@ -397,8 +401,8 @@ tasks:
 
       Esempi:
         task add-dep LIST=1
-        task add-dep SERVICE=wms-service DEPS=security,mail
-        task add-dep SERVICE=wms-service DEPS=org.apache.commons:commons-lang3:3.17.0
+        task add-dep SERVICE=ordini-service DEPS=security,mail
+        task add-dep SERVICE=ordini-service DEPS=org.apache.commons:commons-lang3:3.17.0
 
       Dopo serve `task dev` (non `task compile`): il classpath di un servizio
       e' fissato quando parte.
@@ -406,7 +410,7 @@ tasks:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/add-dep.ps1{{if .SERVICE}} -Module {{.SERVICE}}{{end}}{{if .DEPS}} -Deps {{.DEPS}}{{end}}{{if .LIST}} -List{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/add-dep.sh{{if .SERVICE}} --module {{.SERVICE}}{{end}}{{if .DEPS}} --deps {{.DEPS}}{{end}}{{if .LIST}} --list{{end}} {{.CLI_ARGS}}{{end}}'
 
   set-port:
-    desc: "Sposta un modulo su un'altra porta, ovunque sia scritta (task set-port SERVICE=wms-ui PORT=9080)"
+    desc: "Sposta un modulo su un'altra porta, ovunque sia scritta (task set-port SERVICE=<modulo> PORT=9080)"
     interactive: true
     summary: |
       Cambia la porta di un modulo in tutti e quattro i posti in cui e'
@@ -419,7 +423,7 @@ tasks:
         PORT=<porta>       OBBLIGATORIA
 
       Esempi:
-        task set-port SERVICE=wms-ui PORT=9080
+        task set-port SERVICE=ordini-service PORT=8090
         task set-port SERVICE=naming-server PORT=8762
 
       Per una prova al volo, senza toccare i file: task dev UI_PORT=9080
@@ -636,7 +640,7 @@ tasks:
 
       Esempi:
         task seed-data
-        task seed-data SERVICE=wms-service ROWS=10
+        task seed-data SERVICE=ordini-service ROWS=10
         task seed-data ROWS=0
 
       Un data.sql scritto da te continua a valere: le tabelle che riempie lui
@@ -774,7 +778,7 @@ tasks:
   # --- Stack in container -----------------------------------------------------
 
   docker-up:
-    desc: Compila le immagini e avvia lo stack completo dell'esame in Docker
+    desc: Compila le immagini e avvia lo stack completo in Docker
     summary: |
       Costruisce le immagini e avvia lo stack in container: e' quello che
       presenterai. Prima controlla che il progetto sia coerente e che le porte
@@ -792,7 +796,7 @@ tasks:
       - task: compose-up
 
   docker-down:
-    desc: Ferma i container dell'esame (i dati del database restano)
+    desc: Ferma i container (i dati del database restano)
     dir: demo
     cmds:
       - docker compose down --remove-orphans
@@ -823,21 +827,6 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& .\mvnw.cmd clean package -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw clean package -Dmaven.test.skip=true{{end}}'
 
-  test-e2e:
-    desc: "Collaudo end-to-end sui servizi accesi (task test-e2e UI_PORT=9080 se hai spostato la UI)"
-    summary: |
-      Percorre il flusso completo sui servizi accesi: si puo' lanciare a stack
-      acceso, si accorge da solo se deve aspettare un riavvio.
-
-      Variabili (facoltative):
-        UI_PORT=<porta>   se hai spostato la UI
-
-      Esempi:
-        task test-e2e
-        task test-e2e UI_PORT=9080
-    cmds:
-      - 'powershell -ExecutionPolicy Bypass -File ./test_e2e_wms.ps1{{if .UI_PORT}} -UiPort {{.UI_PORT}}{{end}} {{.CLI_ARGS}}'
-
   # --- Pulizia ----------------------------------------------------------------
 
   clean-ports:
@@ -852,6 +841,13 @@ tasks:
 
   # --- Avvio di un singolo servizio in primo piano ----------------------------
 
+  run-eureka:
+    desc: Avvia il solo Eureka server, in primo piano
+    cmds:
+      - task: run-module
+        vars:
+          MODULE: "naming-server"
+
   run:
     desc: "Avvia un solo modulo in primo piano, per vederne l'output (task run SERVICE=<modulo>)"
     summary: |
@@ -863,46 +859,11 @@ tasks:
         SERVICE=<modulo>   OBBLIGATORIA, la cartella sotto demo/
 
       Esempio:
-        task run SERVICE=wms-service
+        task run SERVICE=ordini-service
     cmds:
       - task: run-module
         vars:
           MODULE: '{{.SERVICE}}'
-
-  run-eureka:
-    desc: Avvia il solo Eureka server, in primo piano
-    cmds:
-      - task: run-module
-        vars:
-          MODULE: "naming-server"
-
-  run-product:
-    desc: Avvia il solo product-service, in primo piano
-    cmds:
-      - task: run-module
-        vars:
-          MODULE: "product-service"
-
-  run-crm:
-    desc: Avvia il solo crm-service, in primo piano
-    cmds:
-      - task: run-module
-        vars:
-          MODULE: "crm-service"
-
-  run-wms:
-    desc: Avvia il solo wms-service, in primo piano
-    cmds:
-      - task: run-module
-        vars:
-          MODULE: "wms-service"
-
-  run-wms-ui:
-    desc: Avvia la sola wms-ui, in primo piano
-    cmds:
-      - task: run-module
-        vars:
-          MODULE: "wms-ui"
 
   # --- Interni ----------------------------------------------------------------
 
