@@ -642,6 +642,116 @@ non è codice ricompilato, quindi l'hot reload non lo rilegge.
 
 ---
 
+## La Logica di Business: dove, quando e come scriverla
+
+I comandi `task` generano in pochi secondi tutto lo scheletro dell'architettura: i microservizi, il database relazionale (H2 o Postgres), le entity, i repository JPA, i DTO, i controller REST con Swagger e i client Feign per comunicare tra servizi.
+**La logica di business richiesta dalla traccia è l'unica parte di codice che scriverai tu a mano.**
+
+### 1. DOVE si scrive?
+Sempre e soltanto all'interno dei metodi della classe `@Service` (es. `src/main/java/.../service/OrdineService.java`), **MAI** nel Controller o nell'Entity:
+- **No nel Controller**: il controller deve solo ricevere la richiesta HTTP, validarla con `@Valid` e delegare al service.
+- **No nell'Entity**: l'entity rappresenta solo la riga del database.
+- **Sì nel Service**: il service contiene le decisioni, le formule matematiche, i controlli di disponibilità e le chiamate inter-servizio con Feign.
+
+### 2. QUANDO si scrive?
+All'esame segui questo ordine naturale:
+1. Generi i microservizi (`task new-service`)
+2. Generi le entità con DTO (`task new-entity ... DTO=1`)
+3. Colleghi le relazioni tra tabelle (`task add-relation`)
+4. Colleghi i microservizi tra loro (`task new-client`)
+5. 👉 **ADESSO apri il Service Java e inserisci la logica di business!**
+
+### 3. Esempi pratici di Business Logic tipici d'esame:
+
+#### Esempio 1: Calcolo e validazione importi (es. Carrello o Ordine)
+Nel file `OrdineService.java`, arricchisci il metodo `crea` o aggiungi un metodo specifico:
+```java
+@Transactional
+public OrdineDto creaOrdine(NuovoOrdineRequest req) {
+    // 1. Regola di validazione di business
+    if (req.quantita() <= 0) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La quantita' deve essere maggiore di zero");
+    }
+
+    // 2. Chiamata Feign a un altro microservizio per verificare disponibilità e prezzo
+    ArticoloDto articolo = catalogoClient.perId(req.articoloId());
+    if (!Boolean.TRUE.equals(articolo.disponibile())) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Articolo non disponibile");
+    }
+
+    // 3. Formula di business (totale = prezzo * quantita con eventuale sconto)
+    BigDecimal totale = articolo.prezzo().multiply(BigDecimal.valueOf(req.quantita()));
+    if (req.quantita() >= 10) {
+        totale = totale.multiply(BigDecimal.valueOf(0.90)); // 10% di sconto quantità
+    }
+
+    // 4. Salvataggio e restituzione DTO
+    OrdineEntity ordine = new OrdineEntity();
+    ordine.setArticoloId(req.articoloId());
+    ordine.setQuantita(req.quantita());
+    ordine.setTotale(totale);
+    ordine.setData(LocalDate.now());
+
+    return toDto(repository.save(ordine));
+}
+```
+
+#### Esempio 2: Controllo giacenze e scalamento scorte
+```java
+@Transactional
+public void decrementaGiacenza(Long articoloId, int quantita) {
+    ArticoloEntity articolo = repository.findById(articoloId).orElseThrow(
+        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Articolo non trovato"));
+    
+    if (articolo.getGiacenza() < quantita) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Giacenza insufficiente: disponibili solo " + articolo.getGiacenza() + " pezzi");
+    }
+    
+    articolo.setGiacenza(articolo.getGiacenza() - quantita);
+    if (articolo.getGiacenza() == 0) {
+        articolo.setDisponibile(false);
+    }
+    // Hibernate esegue l'UPDATE automatico alla fine del metodo transazionale!
+}
+```
+
+### 4. Come collaudare subito la logica?
+- Salva il file Java.
+- Nel terminale dai `task compile` (che ricarica il jar in ~5 secondi con devtools).
+- Apri **Swagger UI** (`http://localhost:<porta>/swagger-ui.html`) e clicca **Try it out** sul metodo per testare la richiesta.
+
+---
+
+## Il Percorso Completo Guidato per una Traccia d'Esame (Passo dopo Passo)
+
+Ecco la scaletta esatta da seguire per svolgere qualsiasi traccia d'esame:
+
+1. **Inizializzazione**:
+   - `task rete` e `task check` per verificare che l'ambiente sia pronto.
+2. **Creazione Microservizi**:
+   - `task new-service` (in modalità interattiva per ogni servizio del dominio, es. `catalogo-service`, `ordini-service`).
+   - Se la traccia chiede una web app: `task new-service NAME=web-ui UI=1`.
+3. **Creazione Entità e Tabelle**:
+   - `task new-entity` (in modalità interattiva con `DTO=1` per ogni tabella richiesta, es. `Categoria`, `Articolo`, `Ordine`).
+4. **Relazioni JPA e DTO-in-DTO**:
+   - `task add-relation` (in modalità interattiva per collegare le chiavi esterne `@ManyToOne` e generare il nested DTO).
+5. **Comunicazione tra Microservizi**:
+   - `task new-client` (per creare il client Feign nel servizio chiamante che deve interrogare l'altro).
+6. **Scrittura della Logica di Business**:
+   - Apri i file `...Service.java` ed inserisci i calcoli, i controlli di integrità e le chiamate Feign.
+7. **Interfaccia Web (se richiesta)**:
+   - `task new-view` (collega automaticamente la vista Thymeleaf al Feign Client per elenco e form).
+8. **Dati di Prova e Schema del Database**:
+   - `task seed-data` per riempire le tabelle con dati plausibili validati.
+   - `task db-schema` per generare il diagramma ER e il modello concettuale/logico.
+9. **Avvio e Collaudo**:
+   - `task dev` per avviare tutto lo stack.
+   - Controlla con `task status`, su Eureka (`http://localhost:8761`) e prova le API su Swagger UI.
+10. **Consegna Finale**:
+    - `task consegna NOME=MIO_COGNOME` per generare lo ZIP completo e autosufficiente con l'allegato tecnico.
+
+---
+
 ## Fase 2 — Collaudo, prima di chiamare la commissione
 
 ```bash
