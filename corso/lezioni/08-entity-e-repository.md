@@ -233,10 +233,27 @@ private UtenteEntity utente;
 3. **MAI `@Data` di Lombok sulle entity con relazioni**: genera in automatico
    `toString()`, `equals()` e `hashCode()` ricorsivi. Con relazioni bidirezionali,
    `toString()` entra in un loop infinito che fa esplodere la JVM con `StackOverflowError`.
-   Usa solo `@Getter`, `@Setter`, `@NoArgsConstructor`.
-4. **Evita il loop JSON Jackson**: se serializzi un'entity con relazione bidirezionale,
-   Jackson va in loop infinito. La soluzione pulita è **restituire sempre DTO** dai
-   controller (usa `DTO=1` in `task new-entity`!).
+4. **Serializzazione JSON Jackson delle relazioni (loop e LazyInitializationException)**:
+   Se serializzi un'entity con relazione bidirezionale, Jackson va in loop infinito (`Articolo -> Categoria -> Articoli -> ...`).
+   - **Con DTO (approccio consigliato)**: nel record `ArticoloDto`, includi direttamente un `CategoriaDto` annidato (oppure appiattisci con `Long categoriaId, String categoriaNome`). Nel metodo `toDto(entity)` nel service fai:
+     ```java
+     CategoriaDto cat = entity.getCategoria() != null ? new CategoriaDto(entity.getCategoria().getId(), entity.getCategoria().getNome()) : null;
+     ```
+     Così hai tutto l'oggetto collegato in JSON, pulito, senza loop e senza problemi di lazy loading!
+   - **Senza DTO (serializzando direttamente le Entity)**: se restituisci l'Entity dal controller e vuoi l'oggetto collegato intero, usa `@JsonIgnoreProperties`:
+     ```java
+     // In ArticoloEntity: mostra la categoria ma salta la lista ciclica dentro di essa
+     @ManyToOne(fetch = FetchType.LAZY)
+     @JoinColumn(name = "categoria_id")
+     @JsonIgnoreProperties("articoli")
+     private CategoriaEntity categoria;
+
+     // In CategoriaEntity: mostra gli articoli ma salta il puntatore indietro
+     @OneToMany(mappedBy = "categoria", cascade = CascadeType.ALL)
+     @JsonIgnoreProperties("categoria")
+     private List<ArticoloEntity> articoli = new ArrayList<>();
+     ```
+     > ⚠️ **Nota su `fetch = LAZY` senza DTO**: se Jackson serializza un'entity con `fetch = LAZY` fuori dalla transazione del service, potrebbe lanciare `LazyInitializationException` (no Session). Per questo con le relazioni è sempre più sicuro e pulito usare i DTO (`task new-entity ... DTO=1`)!
 
 ### Configurare le relazioni in 5 secondi: `task add-relation`
 

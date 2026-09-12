@@ -17,7 +17,7 @@ HTTP.
 Un controller sottile e un service che non sa niente di HTTP: così le regole
 stanno in un posto solo, e si provano senza avviare un server.
 
-> 💡 **Scorciatoia d'esame**: Ricorda che eseguendo `task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=...` hai già ottenuto sia il `Service` che il `Controller` REST con le operazioni CRUD complete, la validazione e la documentazione Swagger! Qui vediamo come sono composti per personalizzarli.
+> 💡 **Scorciatoia d'esame**: Ricorda che eseguendo `task new-entity SERVICE=<modulo> NAME=<Nome> FIELDS=... DTO=1` hai già ottenuto sia il `Service` che il `Controller` REST già impostati sui DTO (con `toDto` e `toEntity` automatici), le operazioni CRUD complete, la validazione e la documentazione Swagger! Qui vediamo come sono composti per personalizzarli.
 
 ## Il service
 
