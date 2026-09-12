@@ -1,6 +1,6 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 14:31',
+  generato: '2026-09-12 14:41',
   progetto: {
     cartella: 'demo',
     pacchetto: 'esame',
@@ -1846,6 +1846,87 @@ Tre cose da portarsi via:
 - **\`@Transactional\`** su un metodo che modifica: l'entity letta dentro la
   transazione è seguita da Hibernate, e ogni modifica diventa un \`UPDATE\` alla
   fine del metodo, senza chiamare \`save\`.
+
+---
+
+## Dove e quando scrivere la Logica di Business della Traccia
+
+I comandi \`task new-entity\`, \`task add-relation\` e \`task new-client\` ti generano tutto il "plumbing" (struttura, database, CRUD, DTO, serializzazione, controller REST e client Feign).
+**Il tuo compito all'esame è scrivere solo la logica di business specifica richiesta dalla traccia.**
+
+### 1. DOVE si scrive?
+Sempre e soltanto dentro la classe \`@Service\` (es. \`OrdineService.java\`, \`PrestitoService.java\`), **MAI** nel Controller o nell'Entity:
+- **No nel Controller**: il controller deve solo ricevere la richiesta HTTP, validarla con \`@Valid\` e passarla al service.
+- **No nell'Entity**: le entity sono modelli dati mappati sul database relazionale.
+- **Sì nel Service**: il service contiene le decisioni, le formule di calcolo, i controlli di integrità e le chiamate Feign verso altri microservizi.
+
+### 2. QUANDO si scrive?
+Nel flusso operativo dell'esame, scrivi la business logic subito dopo aver creato lo scheletro:
+1. \`task new-service\` (crea i microservizi)
+2. \`task new-entity ... DTO=1\` (crea tabelle, repository, CRUD e DTO)
+3. \`task add-relation\` (collega le foreign key ManyToOne/OneToMany e DTO-in-DTO)
+4. \`task new-client\` (se un servizio deve interrogare l'altro via Feign)
+5. 👉 **ADESSO apri il file \`...Service.java\` e scrivi la logica!**
+
+### 3. Esempi concreti di Business Logic tipici dell'esame:
+
+#### Esempio A: Calcolo e validazione importi (es. Carrello o Ordine)
+\`\`\`java
+@Transactional
+public OrdineDto creaOrdine(NuovoOrdineRequest req) {
+    // 1. Controllo di business
+    if (req.quantita() <= 0) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La quantita' deve essere maggiore di zero");
+    }
+
+    // 2. Chiamata Feign a un altro servizio per verificare disponibilità e prezzo
+    ArticoloDto articolo = catalogoClient.perId(req.articoloId());
+    if (!Boolean.TRUE.equals(articolo.disponibile())) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Articolo non disponibile a magazzino");
+    }
+
+    // 3. Formula di business (prezzo * quantita con eventuale sconto)
+    BigDecimal totale = articolo.prezzo().multiply(BigDecimal.valueOf(req.quantita()));
+    if (req.quantita() >= 10) {
+        totale = totale.multiply(BigDecimal.valueOf(0.90)); // 10% sconto quantità
+    }
+
+    // 4. Salvataggio e ritorno del DTO
+    OrdineEntity ordine = new OrdineEntity();
+    ordine.setArticoloId(req.articoloId());
+    ordine.setQuantita(req.quantita());
+    ordine.setTotale(totale);
+    ordine.setData(LocalDate.now());
+
+    return toDto(ordineRepository.save(ordine));
+}
+\`\`\`
+
+#### Esempio B: Controllo disponibilità o regole temporali (es. Prenotazione o Prestito)
+\`\`\`java
+@Transactional
+public PrestitoDto registraPrestito(NuovoPrestitoRequest req) {
+    // Verifica che l'utente non abbia già più di 3 prestiti attivi
+    long prestitiAttivi = prestitoRepository.countByUtenteEmailAndDataRestituzioneIsNull(req.email());
+    if (prestitiAttivi >= 3) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "L'utente ha gia' raggiunto il limite di 3 prestiti attivi");
+    }
+
+    // Segna la risorsa come occupata via Feign
+    catalogoClient.aggiornaDisponibilita(req.libroId(), false);
+
+    PrestitoEntity entity = new PrestitoEntity();
+    entity.setLibroId(req.libroId());
+    entity.setUtenteEmail(req.email());
+    entity.setDataInizio(LocalDate.now());
+    entity.setDataScadenza(LocalDate.now().plusDays(14));
+
+    return toDto(prestitoRepository.save(entity));
+}
+\`\`\`
+
+### 4. Come collaudi la tua Business Logic?
+Salva il file \`.java\`, lancia \`task compile\` (che ricarica il servizio modificato in ~5 secondi con hot reload) e prova la richiesta direttamente da **Swagger UI** (\`http://localhost:<porta>/swagger-ui.html\`)!
 
 ## Il controller
 
@@ -4481,6 +4562,116 @@ da Esplora risorse: nessuno script dipende dal suo nome.
 
 Nessun comando: modifichi il file e rilanci \`task dev\`. Un \`application.yml\`
 non è codice ricompilato, quindi l'hot reload non lo rilegge.
+
+---
+
+## La Logica di Business: dove, quando e come scriverla
+
+I comandi \`task\` generano in pochi secondi tutto lo scheletro dell'architettura: i microservizi, il database relazionale (H2 o Postgres), le entity, i repository JPA, i DTO, i controller REST con Swagger e i client Feign per comunicare tra servizi.
+**La logica di business richiesta dalla traccia è l'unica parte di codice che scriverai tu a mano.**
+
+### 1. DOVE si scrive?
+Sempre e soltanto all'interno dei metodi della classe \`@Service\` (es. \`src/main/java/.../service/OrdineService.java\`), **MAI** nel Controller o nell'Entity:
+- **No nel Controller**: il controller deve solo ricevere la richiesta HTTP, validarla con \`@Valid\` e delegare al service.
+- **No nell'Entity**: l'entity rappresenta solo la riga del database.
+- **Sì nel Service**: il service contiene le decisioni, le formule matematiche, i controlli di disponibilità e le chiamate inter-servizio con Feign.
+
+### 2. QUANDO si scrive?
+All'esame segui questo ordine naturale:
+1. Generi i microservizi (\`task new-service\`)
+2. Generi le entità con DTO (\`task new-entity ... DTO=1\`)
+3. Colleghi le relazioni tra tabelle (\`task add-relation\`)
+4. Colleghi i microservizi tra loro (\`task new-client\`)
+5. 👉 **ADESSO apri il Service Java e inserisci la logica di business!**
+
+### 3. Esempi pratici di Business Logic tipici d'esame:
+
+#### Esempio 1: Calcolo e validazione importi (es. Carrello o Ordine)
+Nel file \`OrdineService.java\`, arricchisci il metodo \`crea\` o aggiungi un metodo specifico:
+\`\`\`java
+@Transactional
+public OrdineDto creaOrdine(NuovoOrdineRequest req) {
+    // 1. Regola di validazione di business
+    if (req.quantita() <= 0) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La quantita' deve essere maggiore di zero");
+    }
+
+    // 2. Chiamata Feign a un altro microservizio per verificare disponibilità e prezzo
+    ArticoloDto articolo = catalogoClient.perId(req.articoloId());
+    if (!Boolean.TRUE.equals(articolo.disponibile())) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Articolo non disponibile");
+    }
+
+    // 3. Formula di business (totale = prezzo * quantita con eventuale sconto)
+    BigDecimal totale = articolo.prezzo().multiply(BigDecimal.valueOf(req.quantita()));
+    if (req.quantita() >= 10) {
+        totale = totale.multiply(BigDecimal.valueOf(0.90)); // 10% di sconto quantità
+    }
+
+    // 4. Salvataggio e restituzione DTO
+    OrdineEntity ordine = new OrdineEntity();
+    ordine.setArticoloId(req.articoloId());
+    ordine.setQuantita(req.quantita());
+    ordine.setTotale(totale);
+    ordine.setData(LocalDate.now());
+
+    return toDto(repository.save(ordine));
+}
+\`\`\`
+
+#### Esempio 2: Controllo giacenze e scalamento scorte
+\`\`\`java
+@Transactional
+public void decrementaGiacenza(Long articoloId, int quantita) {
+    ArticoloEntity articolo = repository.findById(articoloId).orElseThrow(
+        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Articolo non trovato"));
+    
+    if (articolo.getGiacenza() < quantita) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Giacenza insufficiente: disponibili solo " + articolo.getGiacenza() + " pezzi");
+    }
+    
+    articolo.setGiacenza(articolo.getGiacenza() - quantita);
+    if (articolo.getGiacenza() == 0) {
+        articolo.setDisponibile(false);
+    }
+    // Hibernate esegue l'UPDATE automatico alla fine del metodo transazionale!
+}
+\`\`\`
+
+### 4. Come collaudare subito la logica?
+- Salva il file Java.
+- Nel terminale dai \`task compile\` (che ricarica il jar in ~5 secondi con devtools).
+- Apri **Swagger UI** (\`http://localhost:<porta>/swagger-ui.html\`) e clicca **Try it out** sul metodo per testare la richiesta.
+
+---
+
+## Il Percorso Completo Guidato per una Traccia d'Esame (Passo dopo Passo)
+
+Ecco la scaletta esatta da seguire per svolgere qualsiasi traccia d'esame:
+
+1. **Inizializzazione**:
+   - \`task rete\` e \`task check\` per verificare che l'ambiente sia pronto.
+2. **Creazione Microservizi**:
+   - \`task new-service\` (in modalità interattiva per ogni servizio del dominio, es. \`catalogo-service\`, \`ordini-service\`).
+   - Se la traccia chiede una web app: \`task new-service NAME=web-ui UI=1\`.
+3. **Creazione Entità e Tabelle**:
+   - \`task new-entity\` (in modalità interattiva con \`DTO=1\` per ogni tabella richiesta, es. \`Categoria\`, \`Articolo\`, \`Ordine\`).
+4. **Relazioni JPA e DTO-in-DTO**:
+   - \`task add-relation\` (in modalità interattiva per collegare le chiavi esterne \`@ManyToOne\` e generare il nested DTO).
+5. **Comunicazione tra Microservizi**:
+   - \`task new-client\` (per creare il client Feign nel servizio chiamante che deve interrogare l'altro).
+6. **Scrittura della Logica di Business**:
+   - Apri i file \`...Service.java\` ed inserisci i calcoli, i controlli di integrità e le chiamate Feign.
+7. **Interfaccia Web (se richiesta)**:
+   - \`task new-view\` (collega automaticamente la vista Thymeleaf al Feign Client per elenco e form).
+8. **Dati di Prova e Schema del Database**:
+   - \`task seed-data\` per riempire le tabelle con dati plausibili validati.
+   - \`task db-schema\` per generare il diagramma ER e il modello concettuale/logico.
+9. **Avvio e Collaudo**:
+   - \`task dev\` per avviare tutto lo stack.
+   - Controlla con \`task status\`, su Eureka (\`http://localhost:8761\`) e prova le API su Swagger UI.
+10. **Consegna Finale**:
+    - \`task consegna NOME=MIO_COGNOME\` per generare lo ZIP completo e autosufficiente con l'allegato tecnico.
 
 ---
 

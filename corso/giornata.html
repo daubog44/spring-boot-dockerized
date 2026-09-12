@@ -354,7 +354,9 @@ html.video .stage { width: 1280px; height: 720px; border-radius: 0; box-shadow: 
     "obiettivo": "Generare le classi @Entity e relazioni della traccia (anche via wizard interattivo) e avere subito le tabelle piene di dati e lo schema pronto per l'allegato.",
     "passi": [
       {"cmd": "task new-entity", "testo": "Genera Entity, Repository, DTO, Service e Controller: lancialo senza argomenti per il wizard interattivo!"},
-      {"cmd": "task add-relation", "testo": "Collega due entità (ManyToOne, OneToMany...) con @JsonIgnoreProperties automatico anti-loop Jackson. Guidato se lanciato da solo."},
+      {"cmd": "task add-relation", "testo": "Collega due entità (ManyToOne, OneToMany...) con @JsonIgnoreProperties e DTO-in-DTO automatico. Guidato se lanciato da solo."},
+      {"cmd": "task new-client", "testo": "Collega due microservizi via OpenFeign: crea client Feign e contratti DTO. Guidato da solo."},
+      {"testo": "Logica di business: aprila e scrivila nel file ...Service.java (formule, controlli disponibilità, eccezioni, chiamate Feign)."},
       {"cmd": "task seed-data", "testo": "Da ora, a ogni avvio, le tabelle vuote si riempiono da sole, passando da Hibernate: id, relazioni, enum, @Size, @Email, @Pattern rispettati. Anche su PostgreSQL e in Docker."},
       {"cmd": "task seed-data SERVICE=ordini-service ROWS=10", "testo": "Un servizio solo, dieci righe per tabella. ROWS=0 li spegne."},
       {"cmd": "task db-schema", "testo": "Lo schema concettuale e logico, letto dal database dopo che Hibernate l'ha creato, con il diagramma ER."}
@@ -363,7 +365,7 @@ html.video .stage { width: 1280px; height: 720px; border-radius: 0; box-shadow: 
     "nota": "Tutti i comandi (new-entity, add-relation, new-client, new-auth...) funzionano in modalità interattiva se lanciati senza argomenti!",
     "esercizio": "Lancia task add-relation senza parametri e segui le domande a schermo per collegare due entità.",
     "scene": [
-      {"mostra": "intro", "dice": "Adesso il cuore della traccia: il dominio. Con task new-entity e task add-relation crei entità, DTO e relazioni JPA senza errori: se li lanci senza argomenti si aprono i wizard interattivi."},
+      {"mostra": "intro", "dice": "Adesso il cuore della traccia: il dominio. Con task new-entity, task add-relation e task new-client crei entità, DTO e contratti. Nei file Service scrivi la logica di business della traccia. Se li lanci senza argomenti si aprono i wizard interattivi."},
       {"mostra": "passi", "dice": "Poi task seed-data. Da quel momento, a ogni avvio, le tabelle vuote si riempiono da sole con dati plausibili, salvati passando da Hibernate. E task db-schema legge lo schema dal database e te lo scrive pronto per l'allegato, con il diagramma."}
     ]
   },
