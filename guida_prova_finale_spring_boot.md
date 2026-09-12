@@ -1017,6 +1017,44 @@ In alternativa, un `demo/ordini-service/src/main/resources/data.sql` con degli
 > (`task use-postgres SERVICE=ordini-service`) restano: per questo il
 > `CommandLineRunner` qui sopra controlla `count() > 0` prima di inserire.
 
+#### 6.4.1 Relazioni JPA, Serializzazione JSON e Join: `@JsonIgnoreProperties` vs Pattern "DTO in DTO"
+
+Quando colleghi due entità nello stesso microservizio tramite `@ManyToOne` e `@OneToMany`, Jackson rischia di entrare in un loop infinito di serializzazione (`Articolo -> Categoria -> Articoli -> ...`), oppure Hibernate solleva `LazyInitializationException` se l'entità correlata con `fetch = FetchType.LAZY` viene letta fuori dalla transazione del service.
+
+Hai a disposizione due soluzioni architetturali:
+
+##### Soluzione A: Senza DTO — `@JsonIgnoreProperties` + `JOIN FETCH`
+Se il controller restituisce direttamente l'entità `@Entity`, usa `@JsonIgnoreProperties` su entrambi i lati della relazione per spezzare il ciclo ricorsivo:
+- Su `@ManyToOne CategoriaEntity categoria`: applica `@JsonIgnoreProperties("articoli")` (mostra tutti i dettagli della categoria, ma esclude la sua lista di articoli).
+- Su `@OneToMany List<ArticoloEntity> articoli`: applica `@JsonIgnoreProperties("categoria")` (mostra gli articoli, ma esclude il puntatore indietro alla categoria).
+- **Per caricare tutto con un JOIN SQL efficiente nel DB**: nel repository usa una query JPQL con `JOIN FETCH`:
+  ```java
+  @Query("SELECT a FROM ArticoloEntity a LEFT JOIN FETCH a.categoria")
+  List<ArticoloEntity> findAllWithCategoria();
+  ```
+  Così Hibernate esegue una sola query SQL con `LEFT JOIN`, popolando l'oggetto correlato in memoria ed evitando problemi di sessione chiusa.
+
+##### Soluzione B: Con DTO — Pattern "DTO in DTO" per Join Completo (Consigliata)
+È l'approccio standard raccomandato nell'industria e all'esame:
+1. In `common-dto`, crei il DTO della tabella secondaria e lo annidi come campo nel DTO principale:
+   ```java
+   public record CategoriaDto(Long id, String nome) {}
+   public record ArticoloDto(Long id, String nome, BigDecimal prezzo, CategoriaDto categoria) {}
+   ```
+2. Nel Repository, esegui il join SQL con `JOIN FETCH`:
+   ```java
+   @Query("SELECT a FROM ArticoloEntity a LEFT JOIN FETCH a.categoria")
+   List<ArticoloEntity> findAllWithCategoria();
+   ```
+3. Nel Service, nel metodo mapper `toDto(entity)`, trasformi l'entità correlata nel relativo record annidato:
+   ```java
+   CategoriaDto catDto = entity.getCategoria() != null 
+       ? new CategoriaDto(entity.getCategoria().getId(), entity.getCategoria().getNome())
+       : null;
+   return new ArticoloDto(entity.getId(), entity.getNome(), entity.getPrezzo(), catDto);
+   ```
+4. **Risultato**: JSON pulito, zero loop, contratti stabili e documentazione OpenAPI/Swagger precisa al millimetro.
+
 ---
 
 ### 6.5 Lombok (Riduzione del Codice Boilerplate)
