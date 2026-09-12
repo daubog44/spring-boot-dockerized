@@ -267,14 +267,15 @@ controllare i vincoli scritti sul record (`@NotNull`, `@Email`, `@Min`,
 
 Quando un client invia dati errati (es. email non valida o campi obbligatori mancanti), Spring lancia un'eccezione di validazione (`MethodArgumentNotValidException`). Senza un gestore globale, rischieresti di restituire status non chiari o stack trace grezzi.
 
-Per generare automaticamente un gestore `@RestControllerAdvice` centralizzato per il servizio:
+> 💡 **Generato in automatico nei servizi REST**:
+> Nei nuovi microservizi REST creati con `task new-service` (senza `UI=1`), `GlobalExceptionHandler.java` viene già generato e configurato **automaticamente** nel pacchetto `controller`!
+> Se desideri aggiungerlo a un modulo preesistente o rigenerarlo, puoi usare in qualsiasi momento:
+> ```bash
+> task new-handler SERVICE=catalogo-service
+> ```
 
-```bash
-task new-handler SERVICE=catalogo-service
-```
-
-Questo comando genera `exception/GlobalExceptionHandler.java` pronto all'uso, che:
-- Intercetta gli errori di validazione dei campi (`@Valid`) e risponde con **400 Bad Request** e una lista dettagliata di ogni campo errato con il relativo messaggio;
+Questo gestore (`@RestControllerAdvice`) è pronto all'uso e:
+- Intercetta gli errori di validazione dei campi (`@Valid`) e risponde con **400 Bad Request** e una mappa dettagliata di ogni campo errato con il relativo messaggio;
 - Intercetta `ResponseStatusException` mantenendo lo status HTTP specificato (es. 404, 409);
 - Intercetta `EntityNotFoundException` / `NoSuchElementException` rispondendo con **404 Not Found**;
 - Intercetta qualsiasi altro errore imprevisto rispondendo con un JSON pulito in formato standard.

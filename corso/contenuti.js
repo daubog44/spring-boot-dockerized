@@ -1,6 +1,6 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 14:41',
+  generato: '2026-09-12 15:22',
   progetto: {
     cartella: 'demo',
     pacchetto: 'esame',
@@ -1043,6 +1043,12 @@ task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):re
 \`\`\`
 
 > 💡 **Modalità Interattiva**: se non ricordi i parametri a memoria, puoi anche lanciare semplicemente \`task new-entity\` senza argomenti. Un wizard ti chiederà a quale modulo applicarlo, il nome dell'entità, i campi e se desideri generare anche il DTO!
+> 
+> ⚠️ **Quali moduli compaiono nel menu?** Il wizard mostra solo i microservizi che includono \`spring-boot-starter-data-jpa\` nel proprio \`pom.xml\`. Se stai sviluppando un modulo UI o creato senza database (\`NODB=1\`) che deve gestire tabelle locali (es. \`cup-ui\` con slot e medici), aggiungi JPA ed H2 con un comando:
+> \`\`\`bash
+> task add-dep SERVICE=cup-ui DEPS=data-jpa,h2
+> \`\`\`
+> Subito dopo, il modulo apparirà tra le opzioni selezionabili di \`task new-entity\`!
 
 In un solo colpo questo comando genera quattro file sincronizzati:
 1. **\`entity/LibroEntity.java\`**: classe \`@Entity\` con \`@Table(name = "libri")\`, chiave \`@Id @GeneratedValue\`, campi con annotazioni di validazione (\`@NotBlank\`, \`@NotNull\`, ecc.) e getter/setter Lombok.
@@ -2031,14 +2037,15 @@ controllare i vincoli scritti sul record (\`@NotNull\`, \`@Email\`, \`@Min\`,
 
 Quando un client invia dati errati (es. email non valida o campi obbligatori mancanti), Spring lancia un'eccezione di validazione (\`MethodArgumentNotValidException\`). Senza un gestore globale, rischieresti di restituire status non chiari o stack trace grezzi.
 
-Per generare automaticamente un gestore \`@RestControllerAdvice\` centralizzato per il servizio:
+> 💡 **Generato in automatico nei servizi REST**:
+> Nei nuovi microservizi REST creati con \`task new-service\` (senza \`UI=1\`), \`GlobalExceptionHandler.java\` viene già generato e configurato **automaticamente** nel pacchetto \`controller\`!
+> Se desideri aggiungerlo a un modulo preesistente o rigenerarlo, puoi usare in qualsiasi momento:
+> \`\`\`bash
+> task new-handler SERVICE=catalogo-service
+> \`\`\`
 
-\`\`\`bash
-task new-handler SERVICE=catalogo-service
-\`\`\`
-
-Questo comando genera \`exception/GlobalExceptionHandler.java\` pronto all'uso, che:
-- Intercetta gli errori di validazione dei campi (\`@Valid\`) e risponde con **400 Bad Request** e una lista dettagliata di ogni campo errato con il relativo messaggio;
+Questo gestore (\`@RestControllerAdvice\`) è pronto all'uso e:
+- Intercetta gli errori di validazione dei campi (\`@Valid\`) e risponde con **400 Bad Request** e una mappa dettagliata di ogni campo errato con il relativo messaggio;
 - Intercetta \`ResponseStatusException\` mantenendo lo status HTTP specificato (es. 404, 409);
 - Intercetta \`EntityNotFoundException\` / \`NoSuchElementException\` rispondendo con **404 Not Found**;
 - Intercetta qualsiasi altro errore imprevisto rispondendo con un JSON pulito in formato standard.
@@ -4313,6 +4320,17 @@ Genera le classi canoniche nello standard del progetto:
 - \`OrdineDto.java\` in \`common-dto\` (se \`DTO=1\`).
 - \`OrdineService.java\` con il CRUD pronto (e mapper Entity <-> DTO).
 - \`OrdineController.java\` con gli endpoint REST documentati in OpenAPI/Swagger.
+
+> 💡 **Nota sui moduli con database e UI ibridi**:
+> \`task new-entity\` elenca e accetta solo i moduli che contengono \`spring-boot-starter-data-jpa\` nel proprio \`pom.xml\`.
+> Se hai creato un modulo UI (\`UI=1\`) o senza DB (\`NODB=1\`) e la traccia richiede che gestisca tabelle proprie (es. \`cup-ui\` con slot e medici locali), puoi abilitare JPA e H2 in un attimo:
+> \`\`\`bash
+> task add-dep SERVICE=cup-ui DEPS=data-jpa,h2
+> \`\`\`
+> Appena eseguito, il modulo comparirà automaticamente nell'elenco di \`task new-entity\`.
+
+> 💡 **Gestione errori REST di default**:
+> Ogni volta che crei un nuovo microservizio REST con \`task new-service\`, viene generato automaticamente \`GlobalExceptionHandler.java\` (\`@RestControllerAdvice\`), pronto a intercettare errori \`@Valid\` (restituendo HTTP 400 con la mappa dettagliata dei campi), \`ResponseStatusException\` (es. 404) ed eccezioni generiche (500). Sui moduli UI (\`UI=1\`) non viene generato di default per non restituire JSON al posto dei template Thymeleaf.
 
 ### Collegare le relazioni JPA: task add-relation
 

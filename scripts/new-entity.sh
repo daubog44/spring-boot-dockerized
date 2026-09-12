@@ -44,14 +44,16 @@ if [ -z "$SERVICE" ] || [ -z "$NAME" ]; then
     fi
   done
   if [ "${#JPA_MODULES[@]}" -eq 0 ]; then
-    echo "Non ci sono moduli con JPA (database) in demo/. Creane uno con task new-service." >&2
+    echo "Non ci sono moduli con JPA (database) in demo/. Creane uno con task new-service, oppure aggiungi JPA a un modulo esistente:" >&2
+    echo "  task add-dep SERVICE=<nome> DEPS=data-jpa,h2" >&2
     exit 1
   fi
 
   echo ""
   echo "CREAZIONE ENTITY GUIDATA"
   if [ -z "$SERVICE" ]; then
-    echo "Seleziona il microservizio con database:"
+    echo "Seleziona il microservizio con database (mostrati solo i moduli con spring-boot-starter-data-jpa):"
+    echo "  (Se manca un servizio UI o creato con NODB=1, abilitalo con: task add-dep SERVICE=<nome> DEPS=data-jpa,h2)"
     for i in "${!JPA_MODULES[@]}"; do
       echo "  $((i+1))) ${JPA_MODULES[$i]}"
     done
@@ -92,8 +94,9 @@ if [ ! -f "$MODULE_DIR/pom.xml" ]; then
   exit 1
 fi
 if ! grep -q 'spring-boot-starter-data-jpa' "$MODULE_DIR/pom.xml"; then
-  echo "'$SERVICE' non ha un database (creato con NODB=1 o UI=1): niente JPA, niente entity." >&2
-  echo "Rifallo senza NODB, o aggiungi a mano spring-boot-starter-data-jpa, h2, postgresql e validation al suo pom.xml." >&2
+  echo "'$SERVICE' non ha un database configurato (creato con NODB=1 o UI=1): niente JPA, niente entity." >&2
+  echo "Per abilitare le Entity su questo servizio aggiungi JPA ed H2:" >&2
+  echo "  task add-dep SERVICE=$SERVICE DEPS=data-jpa,h2" >&2
   exit 1
 fi
 
