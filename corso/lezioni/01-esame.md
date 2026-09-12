@@ -66,15 +66,16 @@ arriviamo nella [lezione sulla consegna](16-consegna-e-allegato.md).
 
 ## Che cosa fa il template, e che cosa fai tu
 
-| Già fatto, e collaudato | Tocca a te |
+| Già fatto, e collaudato con i task | Tocca a te |
 | :--- | :--- |
 | Eureka configurato sulla porta 8761 | leggere la traccia e decidere i moduli |
-| un comando che crea un modulo e lo collega a pom, Dockerfile, compose e avvio | le `@Entity` e i repository |
-| Feign, Swagger, Lombok, validation e actuator in ogni modulo nuovo | le regole della traccia, nei service |
-| PostgreSQL nel compose, collegato a un modulo con un comando | le chiamate fra servizi (le interfacce Feign) |
-| avvio in locale con hot reload, i log in un terminale solo | l'algoritmo |
-| dati di prova e schema del database ricavati dalle tue entity | le pagine Thymeleaf |
-| la cartella da consegnare, con l'allegato scritto per metà | le parti dell'allegato fra parentesi quadre e le due risposte teoriche |
+| `task wizard` / `task new-service` per creare e collegare i moduli a pom, Dockerfile, compose e avvio | personalizzare i campi e i nomi |
+| `task new-entity` che genera in blocco Entity JPA, Repository, Service e Controller REST | le regole di business specifiche e le relazioni JPA |
+| `task new-client` per generare le chiamate Feign e i DTO condivisi | invocare i client nei service |
+| `task new-view` per generare le schermate Thymeleaf con form e tabelle | personalizzare layout e flussi della UI |
+| `task new-auth` e `task new-handler` per sicurezza e gestione eccezioni | definire credenziali e ruoli |
+| `task seed-data` e `task db-schema` per dati di prova e schema database | verificare i flussi |
+| `task consegna` per impacchettare l'archivio d'esame e l'allegato tecnico pronto | le risposte alle due domande teoriche |
 
 La lezione dopo apre il template cartella per cartella. Se vuoi prima vedere
 tutta la giornata con l'orologio in mano, c'è [la procedura del giorno

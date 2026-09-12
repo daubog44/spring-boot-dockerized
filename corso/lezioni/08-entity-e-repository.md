@@ -20,6 +20,39 @@ demo/catalogo-service/src/main/java/esame/catalogoservice/
 Spring trova da solo tutto quello che sta sotto il pacchetto di `Main`: i
 sottopacchetti sono un ordine per te, non una configurazione.
 
+## Generare tutto in 5 secondi: `task new-entity`
+
+Invece di creare a mano classi, costruttori, annotazioni e interfacce, hai a disposizione il task di scaffolding completo:
+
+```bash
+task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):required:unique,annoPubblicazione:int,disponibile:bool
+```
+
+In un solo colpo questo comando genera quattro file sincronizzati:
+1. **`entity/LibroEntity.java`**: classe `@Entity` con `@Table(name = "libri")`, chiave `@Id @GeneratedValue`, campi con annotazioni di validazione (`@NotBlank`, `@NotNull`, ecc.) e getter/setter Lombok.
+2. **`repository/LibroRepository.java`**: interfaccia `JpaRepository<LibroEntity, Long>` pronta con tutti i metodi CRUD.
+3. **`service/LibroService.java`**: classe `@Service` con metodi operativi completi (`tutti()`, `perId()`, `crea()`, `aggiorna()`, `elimina()`).
+4. **`controller/LibroController.java`**: `@RestController` mappato su `/api/libri` con documentazione OpenAPI Swagger (`@Tag`, `@Operation`), `@GetMapping`, `@PostMapping`, `@PutMapping`, `@DeleteMapping` e validazione `@Valid`.
+
+### I tipi e i modificatori ammessi in `FIELDS=`
+
+| Sintassi | Tipo Java | Colonna DB / Validazione |
+| :--- | :--- | :--- |
+| `nome:string` | `String` | `VARCHAR(255)` |
+| `nome:string(150)` | `String` | `VARCHAR(150)` + `@Size(max=150)` |
+| `nome:int` o `nome:integer` | `Integer` | `INTEGER` |
+| `nome:long` | `Long` | `BIGINT` |
+| `nome:decimal` | `BigDecimal` | `NUMERIC(12,2)` |
+| `nome:bool` o `nome:boolean` | `Boolean` | `BOOLEAN` |
+| `nome:date` | `LocalDate` | `DATE` |
+| `nome:datetime` | `LocalDateTime` | `TIMESTAMP` |
+| `nome:email` | `String` | `@Email` + `VARCHAR(255)` |
+| `nome:text` | `String` | `@Lob` (`TEXT`) |
+| `:required` | vincolo | `@NotNull` / `@NotBlank` + `nullable = false` |
+| `:unique` | vincolo | `unique = true` sul database |
+
+Dopo aver lanciato il comando, puoi aprire i file per aggiungere relazioni (`@ManyToOne`, `@OneToMany`), campi speciali (enum) o metodi di ricerca nel repository come vediamo qui sotto.
+
 ## Un'entity
 
 ```java demo/catalogo-service/src/main/java/esame/catalogoservice/entity/LibroEntity.java

@@ -180,6 +180,44 @@ rispettati). Prima prova su un H2 usa-e-getta e ti dice com'è andata.
 
 ---
 
+## 3.1 Cheat Sheet Scaffolding & Generazione Rapida
+
+Per non perdere ore a scrivere codice boilerplate e classi ripetitive durante l'esame, hai a disposizione questi comandi:
+
+| Task | Sintassi ed Esempio | Che cosa genera |
+| :--- | :--- | :--- |
+| **`task wizard`** | `task wizard` | Crea l'intera architettura a microservizi guidandoti passo passo. |
+| **`task new-service`** | `task new-service NAME=ordini-service [UI=1] [NODB=1]` | Crea un nuovo microservizio e lo collega a pom, Dockerfile, compose, porte ed editor. |
+| **`task new-entity`** | `task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=cliente:string(100):required,quantita:int:required,totale:decimal,data:date` | Genera in blocco **Entity JPA**, **Repository**, **Service CRUD** e **Controller REST** con Swagger. |
+| **`task new-client`** | `task new-client FROM=ordini-ui TO=ordini-service DTO=OrdineDto [FIELDS=...]` | Genera interfaccia `@FeignClient(name="ORDINI-SERVICE")` e, con `FIELDS=`, anche il DTO in `common-dto`. |
+| **`task new-dto`** | `task new-dto NAME=OrdineDto FIELDS=id:long,cliente:string:required [CLASS=1]` | Genera un Java record DTO immutabile con validazioni in `common-dto`. |
+| **`task new-view`** | `task new-view SERVICE=ordini-ui NAME=Ordini FIELDS=cliente:string:required,quantita:int` | Genera controller Spring MVC (`OrdiniUiController`) e template Thymeleaf (`ordini.html`) con form e tabella. |
+| **`task new-auth`** | `task new-auth SERVICE=ordini-service TYPE=inmemory`<br>`task new-auth SERVICE=ordini-service TYPE=db`<br>`task new-auth SERVICE=ordini-ui TYPE=form` | Configura Spring Security: Basic Auth in memoria, con tabella utenti/ruoli su database, o Form Login con pagina web. |
+| **`task new-handler`**| `task new-handler SERVICE=ordini-service` | Genera `@RestControllerAdvice` per gestire errori di validazione (400), non trovato (404) e 500 in formato JSON pulito. |
+| **`task seed-data`** | `task seed-data` | Popola automaticamente con dati credibili le tabelle vuote al bootstrap. |
+| **`task db-schema`** | `task db-schema` | Genera la tabella Markdown dello schema DB per l'allegato tecnico dell'esame. |
+| **`task add-dep`** | `task add-dep SERVICE=ordini-service DEPS=security,mail` | Aggiunge starter Maven senza dover cercare versioni o groupId. |
+| **`task set-port`** | `task set-port SERVICE=ordini-service PORT=9080` | Cambia la porta di un servizio ovunque sia scritta nel progetto. |
+| **`task remove-service`** | `task remove-service SERVICE=vecchio-service` | Rimuove un modulo e lo scollega da pom, Dockerfile, compose e liste di avvio. |
+
+### Tabella dei Tipi e Modificatori per `FIELDS=`
+
+| Tipo nel comando | Tipo Java | Dettaglio DB / Validazione |
+| :--- | :--- | :--- |
+| `string` / `string(N)` | `String` | `VARCHAR(255)` o `VARCHAR(N)` + `@Size(max=N)` |
+| `int` / `integer` | `Integer` | `INTEGER` |
+| `long` | `Long` | `BIGINT` |
+| `decimal` / `double` | `BigDecimal` | `NUMERIC(12,2)` |
+| `bool` / `boolean` | `Boolean` | `BOOLEAN` |
+| `date` | `LocalDate` | `DATE` |
+| `datetime` | `LocalDateTime` | `TIMESTAMP` |
+| `email` | `String` | `@Email` + `VARCHAR(255)` |
+| `text` | `String` | `@Lob` (`TEXT`) |
+| `:required` | vincolo | `@NotNull` / `@NotBlank` + `nullable = false` |
+| `:unique` | vincolo | vincolo di unicità `unique = true` |
+
+---
+
 ## 4. Collaudo Rapido
 
 ### Prima: il progetto è coerente?
@@ -301,6 +339,13 @@ task docker-up
 
 ### 🚨 Emergenza 4: "Eureka registra i servizi ma i Feign Client danno 500"
 Ogni servizio tiene una copia locale del registro di Eureka, e il load balancer di Feign una copia di quella. Con i valori di Spring le due cache insieme fanno anche 30-60 secondi di "Load balancer does not contain an instance for the service ...". I moduli creati da `task new-service` le accorciano a 5 secondi (`registry-fetch-interval-seconds` e `spring.cloud.loadbalancer.cache.ttl` nell'`application.yml`), e Eureka rinfresca le sue risposte ogni 5: dopo l'avvio bastano pochi secondi. Se un modulo scritto a mano ha ancora il problema, copia quelle righe da un modulo generato.
+
+### 🚨 Emergenza 5: "Errori 500 generici o validazioni @Valid non formattate nelle API REST"
+Se inviando dati non validi le tue API REST rispondono con 500 o messaggi illeggibili invece di 400 Bad Request:
+```bash
+task new-handler SERVICE=<modulo>
+```
+Genera `exception/GlobalExceptionHandler.java` (`@RestControllerAdvice`) che intercetta `MethodArgumentNotValidException` (trasformandola in 400 con dettaglio campo per campo), `ResponseStatusException` (mantenendo lo status HTTP 404/409) ed eccezioni non gestite (formattate in un JSON standard).
 
 ---
 
