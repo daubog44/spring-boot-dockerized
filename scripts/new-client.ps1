@@ -43,6 +43,14 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
 
+function Convert-ToPascal {
+    param([string]$Text)
+    $clean = $Text -replace '[^a-zA-Z0-9]+', ' '
+    $words = $clean -split '\s+' | Where-Object { $_ }
+    $res = foreach ($w in $words) { $w.Substring(0, 1).ToUpperInvariant() + $w.Substring(1).ToLowerInvariant() }
+    return ($res -join '')
+}
+
 if (-not $From -or -not $To) {
     if ([Console]::IsInputRedirected) {
         throw "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [ROUTE=<rotta>]`n" +
@@ -80,8 +88,51 @@ if (-not $From -or -not $To) {
         $To = $targets[$idxNum - 1]
     }
 
+    $targetDir = Join-Path $demoDir $To
+    $targetRoutes = @()
+    if (Test-Path (Join-Path $targetDir 'pom.xml')) {
+        $ctrls = @(Get-ChildItem -Path (Join-Path $targetDir 'src/main/java') -Recurse -Filter '*Controller.java' -ErrorAction SilentlyContinue)
+        foreach ($c in $ctrls) {
+            $cText = Read-TextFile $c.FullName
+            $hits = [regex]::Matches($cText, '@RequestMapping\s*\(\s*(?:(?:value|path)\s*=\s*)?"([^"]+)"\s*\)')
+            foreach ($h in $hits) {
+                $val = $h.Groups[1].Value
+                if ($val -ne '/api/ping' -and $targetRoutes -notcontains $val) {
+                    $targetRoutes += $val
+                }
+            }
+        }
+    }
+
+    if (-not $Path) {
+        if ($targetRoutes.Count -gt 1) {
+            Write-Host "Rotte disponibili rilevate in ${To}:" -ForegroundColor DarkGray
+            for ($i = 0; $i -lt $targetRoutes.Count; $i++) {
+                Write-Host "  $($i + 1)) $($targetRoutes[$i])"
+            }
+            Write-Host "  $($targetRoutes.Count + 1)) Altra rotta personalizzata"
+            $rIdx = Read-Host "  [1] >"
+            $rNum = if ($rIdx -match '^\d+$') { [int]$rIdx } else { 1 }
+            if ($rNum -ge 1 -and $rNum -le $targetRoutes.Count) {
+                $Path = $targetRoutes[$rNum - 1]
+            } else {
+                $Path = (Read-Host "  Prefisso rotta REST (default: /api)").Trim()
+            }
+        } elseif ($targetRoutes.Count -eq 1) {
+            $Path = $targetRoutes[0]
+            Write-Host "  Rotta rilevata: $Path" -ForegroundColor DarkGray
+        }
+    }
+
     if (-not $Dto) {
-        $Dto = (Read-Host "  Nome DTO scambiato (es. LibroDto, OrdineDto)").Trim()
+        $suggestedDto = ''
+        if ($Path) {
+            $token = ($Path.Trim('/') -split '/')[-1]
+            $suggestedDto = (Convert-ToPascal $token) + 'Dto'
+        }
+        $prompt = if ($suggestedDto) { "  Nome DTO scambiato (premi Invio per $suggestedDto)" } else { "  Nome DTO scambiato (es. LibroDto, OrdineDto)" }
+        $inputDto = (Read-Host $prompt).Trim()
+        $Dto = if ($inputDto) { $inputDto } elseif ($suggestedDto) { $suggestedDto } else { '' }
     }
 }
 
@@ -102,13 +153,34 @@ if (Test-Path $toYml) {
     if ($hit.Success) { $eurekaName = $hit.Groups[1].Value.ToUpperInvariant() }
 }
 
-# Nome del client in PascalCase
-function Convert-ToPascal {
-    param([string]$Text)
-    $clean = $Text -replace '[^a-zA-Z0-9]+', ' '
-    $words = $clean -split '\s+' | Where-Object { $_ }
-    $res = foreach ($w in $words) { $w.Substring(0, 1).ToUpperInvariant() + $w.Substring(1).ToLowerInvariant() }
-    return ($res -join '')
+# Raccogli tutte le rotte esposte dai controller del modulo target per convalida e default
+$knownRoutes = @()
+$toControllers = @(Get-ChildItem -Path (Join-Path $toDir 'src/main/java') -Recurse -Filter '*Controller.java' -ErrorAction SilentlyContinue)
+foreach ($c in $toControllers) {
+    $cText = Read-TextFile $c.FullName
+    $matches = [regex]::Matches($cText, '@RequestMapping\s*\(\s*(?:(?:value|path)\s*=\s*)?"([^"]+)"\s*\)')
+    foreach ($m in $matches) {
+        $val = $m.Groups[1].Value
+        if ($val -ne '/api/ping' -and $knownRoutes -notcontains $val) {
+            $knownRoutes += $val
+        }
+    }
+}
+
+# Se non specificato, usa la rotta passata oppure la prima trovata nel target
+$routePath = if ($Path) {
+    $Path
+} elseif ($knownRoutes.Count -gt 0) {
+    $knownRoutes[0]
+} else {
+    '/api'
+}
+
+# Avviso rotta non trovata sul target
+if ($knownRoutes.Count -gt 0 -and $knownRoutes -notcontains $routePath) {
+    Write-Host "ATTENZIONE: Nessun controller in '$To' espone la rotta '$routePath'." -ForegroundColor Yellow
+    Write-Host "            Rotte trovate nel target: $($knownRoutes -join ', ')" -ForegroundColor Yellow
+    Write-Host "            Se l'endpoint non esiste sul target, le chiamate Feign falliranno con HTTP 404 (Not Found) a runtime." -ForegroundColor Yellow
 }
 
 $clientName = if ($Name) {
@@ -118,22 +190,7 @@ $clientName = if ($Name) {
     (Convert-ToPascal $baseName) + 'Client'
 }
 
-# Se non specificato, cerca rotta e DTO dai controller del target
-$routePath = $Path
 $dtoName = $Dto
-
-if (-not $routePath) {
-    $toControllers = @(Get-ChildItem -Path (Join-Path $toDir 'src/main/java') -Recurse -Filter '*Controller.java' -ErrorAction SilentlyContinue)
-    foreach ($c in $toControllers) {
-        $cText = Read-TextFile $c.FullName
-        $m = [regex]::Match($cText, '@RequestMapping\s*\(\s*(?:(?:value|path)\s*=\s*)?"([^"]+)"\s*\)')
-        if ($m.Success -and $m.Groups[1].Value -ne '/api/ping') {
-            $routePath = $m.Groups[1].Value
-            break
-        }
-    }
-    if (-not $routePath) { $routePath = '/api' }
-}
 
 if (-not $dtoName) {
     if ($Fields) {

@@ -456,6 +456,12 @@ task new-client FROM=prenotazioni-service TO=catalogo-service ROUTE=/api/categor
 ```
 > **Nota tecnica**: Ogni client generato contiene automaticamente l'attributo `contextId` (`@FeignClient(name = "CATALOGO-SERVICE", contextId = "eventiClient")`). Questo evita qualsiasi conflitto di bean name in Spring Boot e permette di iniettare entrambi i client nello stesso `@Service` o controller senza alcuna configurazione aggiuntiva.
 
+#### Cosa succede se indichi una ROUTE inesistente o sbagliata?
+- **A runtime**: Spring Cloud OpenFeign compone l'URL interrogando Eureka per l'indirizzo del target e accodando la rotta specificata. Se il controller target non ha quella mappatura (es. refuso `/api/eventi` anziché `/api/evento`), il microservizio risponde con **HTTP 404 (Not Found)** e Feign solleva un'eccezione `feign.FeignException$NotFound: [404] during [GET] to [http://.../api/eventi]`.
+- **Durante la generazione (`task new-client`)**: lo script scansiona automaticamente i controller del target:
+  1. Se lanci il comando guidato (`task new-client`) e il target ha più rotte, ti mostra l'elenco numerato per farti scegliere la rotta con un click, suggerendoti subito il DTO associato.
+  2. Se passi via CLI una `ROUTE=...` non presente nei controller del target, lo script stampa subito un avviso giallo di warning elencando le rotte reali trovate nel target, così ti accorgi del refuso all'istante.
+
 #### Relazioni Many-to-Many tra Microservizi e Composite DTO via Feign
 
 > **REGOLA ARCHITETTURALE FONDAMENTALE**: Nei microservizi ogni modulo ha il proprio database isolato (*Database per Service*). Non puoi MAI creare una relazione JPA (`@ManyToMany` o `@ManyToOne`) tra entità che appartengono a due microservizi diversi!

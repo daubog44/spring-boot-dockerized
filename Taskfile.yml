@@ -429,10 +429,17 @@ tasks:
         DTO=<NomeDto>      facoltativa: nome del DTO di common-dto (es. LibroDto)
         FIELDS=<campi>     facoltativa: se il DTO non esiste o sono specificati,
                            crea automaticamente il DTO in common-dto!
-        NAME=<Nome>        facoltativa: nome client (default: derivato da TO)
-        ROUTE=<rotta>      facoltativa: prefisso rotta (default: /api/<risorsa>)
+        NAME=<Nome>        facoltativa: nome client (default: derivato da TO o rotta, es. EventiClient)
+        ROUTE=<rotta>      facoltativa: prefisso rotta (default: auto-rilevata dai controller di TO)
 
-      Esempio:
+      Note:
+        - Supporta client multipli verso lo stesso servizio target specificando NAME e ROUTE
+          (ogni client riceve un contextId univoco per evitare collisioni Spring).
+        - Se inserisci una ROUTE non presente nei controller del target, vieni avvisato
+          che a runtime le chiamate riceveranno errore HTTP 404 (Not Found).
+
+      Esempi:
+        task new-client FROM=prenotazioni-service TO=catalogo-service ROUTE=/api/evento NAME=EventiClient DTO=EventoDto
         task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto FIELDS=id:long,titolo:string:required
     cmds:
       # Variabile ROUTE, non PATH: Task legge le variabili d'ambiente del

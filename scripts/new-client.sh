@@ -30,17 +30,34 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# Helper per PascalCase
+to_pascal() {
+  local s="$1"
+  local clean
+  clean="$(printf '%s' "$s" | sed -e 's/[^a-zA-Z0-9]/ /g')"
+  local out=""
+  for w in $clean; do
+    local first rest
+    first="$(printf '%s' "$w" | cut -c1 | tr '[:lower:]' '[:upper:]')"
+    rest="$(printf '%s' "$w" | cut -c2- | tr '[:upper:]' '[:lower:]')"
+    out="${out}${first}${rest}"
+  done
+  printf '%s' "$out"
+}
+
 if [ -z "$FROM" ] || [ -z "$TO" ]; then
   if [ ! -t 0 ]; then
     echo "Uso: task new-client FROM=<modulo-chiamante> TO=<modulo-target> [DTO=<NomeDto>] [FIELDS=<campi>] [NAME=<ClientName>] [ROUTE=<rotta>]" >&2
+    echo "Esempio: task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto FIELDS=id:long,titolo:string:required" >&2
     exit 1
   fi
 
   ALL_MODULES=()
-  for d in "$DEMO_DIR"/*; do
-    if [ -f "$d/pom.xml" ] && [ "$(basename "$d")" != "common-dto" ]; then
-      ALL_MODULES+=("$(basename "$d")")
-    fi
+  for d in "$DEMO_DIR"/*/; do
+    [ -f "$d/pom.xml" ] || continue
+    m="$(basename "$d")"
+    [ "$m" = "common-dto" ] && continue
+    ALL_MODULES+=("$m")
   done
   if [ "${#ALL_MODULES[@]}" -lt 2 ]; then
     echo "Servono almeno due moduli in demo/ per collegare un client OpenFeign." >&2
@@ -75,9 +92,61 @@ if [ -z "$FROM" ] || [ -z "$TO" ]; then
     TO="${TARGETS[$((IDX-1))]}"
   fi
 
+  TARGET_ROUTES=()
+  if [ -d "$DEMO_DIR/$TO/src/main/java" ]; then
+    while IFS= read -r c; do
+      [ -f "$c" ] || continue
+      while IFS= read -r m; do
+        if [ -n "$m" ] && [ "$m" != "/api/ping" ]; then
+          already=0
+          for kr in "${TARGET_ROUTES[@]}"; do
+            if [ "$kr" = "$m" ]; then already=1; break; fi
+          done
+          [ $already -eq 0 ] && TARGET_ROUTES+=("$m")
+        fi
+      done < <(grep -oE '@RequestMapping\([[:space:]]*(value[[:space:]]*=[[:space:]]*|path[[:space:]]*=[[:space:]]*)?"[^"]*"' "$c" 2>/dev/null | sed -E 's/.*"([^"]*)".*/\1/')
+    done < <(find "$DEMO_DIR/$TO/src/main/java" -name '*Controller.java' 2>/dev/null)
+  fi
+
+  if [ -z "$PATH_VAL" ]; then
+    if [ "${#TARGET_ROUTES[@]}" -gt 1 ]; then
+      echo "Rotte disponibili rilevate in $TO:"
+      for i in "${!TARGET_ROUTES[@]}"; do
+        echo "  $((i+1))) ${TARGET_ROUTES[$i]}"
+      done
+      echo "  $((${#TARGET_ROUTES[@]}+1))) Altra rotta personalizzata"
+      printf "  [1] > "
+      read -r R_IDX
+      [ -n "$R_IDX" ] || R_IDX=1
+      if [ "$R_IDX" -ge 1 ] && [ "$R_IDX" -le "${#TARGET_ROUTES[@]}" ]; then
+        PATH_VAL="${TARGET_ROUTES[$((R_IDX-1))]}"
+      else
+        printf "  Prefisso rotta REST (default: /api): "
+        read -r PATH_VAL
+      fi
+    elif [ "${#TARGET_ROUTES[@]}" -eq 1 ]; then
+      PATH_VAL="${TARGET_ROUTES[0]}"
+      echo "  Rotta rilevata: $PATH_VAL"
+    fi
+  fi
+
   if [ -z "$DTO" ]; then
-    printf "  Nome DTO scambiato (es. LibroDto, OrdineDto): "
-    read -r DTO
+    SUGG_DTO=""
+    if [ -n "$PATH_VAL" ]; then
+      TOKEN="$(basename "$PATH_VAL")"
+      SUGG_DTO="$(to_pascal "$TOKEN")Dto"
+    fi
+    if [ -n "$SUGG_DTO" ]; then
+      printf "  Nome DTO scambiato (premi Invio per %s): " "$SUGG_DTO"
+    else
+      printf "  Nome DTO scambiato (es. LibroDto, OrdineDto): "
+    fi
+    read -r INP_DTO
+    if [ -n "$INP_DTO" ]; then
+      DTO="$INP_DTO"
+    elif [ -n "$SUGG_DTO" ]; then
+      DTO="$SUGG_DTO"
+    fi
   fi
 fi
 
@@ -95,41 +164,49 @@ if [ -f "$TO_YML" ]; then
   fi
 fi
 
-# Helper per PascalCase
-to_pascal() {
-  local s="$1"
-  local clean
-  clean="$(printf '%s' "$s" | sed -e 's/[^a-zA-Z0-9]/ /g')"
-  local out=""
-  for w in $clean; do
-    local first rest
-    first="$(printf '%s' "$w" | cut -c1 | tr '[:lower:]' '[:upper:]')"
-    rest="$(printf '%s' "$w" | cut -c2- | tr '[:upper:]' '[:lower:]')"
-    out="${out}${first}${rest}"
+KNOWN_ROUTES=()
+if [ -d "$TO_DIR/src/main/java" ]; then
+  while IFS= read -r c; do
+    [ -f "$c" ] || continue
+    while IFS= read -r m; do
+      if [ -n "$m" ] && [ "$m" != "/api/ping" ]; then
+        already=0
+        for kr in "${KNOWN_ROUTES[@]}"; do
+          if [ "$kr" = "$m" ]; then already=1; break; fi
+        done
+        [ $already -eq 0 ] && KNOWN_ROUTES+=("$m")
+      fi
+    done < <(grep -oE '@RequestMapping\([[:space:]]*(value[[:space:]]*=[[:space:]]*|path[[:space:]]*=[[:space:]]*)?"[^"]*"' "$c" 2>/dev/null | sed -E 's/.*"([^"]*)".*/\1/')
+  done < <(find "$TO_DIR/src/main/java" -name '*Controller.java' 2>/dev/null)
+fi
+
+ROUTE_PATH="$PATH_VAL"
+if [ -z "$ROUTE_PATH" ]; then
+  if [ "${#KNOWN_ROUTES[@]}" -gt 0 ]; then
+    ROUTE_PATH="${KNOWN_ROUTES[0]}"
+  else
+    ROUTE_PATH="/api"
+  fi
+fi
+
+# Avviso rotta non trovata sul target
+if [ "${#KNOWN_ROUTES[@]}" -gt 0 ]; then
+  MATCH_FOUND=0
+  for kr in "${KNOWN_ROUTES[@]}"; do
+    if [ "$kr" = "$ROUTE_PATH" ]; then MATCH_FOUND=1; break; fi
   done
-  printf '%s' "$out"
-}
+  if [ $MATCH_FOUND -eq 0 ]; then
+    echo -e "\033[33mATTENZIONE: Nessun controller in '$TO' espone la rotta '$ROUTE_PATH'.\033[0m"
+    echo -e "\033[33m            Rotte trovate nel target: ${KNOWN_ROUTES[*]}\033[0m"
+    echo -e "\033[33m            Se l'endpoint non esiste, le chiamate Feign falliranno con HTTP 404 (Not Found) a runtime.\033[0m"
+  fi
+fi
 
 if [ -n "$NAME" ]; then
   CLIENT_NAME="$NAME"
 else
   BASE_TO="$(printf '%s' "$TO" | sed -E 's/-(service|app|api)$//')"
   CLIENT_NAME="$(to_pascal "$BASE_TO")Client"
-fi
-
-ROUTE_PATH="$PATH_VAL"
-if [ -z "$ROUTE_PATH" ]; then
-  if [ -d "$TO_DIR/src/main/java" ]; then
-    while IFS= read -r c; do
-      [ -f "$c" ] || continue
-      m="$(grep -oE '@RequestMapping\([[:space:]]*(value[[:space:]]*=[[:space:]]*|path[[:space:]]*=[[:space:]]*)?"[^"]*"' "$c" 2>/dev/null | head -n 1 | sed -E 's/.*"([^"]*)".*/\1/' || true)"
-      if [ -n "$m" ] && [ "$m" != "/api/ping" ]; then
-        ROUTE_PATH="$m"
-        break
-      fi
-    done < <(find "$TO_DIR/src/main/java" -name '*Controller.java' 2>/dev/null)
-  fi
-  [ -z "$ROUTE_PATH" ] && ROUTE_PATH="/api"
 fi
 
 DTO_NAME="${DTO:-}"
