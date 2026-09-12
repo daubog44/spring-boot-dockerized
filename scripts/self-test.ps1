@@ -279,6 +279,45 @@ Test-Case 'new-entity rifiuta un''entity che esiste gia''' {
     Assert-Contains $r.Output 'gia''' 'il messaggio non dice che c''e'' gia'''
 }
 
+Test-Case 'new-entity DTO=1 genera entity, dto in common-dto, service con mapper e controller con dto' {
+    $r = Invoke-Tool 'new-entity.ps1' @('-Service', 'epsilon-service', '-Name', 'Editore',
+        '-Fields', 'ragioneSociale:string:required,citta:string', '-Dto')
+    Assert-Ok $r 'new-entity con -Dto e'' fallito'
+
+    $pkg = Get-SandboxPackagePath 'epsilon-service'
+    $base = "demo/epsilon-service/src/main/java/$pkg"
+    $basePkg = (Get-BasePackage -RepoRoot $sandbox) -replace '\.', '/'
+    $dtoFile = Join-Path $demo "common-dto/src/main/java/$basePkg/common/dto/EditoreDto.java"
+    Assert-That (Test-Path $dtoFile) 'EditoreDto non creato in common-dto'
+
+    $service = Get-Text "$base/service/EditoreService.java"
+    Assert-Contains $service 'List<EditoreDto> elenco()' 'il service non restituisce List<EditoreDto>'
+    Assert-Contains $service 'public static EditoreDto toDto(EditoreEntity entity)' 'manca toDto nel service'
+    Assert-Contains $service 'public static EditoreEntity toEntity(EditoreDto dto)' 'manca toEntity nel service'
+
+    $controller = Get-Text "$base/controller/EditoreController.java"
+    Assert-Contains $controller 'List<EditoreDto> elenco()' 'il controller non usa EditoreDto'
+    Assert-Contains $controller 'public EditoreDto crea(@Valid @RequestBody EditoreDto nuovo)' 'crea non usa EditoreDto'
+}
+
+Test-Case 'add-relation configura ManyToOne e OneToMany fra due entity' {
+    $r = Invoke-Tool 'add-relation.ps1' @('-Service', 'epsilon-service', '-From', 'Libro', '-To', 'Editore', '-Type', 'many-to-one')
+    Assert-Ok $r 'add-relation e'' fallito'
+
+    $pkg = Get-SandboxPackagePath 'epsilon-service'
+    $base = "demo/epsilon-service/src/main/java/$pkg"
+    $fromEntity = Get-Text "$base/entity/LibroEntity.java"
+    Assert-Contains $fromEntity '@ManyToOne(fetch = FetchType.LAZY)' 'manca @ManyToOne su Libro'
+    Assert-Contains $fromEntity '@JoinColumn(name = "editore_id")' 'manca @JoinColumn su Libro'
+    Assert-Contains $fromEntity 'private EditoreEntity editore;' 'manca campo editore su Libro'
+
+    $toEntity = Get-Text "$base/entity/EditoreEntity.java"
+    Assert-Contains $toEntity '@OneToMany(mappedBy = "editore"' 'manca @OneToMany inverso su Editore'
+    Assert-Contains $toEntity 'CascadeType.ALL' 'manca CascadeType.ALL'
+    Assert-Contains $toEntity 'private List<LibroEntity> libroList = new ArrayList<>();' 'manca campo libroList su Editore'
+    Assert-Contains $toEntity 'import java.util.List;' 'manca import List'
+}
+
 Test-Case 'new-dto genera record in common-dto con validazione' {
     Assert-Ok (Invoke-Tool 'new-dto.ps1' @('-Name', 'Libro', '-Fields', 'id:long,titolo:string(150):required,disponibile:bool')) 'new-dto e'' fallito'
     $dtoFile = Join-Path $demo 'common-dto/src/main/java/esame/common/dto/LibroDto.java'

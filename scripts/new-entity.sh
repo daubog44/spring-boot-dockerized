@@ -19,12 +19,14 @@ SERVICE=""
 NAME=""
 FIELDS=""
 TABLE=""
+DTO=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -Service|--service) SERVICE="$2"; shift 2 ;;
     -Name|--name) NAME="$2"; shift 2 ;;
     -Fields|--fields) FIELDS="$2"; shift 2 ;;
     -Table|--table) TABLE="$2"; shift 2 ;;
+    -Dto|--dto) DTO=1; shift ;;
     *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
   esac
 done
@@ -93,6 +95,8 @@ ROUTE_BASE="$(printf '%s' "$TABLE_NAME" | tr '_' '-')"
 FIELD_BLOCKS=()
 SETTER_LINES=()
 UNIQUE_FIELDS=()
+FIELD_NAMES=()
+FIELD_PASCALS=()
 USES_BIGDECIMAL=0
 USES_LOCALDATE=0
 USES_LOCALDATETIME=0
@@ -225,6 +229,8 @@ EOF
     FIELD_BLOCKS+=("$BLOCK")
 
     PASCAL="$(pascal_field "$FIELD_NAME")"
+    FIELD_NAMES+=("$FIELD_NAME")
+    FIELD_PASCALS+=("$PASCAL")
     SETTER_LINES+=("        esistente.set$PASCAL(dati.get$PASCAL());")
   done
 fi
@@ -295,15 +301,176 @@ public interface ${NAME}Repository extends JpaRepository<${NAME}Entity, Long> {
 EOF
 echo "  demo/$SERVICE/src/main/java/$PACKAGE_PATH/repository/${NAME}Repository.java"
 
-# --- 4. Il service -----------------------------------------------------------
+# --- 4. Service e Controller --------------------------------------------------
 
-SETTER_BLOCK="        // Nessun campo da FIELDS=: aggiungi qui i tuoi set..."
-if [ "${#SETTER_LINES[@]}" -gt 0 ]; then
-  SETTER_BLOCK="$(printf '%s\n' "${SETTER_LINES[@]}")"
-  SETTER_BLOCK="${SETTER_BLOCK%$'\n'}"
-fi
+BASE_PKG="$(base_package "$DEMO_DIR")"
+DTO_NAME="${NAME}Dto"
 
-cat >"$SERVICE_DIR/${NAME}Service.java" <<EOF
+if [ "$DTO" = "1" ]; then
+  DTO_FIELDS="$FIELDS"
+  if ! printf '%s' "$FIELDS" | grep -qE '\bid:long\b'; then
+    if [ -n "$FIELDS" ]; then
+      DTO_FIELDS="id:long,$FIELDS"
+    else
+      DTO_FIELDS="id:long"
+    fi
+  fi
+  bash "$SCRIPT_DIR/new-dto.sh" --name "$NAME" --fields "$DTO_FIELDS" --service "common-dto" > /dev/null
+
+  TO_DTO_ARGS=""
+  for p in "${FIELD_PASCALS[@]}"; do
+    TO_DTO_ARGS="${TO_DTO_ARGS},"$'\n'"            entity.get${p}()"
+  done
+
+  TO_ENTITY_SETTERS=""
+  for i in "${!FIELD_NAMES[@]}"; do
+    fn="${FIELD_NAMES[$i]}"
+    fp="${FIELD_PASCALS[$i]}"
+    TO_ENTITY_SETTERS="${TO_ENTITY_SETTERS}        entity.set${fp}(dto.${fn}());"$'\n'
+  done
+  [ -z "$TO_ENTITY_SETTERS" ] && TO_ENTITY_SETTERS="        // Nessun campo aggiuntivo"$'\n'
+
+  SETTER_LINES_FROM_DTO=""
+  for i in "${!FIELD_NAMES[@]}"; do
+    fn="${FIELD_NAMES[$i]}"
+    fp="${FIELD_PASCALS[$i]}"
+    SETTER_LINES_FROM_DTO="${SETTER_LINES_FROM_DTO}        esistente.set${fp}(dati.${fn}());"$'\n'
+  done
+  [ -z "$SETTER_LINES_FROM_DTO" ] && SETTER_LINES_FROM_DTO="        // Nessun campo da aggiornare"$'\n'
+  SETTER_LINES_FROM_DTO="${SETTER_LINES_FROM_DTO%$'\n'}"
+
+  cat >"$SERVICE_DIR/${NAME}Service.java" <<EOF
+package $PACKAGE.service;
+
+import $PACKAGE.entity.${NAME}Entity;
+import $PACKAGE.repository.${NAME}Repository;
+import $BASE_PKG.common.dto.$DTO_NAME;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class ${NAME}Service {
+
+    private final ${NAME}Repository repository;
+
+    public List<$DTO_NAME> elenco() {
+        return repository.findAll().stream().map(${NAME}Service::toDto).toList();
+    }
+
+    public $DTO_NAME trova(Long id) {
+        return toDto(trovaEntity(id));
+    }
+
+    public $DTO_NAME crea($DTO_NAME nuovo) {
+        ${NAME}Entity entity = toEntity(nuovo);
+        entity.setId(null);
+        return toDto(repository.save(entity));
+    }
+
+    public $DTO_NAME aggiorna(Long id, $DTO_NAME dati) {
+        ${NAME}Entity esistente = trovaEntity(id);
+$SETTER_LINES_FROM_DTO
+        return toDto(repository.save(esistente));
+    }
+
+    public void elimina(Long id) {
+        trovaEntity(id);
+        repository.deleteById(id);
+    }
+
+    private ${NAME}Entity trovaEntity(Long id) {
+        return repository.findById(id).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "$NAME " + id + " non trovato"));
+    }
+
+    // --- Mapper Entity <-> DTO ---
+
+    public static $DTO_NAME toDto(${NAME}Entity entity) {
+        if (entity == null) return null;
+        return new $DTO_NAME(
+            entity.getId()${TO_DTO_ARGS}
+        );
+    }
+
+    public static ${NAME}Entity toEntity($DTO_NAME dto) {
+        if (dto == null) return null;
+        ${NAME}Entity entity = new ${NAME}Entity();
+        entity.setId(dto.id());
+${TO_ENTITY_SETTERS}        return entity;
+    }
+}
+EOF
+  echo "  demo/$SERVICE/src/main/java/$PACKAGE_PATH/service/${NAME}Service.java"
+
+  cat >"$CONTROLLER_DIR/${NAME}Controller.java" <<EOF
+package $PACKAGE.controller;
+
+import $BASE_PKG.common.dto.$DTO_NAME;
+import $PACKAGE.service.${NAME}Service;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Tag(name = "$NAME", description = "CRUD per $NAME basato su DTO")
+@RestController
+@RequestMapping("/api/$ROUTE_BASE")
+@RequiredArgsConstructor
+public class ${NAME}Controller {
+
+    private final ${NAME}Service service;
+
+    @Operation(summary = "Tutti/e")
+    @GetMapping
+    public List<$DTO_NAME> elenco() {
+        return service.elenco();
+    }
+
+    @Operation(summary = "Per id (404 se non c'e')")
+    @GetMapping("/{id}")
+    public $DTO_NAME perId(@PathVariable Long id) {
+        return service.trova(id);
+    }
+
+    @Operation(summary = "Crea")
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public $DTO_NAME crea(@Valid @RequestBody $DTO_NAME nuovo) {
+        return service.crea(nuovo);
+    }
+
+    @Operation(summary = "Aggiorna (404 se non c'e')")
+    @PutMapping("/{id}")
+    public $DTO_NAME aggiorna(@PathVariable Long id, @Valid @RequestBody $DTO_NAME dati) {
+        return service.aggiorna(id, dati);
+    }
+
+    @Operation(summary = "Elimina (404 se non c'e')")
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void elimina(@PathVariable Long id) {
+        service.elimina(id);
+    }
+}
+EOF
+  echo "  demo/$SERVICE/src/main/java/$PACKAGE_PATH/controller/${NAME}Controller.java"
+else
+  SETTER_BLOCK="        // Nessun campo da FIELDS=: aggiungi qui i tuoi set..."
+  if [ "${#SETTER_LINES[@]}" -gt 0 ]; then
+    SETTER_BLOCK="$(printf '%s\n' "${SETTER_LINES[@]}")"
+    SETTER_BLOCK="${SETTER_BLOCK%$'\n'}"
+  fi
+
+  cat >"$SERVICE_DIR/${NAME}Service.java" <<EOF
 package $PACKAGE.service;
 
 import $PACKAGE.entity.${NAME}Entity;
@@ -348,11 +515,9 @@ $SETTER_BLOCK
     }
 }
 EOF
-echo "  demo/$SERVICE/src/main/java/$PACKAGE_PATH/service/${NAME}Service.java"
+  echo "  demo/$SERVICE/src/main/java/$PACKAGE_PATH/service/${NAME}Service.java"
 
-# --- 5. Il controller ---------------------------------------------------------
-
-cat >"$CONTROLLER_DIR/${NAME}Controller.java" <<EOF
+  cat >"$CONTROLLER_DIR/${NAME}Controller.java" <<EOF
 package $PACKAGE.controller;
 
 import $PACKAGE.entity.${NAME}Entity;
@@ -368,10 +533,9 @@ import java.util.List;
 
 // CRUD generato da task new-entity: aggiungi qui le regole della tua
 // traccia. Se questi dati li consuma anche un altro servizio (Feign), o non
-// vuoi esporre tutti i campi cosi' come sono in tabella, sostituisci
+// vuoi esporre tutti i campi cosi' come sono in tabella, usa DTO=1 oppure sostituisci
 // ${NAME}Entity con un DTO tuo -- vedi la lezione 9 ("fuori dal servizio
-// esce il DTO, mai l'entity") e, se il DTO serve anche altrove, la
-// lezione 4 su common-dto.
+// esce il DTO, mai l'entity") e la lezione 4 su common-dto.
 @Tag(name = "$NAME", description = "Generato da new-entity: descrivilo meglio")
 @RestController
 @RequestMapping("/api/$ROUTE_BASE")
@@ -413,7 +577,8 @@ public class ${NAME}Controller {
     }
 }
 EOF
-echo "  demo/$SERVICE/src/main/java/$PACKAGE_PATH/controller/${NAME}Controller.java"
+  echo "  demo/$SERVICE/src/main/java/$PACKAGE_PATH/controller/${NAME}Controller.java"
+fi
 
 # --- Riepilogo -----------------------------------------------------------------
 

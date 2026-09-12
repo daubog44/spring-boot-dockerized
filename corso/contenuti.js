@@ -1,13 +1,16 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 13:06',
+  generato: '2026-09-12 13:42',
   progetto: {
     cartella: 'demo',
     pacchetto: 'esame',
     java: '25',
     moduli: [
-    { nome: 'common-dto', tipo: 'libreria', porta: '', applicazione: '', database: '', entity: [], feign: [], classi: [] },
-    { nome: 'naming-server', tipo: 'eureka', porta: '8761', applicazione: 'eureka-server', database: '', entity: [], feign: [], classi: [] }
+    { nome: 'common-dto', tipo: 'libreria', porta: '', applicazione: '', database: '', entity: [], feign: [], classi: ['LibroDto', 'NuovoPrestitoRequest', 'PrestitoDto'] },
+    { nome: 'naming-server', tipo: 'eureka', porta: '8761', applicazione: 'eureka-server', database: '', entity: [], feign: [], classi: [] },
+    { nome: 'catalogo-service', tipo: 'rest', porta: '8081', applicazione: 'CATALOGO-SERVICE', database: 'PostgreSQL biblioteca', entity: ['AutoreEntity', 'LibroEntity'], feign: [], classi: [] },
+    { nome: 'prestiti-service', tipo: 'rest', porta: '8082', applicazione: 'PRESTITI-SERVICE', database: 'PostgreSQL prestiti', entity: ['PrestitoEntity'], feign: ['CATALOGO-SERVICE'], classi: [] },
+    { nome: 'biblioteca-ui', tipo: 'ui', porta: '8090', applicazione: 'BIBLIOTECA-UI', database: '', entity: [], feign: ['CATALOGO-SERVICE', 'PRESTITI-SERVICE'], classi: [] }
     ]
   },
   lezioni: [
@@ -1061,6 +1064,17 @@ In un solo colpo questo comando genera quattro file sincronizzati:
 | \`:required\` | vincolo | \`@NotNull\` / \`@NotBlank\` + \`nullable = false\` |
 | \`:unique\` | vincolo | \`unique = true\` sul database |
 
+### Generazione automatica con DTO (\`DTO=1\`)
+
+Se aggiungi \`DTO=1\`:
+\`\`\`bash
+task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,prezzo:decimal,disponibile:bool DTO=1
+\`\`\`
+Il comando:
+1. Crea automaticamente il record immutabile \`LibroDto\` in \`common-dto\` con tutte le validazioni.
+2. Genera in \`LibroService\` i metodi mapper statici \`toDto(entity)\` e \`toEntity(dto)\`.
+3. Modifica \`LibroController\` in modo che riceva e restituisca \`LibroDto\` invece dell'Entity. In questo modo rispetti alla lettera la best practice "fuori dal service esce solo il DTO" ed eviti per sempre i loop di serializzazione Jackson con le relazioni bidirezionali!
+
 Dopo aver lanciato il comando, puoi aprire i file per aggiungere relazioni (\`@ManyToOne\`, \`@OneToMany\`), campi speciali (enum) o metodi di ricerca nel repository come vediamo qui sotto.
 
 ## Un'entity
@@ -1235,7 +1249,28 @@ private UtenteEntity utente;
    Usa solo \`@Getter\`, \`@Setter\`, \`@NoArgsConstructor\`.
 4. **Evita il loop JSON Jackson**: se serializzi un'entity con relazione bidirezionale,
    Jackson va in loop infinito. La soluzione pulita è **restituire sempre DTO** dai
-   controller (o mettere \`@JsonIgnore\` sul lato inverso).
+   controller (usa \`DTO=1\` in \`task new-entity\`!).
+
+### Configurare le relazioni in 5 secondi: \`task add-relation\`
+
+Invece di scrivere annotazioni, chiavi esterne e collezioni inverse a mano col rischio di dimenticare \`fetch = FetchType.LAZY\`, \`mappedBy\`, o gli import:
+
+\`\`\`bash
+task add-relation SERVICE=catalogo-service FROM=Libro TO=Autore TYPE=many-to-one
+\`\`\`
+
+Oppure lancialo **senza argomenti**:
+\`\`\`bash
+task add-relation
+\`\`\`
+Si aprirà una comoda procedura guidata nel terminale: ti chiederà in quale microservizio vuoi operare, elencherà tutte le entità rilevate e ti farà scegliere il tipo di relazione desiderata (\`many-to-one\`, \`one-to-many\`, \`one-to-one\`, \`many-to-many\`).
+
+Cosa fa per te:
+- Inserisce l'annotazione corretta con \`fetch = FetchType.LAZY\`.
+- Configura \`@JoinColumn(name = "autore_id")\` sul lato proprietario.
+- Configura il lato inverso con \`mappedBy\` e lista già inizializzata (\`= new ArrayList<>()\`).
+- Aggiunge automaticamente tutti gli \`import\` necessari (\`jakarta.persistence.*\`, \`java.util.List\`, ecc.).
+- Con \`UNIDIRECTIONAL=1\` evita di aggiungere il campo inverso se ti serve unidirezionale.
 
 ---
 
@@ -3184,13 +3219,27 @@ La domanda teorica A dell'esame include spesso concetti di sicurezza in architet
 ` }
   ],
   documenti: [
-    { file: 'README.md', testo: `# Spring Boot Dockerized — Template d'esame ITS
+    { file: 'README.md', testo: `# Spring Boot Dockerized — Traccia svolta: Biblioteca di quartiere
 
-Template **vuoto** per una prova finale a microservizi: c'è l'impalcatura già
-configurata e collaudata (Eureka, OpenFeign, OpenAPI/Swagger, PostgreSQL, Docker
-Compose, hot reload), **non** c'è nessun servizio d'esempio da smontare.
+Questo branch contiene la traccia **Biblioteca di quartiere** svolta per
+intero sul template del branch
+[\`main\`](https://github.com/daubog44/spring-boot-dockerized/tree/main): un
+catalogo di libri e autori, un servizio dei prestiti con la penale per i
+ritardi, un'interfaccia web, due database PostgreSQL, Eureka e Docker Compose.
+È il filo del corso (\`task learn\`): ogni pezzo di codice che il corso mostra
+sta qui, compilato e collaudato. Traccia, architettura, endpoint e collaudo
+sono in **[README-ESAME-TTFCLOUD.md](./README-ESAME-TTFCLOUD.md)**.
 
-I servizi della traccia li generi con un comando:
+\`\`\`bash
+task dev
+\`\`\`
+
+\`\`\`bash
+powershell -ExecutionPolicy Bypass -File test_e2e_biblioteca.ps1
+\`\`\`
+
+Il resto di questa pagina è il README del template. Nel template i servizi
+della traccia si generano con un comando:
 
 \`\`\`bash
 task new-service NAME=ordini-service
@@ -3227,14 +3276,14 @@ task learn
 \`\`\`
 
 Apre il corso: una pagina statica (niente server, niente rete) con diciotto
-lezioni dalla A alla Z — com'è fatto **questo** template (che parti da qui è
-vuoto: nessun modulo oltre a Eureka e \`common-dto\`), come si parlano i
-servizi, \`common-dto\`, le entity e i repository JPA con tutti gli esempi, la
-rete dell'esame — e poi una traccia vera svolta per intero, la **Biblioteca**
-(branch a parte, non qualcosa che hai già in questa cartella: la lezione 1 lo
-spiega), per vedere del codice funzionante prima di scrivere il tuo. Dentro ci
-sono anche tutte le guide, con la ricerca, e la mappa dei moduli del **tuo**
-progetto, letta dai file veri.
+lezioni dalla A alla Z — com'è fatto il template, come si parlano i servizi,
+\`common-dto\`, le entity e i repository JPA con tutti gli esempi, la rete
+dell'esame, e la traccia Biblioteca svolta pezzo per pezzo. Su **questo**
+branch il codice della Biblioteca c'è già, in \`demo/\`: la mappa dei moduli che
+il corso legge da \`task learn\` è la stessa che vedi qui, non un esempio da
+un'altra parte. Sul template vuoto (branch \`main\`) è diverso: lì la mappa è
+solo Eureka e \`common-dto\`, e il codice della Biblioteca nelle lezioni resta
+un esempio da leggere, come spiega la lezione 1.
 
 ## Documentazione
 
@@ -3253,10 +3302,10 @@ dettaglio di un comando singolo, con le sue variabili, è
 
 ## Branch
 
-- **\`main\`** (questo): il template vuoto. È da qui che si parte a ogni traccia.
+- **\`main\`**: il template vuoto. È da qui che si parte a ogni traccia.
 - **[\`solution/wms\`](https://github.com/daubog44/spring-boot-dockerized/tree/solution/wms)**: soluzione completa della traccia **WMS magazzino** (product, crm, wms, wms-ui, calcolo distanza Manhattan, DTO condivisi, collaudo end-to-end).
 - **[\`example/tourist-events\`](https://github.com/daubog44/spring-boot-dockerized/tree/example/tourist-events)**: esempio svolto della traccia **eventi/turismo** (wrapper OpenFeign di OpenDataHub, estrazione casuale, storico su PostgreSQL).
-- **[\`example/biblioteca\`](https://github.com/daubog44/spring-boot-dockerized/tree/example/biblioteca)**: la traccia **Biblioteca di quartiere** svolta per intero, ed è il filo del corso (catalogo e prestiti con due database, Feign nei due sensi, penale per ritardo con i suoi test, interfaccia con form e restituzioni, collaudo end-to-end).
+- **\`example/biblioteca\`** (questo): la traccia **Biblioteca di quartiere** svolta per intero, ed è il filo del corso (catalogo e prestiti con due database, Feign nei due sensi, penale per ritardo con i suoi test, interfaccia con form e restituzioni, collaudo end-to-end).
 
 I branch svolti servono da riferimento: non serve copiarli, serve guardarli
 quando non ricordi come si fa una cosa.
@@ -3839,9 +3888,10 @@ passare dai comandi; se il \`launch.json\` resta indietro, te lo dice \`task che
 
 ## Fase 1 — Sviluppo: il ciclo che ripeterai tutto il giorno
 
-Questo branch è il template vuoto: c'è Eureka, il modulo \`common-dto\` per le
-classi condivise, e nient'altro. I servizi della traccia li crei tu, un
-comando per uno:
+Questo branch ha la traccia Biblioteca già svolta: \`catalogo-service\`,
+\`prestiti-service\` e \`biblioteca-ui\`, oltre a Eureka e \`common-dto\`. Nel
+template vuoto (\`main\`) i servizi della traccia li crei tu, un comando per
+uno:
 
 \`\`\`bash
 task new-service NAME=ordini-service
@@ -4408,6 +4458,83 @@ Serve saperlo solo se qualcosa va storto:
 5. Se qualcosa non parte, stampa le ultime righe del log del colpevole e
    **ritira quello che aveva avviato**, invece di lasciare mezzo stack acceso.
 ` },
+    { file: 'allegato.md', testo: `# Allegato tecnico: le parti scritte da te
+
+task consegna prende ogni sezione di questo file e la mette al suo posto in
+ALLEGATO-TECNICO.md, accanto a quello che ricava dal progetto (moduli, porte,
+endpoint, schema del database). Scrivi sotto ogni titolo e lascia i titoli
+come sono: una sezione ancora fra parentesi quadre conta come da scrivere, e
+la consegna te lo ricorda.
+
+## Analisi
+
+La biblioteca di quartiere informatizza il catalogo e i prestiti. Il
+bibliotecario consulta i libri, con autore, genere, anno e disponibilità;
+registra un prestito indicando l'email di chi prende il libro e la durata (30
+giorni di norma, al massimo 60); registra la restituzione. Il sistema impedisce
+di prestare un libro già fuori e calcola, per ogni prestito, i giorni di
+ritardo e la penale.
+
+La soluzione è divisa in tre microservizi, ognuno con i suoi dati: il catalogo
+possiede libri e autori, i prestiti possiedono i prestiti e dei libri tengono
+solo l'identificativo. La coerenza fra i due la mantiene il servizio dei
+prestiti: prima di prestare chiede il libro al catalogo, dopo gli comunica che
+non è più disponibile, e alla restituzione che lo è di nuovo. L'interfaccia web
+chiama entrambi. Tutti si registrano su Eureka e si chiamano per nome con
+OpenFeign.
+
+## Algoritmo
+
+Per ogni prestito si calcola il ritardo come il numero di giorni fra la data di
+scadenza e la data di riferimento — la data di restituzione se il prestito è
+chiuso, la data odierna se è aperto — con un minimo di zero. La penale è pari a
+0,50 € per giorno di ritardo, con un tetto di 20,00 €:
+
+penale = min(0,50 × ritardo; 20,00)
+
+Il calcolo sta in \`PrestitoService\` (metodi \`giorniRitardo\` e \`penale\`), due
+funzioni pure che non toccano né il database né la rete, e si esegue ogni volta
+che un prestito viene restituito all'esterno: il valore mostrato è sempre
+aggiornato al giorno corrente e non viene salvato. Il costo è costante per
+prestito e lineare nel numero di prestiti per l'elenco. Gli importi usano
+\`BigDecimal\`, per non avere errori di arrotondamento. I test di \`PenaleTest\`
+verificano la restituzione in anticipo (nessuna penale), sette giorni di
+ritardo (3,50 €) e il tetto (20,00 € da quaranta giorni in su).
+
+## naming-server
+
+Il registro Eureka: i servizi vi si registrano col loro nome
+(\`spring.application.name\`) e lo usano per trovarsi, senza indirizzi scritti
+nel codice.
+
+## catalogo-service
+
+Tiene libri e autori su PostgreSQL (database \`biblioteca\`) e li espone in REST.
+Il servizio dei prestiti lo chiama per leggere un libro e per cambiarne la
+disponibilità.
+
+## prestiti-service
+
+Registra prestiti e restituzioni su un database suo (\`prestiti\`). Chiede i
+libri al catalogo via Feign: risponde 404 se il libro non esiste, 409 se è già
+in prestito, 400 se i dati della richiesta non sono validi. Calcola ritardo e
+penale di ogni prestito.
+
+## biblioteca-ui
+
+L'interfaccia web, con Thymeleaf: mostra catalogo e prestiti con ritardo e
+penale, registra un prestito con un form validato e una restituzione con un
+bottone. Se un servizio non risponde la pagina lo dice, invece di andare in
+errore.
+
+## Domanda A
+
+[Facoltativa: la risposta alla domanda teorica, se la traccia la vuole nell'allegato.]
+
+## Domanda B
+
+[Facoltativa: la risposta alla domanda teorica, se la traccia la vuole nell'allegato.]
+` },
     { file: 'guida_multi_modulo_maven.md', testo: `# Guida 3: Multi-Modulo Maven & Funzionamento Progetto
 
 Guida teorica e pratica per comprendere la struttura **Multi-Module Maven**, il funzionamento del **Maven Reactor**, la gestione delle dipendenze e l'integrazione con **Docker**.
@@ -4819,7 +4946,7 @@ All'esame il tempo è prezioso: delega agli strumenti il lavoro meccanico e conc
 | Ambito | Cosa deleghi al Template / ai comandi \`task\` | Cosa spetta a TE (Candidato) |
 | :--- | :--- | :--- |
 | **Architettura & Moduli** | \`task new-service\` collega il modulo in tutti i 6 punti (pom aggregatore, Dockerfile, docker-compose, dev, VS Code, porte). | Scegliere i nomi dei moduli dalla traccia (es. \`catalogo-service\`, \`ordini-service\`, \`ui-service\`). |
-| **Persistenza & Entity** | \`task new-entity\` genera Entity, Repository, Service CRUD e Controller REST con Swagger. | Definire le **relazioni JPA** (@ManyToOne, @ManyToMany...) all'interno del modulo e i metodi custom del repository (tramite nome derivato \`findBy...\` o query esplicita \`@Query\`/\`nativeQuery\`). |
+| **Persistenza & Entity** | \`task new-entity\` genera Entity, Repository, Service CRUD e Controller REST (anche con DTO via \`DTO=1\`). \`task add-relation\` collega le entity tra loro in JPA (\`@ManyToOne\`, \`@OneToMany\`...) con \`fetch = LAZY\`. | I metodi custom del repository (tramite nome derivato \`findBy...\` o query esplicita \`@Query\`/\`nativeQuery\`) e la logica specifica. |
 | **Microservizi & Database** | Ogni modulo ha il suo database isolato (H2 in-memory o Postgres dedicato con \`task use-postgres\`). | **NON creare mai chiavi esterne tra moduli diversi!** Usare solo l'ID numerico (\`Long libroId\`) e OpenFeign. |
 | **Contratti DTO & Record** | \`task new-dto\` genera i record Java in \`common-dto\` con validazione Bean Validation. | Decidere quali campi esporre e scambiare tra i microservizi. |
 | **Chiamate tra Servizi** | \`task new-client\` crea l'interfaccia \`@FeignClient\` pronta con metodi CRUD risolti tramite Eureka. | Invocare il client nel \`@Service\` chiamante e gestire le eccezioni di business (es. 404 se un record non esiste). |
@@ -6750,7 +6877,8 @@ Per non perdere ore a scrivere codice boilerplate e classi ripetitive durante l'
 | :--- | :--- | :--- |
 | **\`task wizard\`** | \`task wizard\` | Crea l'intera architettura a microservizi guidandoti passo passo. |
 | **\`task new-service\`** | \`task new-service NAME=ordini-service [UI=1] [NODB=1]\` | Crea un nuovo microservizio e lo collega a pom, Dockerfile, compose, porte ed editor. |
-| **\`task new-entity\`** | \`task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=cliente:string(100):required,quantita:int:required,totale:decimal,data:date\` | Genera in blocco **Entity JPA**, **Repository**, **Service CRUD** e **Controller REST** con Swagger. |
+| **\`task new-entity\`** | \`task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=... [DTO=1]\` | Genera in blocco **Entity JPA**, **Repository**, **Service CRUD** e **Controller REST** (anche basati su DTO se \`DTO=1\`). |
+| **\`task add-relation\`** | \`task add-relation SERVICE=ordini-service FROM=Ordine TO=Cliente TYPE=many-to-one\` | Configura una relazione JPA (\`@ManyToOne\`, \`@OneToMany\`, \`@OneToOne\`, \`@ManyToMany\`) con \`fetch = LAZY\`, \`@JoinColumn\` e campo inverso. Interattivo se lanciato senza argomenti (\`task add-relation\`). |
 | **\`task new-client\`** | \`task new-client FROM=ordini-ui TO=ordini-service DTO=OrdineDto [FIELDS=...]\` | Genera interfaccia \`@FeignClient(name="ORDINI-SERVICE")\` e, con \`FIELDS=\`, anche il DTO in \`common-dto\`. |
 | **\`task new-dto\`** | \`task new-dto NAME=OrdineDto FIELDS=id:long,cliente:string:required [CLASS=1]\` | Genera un Java record DTO immutabile con validazioni in \`common-dto\`. |
 | **\`task new-view\`** | \`task new-view SERVICE=ordini-ui NAME=Ordini FIELDS=cliente:string:required,quantita:int\` | Genera controller Spring MVC (\`OrdiniUiController\`) e template Thymeleaf (\`ordini.html\`) con form e tabella. |
@@ -6976,6 +7104,124 @@ archivio unico da consegnare: scompattato, parte con \`docker compose up --build
 Le parti dell'allegato da scrivere a mano (analisi, algoritmo, che cosa fa ogni
 modulo) stanno in \`allegato.md\`: la consegna le mette al loro posto prima di
 fare l'archivio, quindi si può rilanciare quante volte si vuole.
+` },
+    { file: 'README-ESAME-TTFCLOUD.md', testo: `# Documentazione Esame Spring Cloud — Biblioteca di quartiere
+
+## Obiettivo
+
+Questa soluzione informatizza catalogo e prestiti di una biblioteca di
+quartiere: tre microservizi registrati su Eureka, due database PostgreSQL, una
+penale per chi restituisce in ritardo e un'interfaccia web per il
+bibliotecario. È la traccia che il corso del template (\`task learn\`) segue
+lezione per lezione: ogni pezzo di codice mostrato nel corso sta qui.
+
+## La traccia
+
+> 1. Il **catalogo** contiene i libri: titolo, codice ISBN di 13 cifre, anno
+>    di pubblicazione, genere (romanzo, saggio, giallo, fantasy, storico),
+>    autore (nome, cognome, nazionalità) e se il libro è disponibile.
+> 2. Il servizio dei **prestiti** registra chi prende un libro (la sua email),
+>    il giorno del prestito e la scadenza: di norma 30 giorni, al massimo 60.
+>    Un libro già in prestito non si può prestare di nuovo.
+> 3. Alla restituzione il libro torna disponibile. Per ogni giorno di ritardo
+>    si paga una **penale** di 0,50 euro, fino a un massimo di 20 euro.
+> 4. Un'**interfaccia web** mostra il catalogo e i prestiti, con il ritardo e
+>    la penale, e permette di registrare un prestito e una restituzione.
+> 5. I servizi si registrano su un **naming server Eureka** e si chiamano per
+>    nome. Catalogo e prestiti hanno ognuno il proprio database PostgreSQL.
+> 6. L'intero sistema parte con **Docker Compose**.
+
+## Architettura
+
+| Modulo | Porta | Nome su Eureka | Database | Chiama |
+| :--- | ---: | :--- | :--- | :--- |
+| \`naming-server\` | 8761 | \`eureka-server\` | — | — |
+| \`catalogo-service\` | 8081 | \`CATALOGO-SERVICE\` | PostgreSQL \`biblioteca\` | — |
+| \`prestiti-service\` | 8082 | \`PRESTITI-SERVICE\` | PostgreSQL \`prestiti\` | \`CATALOGO-SERVICE\` |
+| \`biblioteca-ui\` | 8090 | \`BIBLIOTECA-UI\` | — | \`CATALOGO-SERVICE\`, \`PRESTITI-SERVICE\` |
+
+\`\`\`
+biblioteca-ui  --Feign-->  CATALOGO-SERVICE  -->  PostgreSQL "biblioteca"
+      |
+      +-------Feign-->  PRESTITI-SERVICE  -->  PostgreSQL "prestiti"
+                              |
+                              +--Feign-->  CATALOGO-SERVICE
+\`\`\`
+
+In \`common-dto\` stanno i record che attraversano la rete: \`LibroDto\`,
+\`PrestitoDto\` e \`NuovoPrestitoRequest\` (il corpo della POST, che la UI manda e
+i prestiti ricevono). \`PrestitoEntity\` tiene solo \`libroId\`: la tabella dei
+libri sta in un altro database, e una chiave esterna fra database non esiste.
+
+Il progetto è stato montato con i comandi del template:
+
+\`\`\`bash
+task db-config DBNAME=biblioteca USER=bib PASSWORD=bib2026
+task new-service NAME=catalogo-service
+task use-postgres SERVICE=catalogo-service
+task new-service NAME=prestiti-service
+task use-postgres SERVICE=prestiti-service DBNAME=prestiti
+task new-service NAME=biblioteca-ui UI=1 PORT=8090
+task add-dep SERVICE=prestiti-service DEPS=test
+task seed-data
+\`\`\`
+
+## Endpoint
+
+| Metodo | Percorso | Servizio | Risponde |
+| :--- | :--- | :--- | :--- |
+| GET | \`/api/libri\` | catalogo | 200 |
+| GET | \`/api/libri/disponibili\` | catalogo | 200 |
+| GET | \`/api/libri/{id}\` | catalogo | 200, 404 |
+| PUT | \`/api/libri/{id}/disponibilita?disponibile=\` | catalogo | 200, 404 |
+| GET | \`/api/prestiti\` | prestiti | 200, con ritardo e penale a oggi |
+| POST | \`/api/prestiti\` | prestiti | 201; 400; 404 libro inesistente; 409 già in prestito |
+| PUT | \`/api/prestiti/{id}/restituzione\` | prestiti | 200; 404; 409 già chiuso |
+| GET | \`/\` | biblioteca-ui | la pagina |
+| POST | \`/prestiti\` | biblioteca-ui | il form del prestito, poi redirect |
+| POST | \`/prestiti/{id}/restituzione\` | biblioteca-ui | il bottone della restituzione, poi redirect |
+
+## L'algoritmo della penale
+
+ritardo = max(0, giorni fra scadenza e riferimento), dove il riferimento è la
+data di restituzione per un prestito chiuso e oggi per uno aperto;
+penale = min(0,50 × ritardo; 20,00). Due funzioni pure in \`PrestitoService\`,
+provate da \`PenaleTest\`:
+
+\`\`\`bash
+cd demo && ./mvnw -pl prestiti-service -am test
+\`\`\`
+
+## Avvio e collaudo
+
+\`\`\`bash
+task dev
+\`\`\`
+
+oppure, tutto in container, \`task docker-up\`. Poi:
+
+\`\`\`bash
+powershell -ExecutionPolicy Bypass -File test_e2e_biblioteca.ps1
+\`\`\`
+
+prova ogni flusso: Eureka e le health, il catalogo, un prestito (201), lo
+stesso libro due volte (409), un libro inesistente (404), un'email sbagliata e
+troppi giorni (400), la restituzione e la seconda restituzione (409), la penale
+di ogni prestito con la formula della traccia, Swagger, e dalla pagina un form
+sbagliato, un prestito e una restituzione.
+
+| Indirizzo | Cosa |
+| :--- | :--- |
+| \`http://localhost:8090\` | l'interfaccia |
+| \`http://localhost:8761\` | la dashboard Eureka |
+| \`http://localhost:8081/swagger-ui.html\` | Swagger del catalogo |
+| \`http://localhost:8082/swagger-ui.html\` | Swagger dei prestiti |
+
+## Consegna
+
+Le parti dell'allegato scritte a mano sono in \`allegato.md\`;
+\`task consegna NOME=COGNOME_NOME\` le unisce a moduli, endpoint e schema del
+database e prepara l'archivio.
 ` }
   ],
 };

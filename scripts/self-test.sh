@@ -203,6 +203,24 @@ run_tool new-entity.sh --service epsilon-service --name Libro --fields "x:int"
 assert_fails "ha rigenerato un'entity che esisteva gia'" && assert_out_contains "gia'"
 end_case
 
+start_case "new-entity DTO=1 genera entity, dto in common-dto, service con mapper e controller con dto"
+run_tool new-entity.sh --service epsilon-service --name Editore --fields "ragioneSociale:string:required,citta:string" --dto
+assert_ok "new-entity con --dto" &&
+  assert_file "demo/common-dto/src/main/java/$(base_package "$DEMO" | tr '.' '/')/common/dto/EditoreDto.java" &&
+  assert_contains "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/service/EditoreService.java" "List<EditoreDto> elenco()" &&
+  assert_contains "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/service/EditoreService.java" "public static EditoreDto toDto(EditoreEntity entity)" &&
+  assert_contains "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/controller/EditoreController.java" "List<EditoreDto> elenco()"
+end_case
+
+start_case "add-relation configura ManyToOne e OneToMany fra due entity"
+run_tool add-relation.sh --service epsilon-service --from Libro --to Editore --type many-to-one
+assert_ok "add-relation" &&
+  assert_contains "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/entity/LibroEntity.java" "@ManyToOne(fetch = FetchType.LAZY)" &&
+  assert_contains "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/entity/LibroEntity.java" '@JoinColumn(name = "editore_id")' &&
+  assert_contains "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/entity/EditoreEntity.java" '@OneToMany(mappedBy = "editore"' &&
+  assert_contains "demo/epsilon-service/src/main/java/$(sb_package_path epsilon-service)/entity/EditoreEntity.java" "private List<LibroEntity> libroList = new ArrayList<>();"
+end_case
+
 start_case "new-dto genera record in common-dto con validazione"
 run_tool new-dto.sh --name Libro --fields "id:long,titolo:string(150):required,disponibile:bool"
 assert_ok "new-dto" &&

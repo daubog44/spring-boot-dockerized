@@ -188,7 +188,8 @@ Per non perdere ore a scrivere codice boilerplate e classi ripetitive durante l'
 | :--- | :--- | :--- |
 | **`task wizard`** | `task wizard` | Crea l'intera architettura a microservizi guidandoti passo passo. |
 | **`task new-service`** | `task new-service NAME=ordini-service [UI=1] [NODB=1]` | Crea un nuovo microservizio e lo collega a pom, Dockerfile, compose, porte ed editor. |
-| **`task new-entity`** | `task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=cliente:string(100):required,quantita:int:required,totale:decimal,data:date` | Genera in blocco **Entity JPA**, **Repository**, **Service CRUD** e **Controller REST** con Swagger. |
+| **`task new-entity`** | `task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=... [DTO=1]` | Genera in blocco **Entity JPA**, **Repository**, **Service CRUD** e **Controller REST** (anche basati su DTO se `DTO=1`). |
+| **`task add-relation`** | `task add-relation SERVICE=ordini-service FROM=Ordine TO=Cliente TYPE=many-to-one` | Configura una relazione JPA (`@ManyToOne`, `@OneToMany`, `@OneToOne`, `@ManyToMany`) con `fetch = LAZY`, `@JoinColumn` e campo inverso. Interattivo se lanciato senza argomenti (`task add-relation`). |
 | **`task new-client`** | `task new-client FROM=ordini-ui TO=ordini-service DTO=OrdineDto [FIELDS=...]` | Genera interfaccia `@FeignClient(name="ORDINI-SERVICE")` e, con `FIELDS=`, anche il DTO in `common-dto`. |
 | **`task new-dto`** | `task new-dto NAME=OrdineDto FIELDS=id:long,cliente:string:required [CLASS=1]` | Genera un Java record DTO immutabile con validazioni in `common-dto`. |
 | **`task new-view`** | `task new-view SERVICE=ordini-ui NAME=Ordini FIELDS=cliente:string:required,quantita:int` | Genera controller Spring MVC (`OrdiniUiController`) e template Thymeleaf (`ordini.html`) con form e tabella. |
