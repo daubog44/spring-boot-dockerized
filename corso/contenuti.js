@@ -1,6 +1,6 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 14:00',
+  generato: '2026-09-12 14:31',
   progetto: {
     cartella: 'demo',
     pacchetto: 'esame',
@@ -1463,8 +1463,13 @@ Cosa fa per te:
 - Inserisce l'annotazione corretta con \`fetch = FetchType.LAZY\`.
 - Configura \`@JoinColumn(name = "autore_id")\` sul lato proprietario.
 - Configura il lato inverso con \`mappedBy\` e lista già inizializzata (\`= new ArrayList<>()\`).
-- Aggiunge automaticamente tutti gli \`import\` necessari (\`jakarta.persistence.*\`, \`java.util.List\`, ecc.).
+- Inserisce automaticamente \`@JsonIgnoreProperties\` su entrambi i lati per spezzare i cicli Jackson ed evitare a monte \`StackOverflowError\`!
+- Aggiunge automaticamente tutti gli \`import\` necessari (\`jakarta.persistence.*\`, \`java.util.List\`, \`com.fasterxml.jackson.annotation.JsonIgnoreProperties\`).
 - Con \`UNIDIRECTIONAL=1\` evita di aggiungere il campo inverso se ti serve unidirezionale.
+
+> 💡 **Tutti i comandi hanno il Wizard Interattivo**:
+> Non ricordi la sintassi di un comando? Lancialo **senza argomenti**!
+> \`task new-entity\`, \`task add-relation\`, \`task new-dto\`, \`task new-client\`, \`task new-view\`, \`task new-auth\`, \`task new-handler\`, \`task add-dep\`, \`task set-port\`, \`task use-postgres\`, \`task remove-service\`, \`task consegna\`: **tutti** ti fanno domande guidate passo-passo nel terminale!
 
 ---
 
@@ -4142,6 +4147,11 @@ Queste cose non le copre il ciclo \`task compile\`, perché toccano più file ch
 devono restare d'accordo fra loro. Per ognuna c'è un comando, e tutti si usano
 allo stesso modo: **variabili \`NOME=valore\`, senza trattini**.
 
+> 💡 **MODALITÀ INTERATTIVA (WIZARD) PER TUTTI I COMANDI**:
+> Non ricordi la sintassi o i parametri esatti? **Lancia il comando da solo, senza argomenti!**
+> Per esempio: \`task new-service\`, \`task new-entity\`, \`task add-relation\`, \`task new-client\`, \`task new-dto\`, \`task new-view\`, \`task new-auth\`, \`task new-handler\`, \`task add-dep\`, \`task set-port\`, \`task remove-service\`, \`task use-postgres\`, \`task consegna\`.
+> Ognuno di essi aprirà un comodo menu interattivo guidato nel terminale che rileverà i moduli e le opzioni disponibili e ti farà le domande passo dopo passo.
+
 \`task help\` (o \`task\` da solo) stampa l'elenco; \`task --summary <comando>\` il
 dettaglio di uno.
 
@@ -4196,6 +4206,7 @@ Per una prova al volo, senza toccare i file, resta \`task dev UI_PORT=9080\`.
 task new-service NAME=ordini-service
 \`\`\`
 
+Oppure lancialo senza argomenti (\`task new-service\`) per farti guidare dal wizard!
 Crea il modulo (pom, \`Main\`, \`application.yml\`, un endpoint \`/api/ping\`) e lo
 collega dove serve: \`<modules>\` del pom aggregatore, \`COPY\` nel \`Dockerfile\`,
 blocco in \`docker-compose.yml\`, lista dei servizi di \`task dev\`. La porta è la
@@ -4211,14 +4222,31 @@ Poi \`task dev\`, e il servizio nuovo si registra su Eureka con gli altri.
 Invece di scrivere a mano le classi ripetitive di ogni tabella:
 
 \`\`\`bash
-task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal:required,data:date
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal:required,data:date DTO=1
 \`\`\`
 
-Genera le quattro classi canoniche nello standard del progetto:
+Oppure semplicemente \`task new-entity\` per la modalità interattiva!
+Genera le classi canoniche nello standard del progetto:
 - \`OrdineEntity.java\` con annotazioni JPA e validazione Jakarta.
 - \`OrdineRepository.java\` che estende \`JpaRepository\`.
-- \`OrdineService.java\` con il CRUD pronto.
+- \`OrdineDto.java\` in \`common-dto\` (se \`DTO=1\`).
+- \`OrdineService.java\` con il CRUD pronto (e mapper Entity <-> DTO).
 - \`OrdineController.java\` con gli endpoint REST documentati in OpenAPI/Swagger.
+
+### Collegare le relazioni JPA: task add-relation
+
+Per collegare due tabelle dello stesso database relazionale:
+
+\`\`\`bash
+task add-relation SERVICE=catalogo-service FROM=Libro TO=Categoria TYPE=many-to-one
+\`\`\`
+
+Oppure \`task add-relation\` senza parametri per scegliere entità e cardinalità dal menu interattivo!
+Il comando:
+- Inserisce \`@ManyToOne\`, \`@OneToMany\`, \`@OneToOne\` o \`@ManyToMany\` con \`fetch = FetchType.LAZY\`.
+- Configura \`@JoinColumn\` sul lato proprietario e \`mappedBy\` sul lato inverso.
+- Inserisce automaticamente \`@JsonIgnoreProperties\` su entrambi i lati per spezzare qualsiasi ciclo di serializzazione Jackson ed evitare lo \`StackOverflowError\` a monte!
+- Importa tutte le annotazioni e collezioni necessarie.
 
 ### Contratti DTO e Feign Client in un solo comando: task new-client e task new-dto
 

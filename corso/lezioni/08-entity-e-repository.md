@@ -449,8 +449,13 @@ Cosa fa per te:
 - Inserisce l'annotazione corretta con `fetch = FetchType.LAZY`.
 - Configura `@JoinColumn(name = "autore_id")` sul lato proprietario.
 - Configura il lato inverso con `mappedBy` e lista già inizializzata (`= new ArrayList<>()`).
-- Aggiunge automaticamente tutti gli `import` necessari (`jakarta.persistence.*`, `java.util.List`, ecc.).
+- Inserisce automaticamente `@JsonIgnoreProperties` su entrambi i lati per spezzare i cicli Jackson ed evitare a monte `StackOverflowError`!
+- Aggiunge automaticamente tutti gli `import` necessari (`jakarta.persistence.*`, `java.util.List`, `com.fasterxml.jackson.annotation.JsonIgnoreProperties`).
 - Con `UNIDIRECTIONAL=1` evita di aggiungere il campo inverso se ti serve unidirezionale.
+
+> 💡 **Tutti i comandi hanno il Wizard Interattivo**:
+> Non ricordi la sintassi di un comando? Lancialo **senza argomenti**!
+> `task new-entity`, `task add-relation`, `task new-dto`, `task new-client`, `task new-view`, `task new-auth`, `task new-handler`, `task add-dep`, `task set-port`, `task use-postgres`, `task remove-service`, `task consegna`: **tutti** ti fanno domande guidate passo-passo nel terminale!
 
 ---
 

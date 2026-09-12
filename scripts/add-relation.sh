@@ -17,6 +17,7 @@ TO=""
 TYPE="many-to-one"
 FIELD=""
 UNIDIRECTIONAL=0
+DTO=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -26,6 +27,7 @@ while [ $# -gt 0 ]; do
     -Type|--type) TYPE="$2"; shift 2 ;;
     -Field|--field) FIELD="$2"; shift 2 ;;
     -Unidirectional|--unidirectional) UNIDIRECTIONAL=1; shift 1 ;;
+    -Dto|--dto) DTO=1; shift 1 ;;
     *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
   esac
 done
@@ -229,12 +231,23 @@ add_field_before_last_brace() {
 
 case "$TYPE_LOWER" in
   many-to-one)
-    FROM_BLOCK=$(cat <<EOF
+    if [ "$UNIDIRECTIONAL" -eq 0 ]; then
+      FROM_BLOCK=$(cat <<EOF
+    @JsonIgnoreProperties("${TO_FIELD_NAME}")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "${TO_SNAKE}_id")
     private ${CLEAN_TO}Entity ${FROM_FIELD_NAME};
 EOF
 )
+      add_import_if_missing "$FROM_FILE" "com.fasterxml.jackson.annotation.JsonIgnoreProperties"
+    else
+      FROM_BLOCK=$(cat <<EOF
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "${TO_SNAKE}_id")
+    private ${CLEAN_TO}Entity ${FROM_FIELD_NAME};
+EOF
+)
+    fi
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.ManyToOne"
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.JoinColumn"
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.FetchType"
@@ -243,6 +256,7 @@ EOF
 
     if [ "$UNIDIRECTIONAL" -eq 0 ]; then
       TO_BLOCK=$(cat <<EOF
+    @JsonIgnoreProperties("${FROM_FIELD_NAME}")
     @OneToMany(mappedBy = "${FROM_FIELD_NAME}", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<${CLEAN_FROM}Entity> ${TO_FIELD_NAME} = new ArrayList<>();
 EOF
@@ -251,17 +265,28 @@ EOF
       add_import_if_missing "$TO_FILE" "jakarta.persistence.CascadeType"
       add_import_if_missing "$TO_FILE" "java.util.List"
       add_import_if_missing "$TO_FILE" "java.util.ArrayList"
+      add_import_if_missing "$TO_FILE" "com.fasterxml.jackson.annotation.JsonIgnoreProperties"
       add_field_before_last_brace "$TO_FILE" "$TO_BLOCK" "$TO_FIELD_NAME"
       sb_step "Aggiunto @OneToMany $TO_FIELD_NAME in ${CLEAN_TO}Entity.java"
     fi
     ;;
 
   one-to-many)
-    FROM_BLOCK=$(cat <<EOF
+    if [ "$UNIDIRECTIONAL" -eq 0 ]; then
+      FROM_BLOCK=$(cat <<EOF
+    @JsonIgnoreProperties("${TO_FIELD_NAME}")
     @OneToMany(mappedBy = "${TO_FIELD_NAME}", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<${CLEAN_TO}Entity> ${FROM_FIELD_NAME} = new ArrayList<>();
 EOF
 )
+      add_import_if_missing "$FROM_FILE" "com.fasterxml.jackson.annotation.JsonIgnoreProperties"
+    else
+      FROM_BLOCK=$(cat <<EOF
+    @OneToMany(mappedBy = "${TO_FIELD_NAME}", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<${CLEAN_TO}Entity> ${FROM_FIELD_NAME} = new ArrayList<>();
+EOF
+)
+    fi
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.OneToMany"
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.CascadeType"
     add_import_if_missing "$FROM_FILE" "java.util.List"
@@ -271,6 +296,7 @@ EOF
 
     if [ "$UNIDIRECTIONAL" -eq 0 ]; then
       TO_BLOCK=$(cat <<EOF
+    @JsonIgnoreProperties("${FROM_FIELD_NAME}")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "${FROM_SNAKE}_id")
     private ${CLEAN_FROM}Entity ${TO_FIELD_NAME};
@@ -279,18 +305,30 @@ EOF
       add_import_if_missing "$TO_FILE" "jakarta.persistence.ManyToOne"
       add_import_if_missing "$TO_FILE" "jakarta.persistence.JoinColumn"
       add_import_if_missing "$TO_FILE" "jakarta.persistence.FetchType"
+      add_import_if_missing "$TO_FILE" "com.fasterxml.jackson.annotation.JsonIgnoreProperties"
       add_field_before_last_brace "$TO_FILE" "$TO_BLOCK" "$TO_FIELD_NAME"
       sb_step "Aggiunto @ManyToOne $TO_FIELD_NAME in ${CLEAN_TO}Entity.java"
     fi
     ;;
 
   one-to-one)
-    FROM_BLOCK=$(cat <<EOF
+    if [ "$UNIDIRECTIONAL" -eq 0 ]; then
+      FROM_BLOCK=$(cat <<EOF
+    @JsonIgnoreProperties("${TO_FIELD_NAME}")
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "${TO_SNAKE}_id", unique = true)
     private ${CLEAN_TO}Entity ${FROM_FIELD_NAME};
 EOF
 )
+      add_import_if_missing "$FROM_FILE" "com.fasterxml.jackson.annotation.JsonIgnoreProperties"
+    else
+      FROM_BLOCK=$(cat <<EOF
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "${TO_SNAKE}_id", unique = true)
+    private ${CLEAN_TO}Entity ${FROM_FIELD_NAME};
+EOF
+)
+    fi
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.OneToOne"
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.JoinColumn"
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.FetchType"
@@ -300,12 +338,14 @@ EOF
 
     if [ "$UNIDIRECTIONAL" -eq 0 ]; then
       TO_BLOCK=$(cat <<EOF
+    @JsonIgnoreProperties("${FROM_FIELD_NAME}")
     @OneToOne(mappedBy = "${FROM_FIELD_NAME}", fetch = FetchType.LAZY)
     private ${CLEAN_FROM}Entity ${TO_FIELD_NAME};
 EOF
 )
       add_import_if_missing "$TO_FILE" "jakarta.persistence.OneToOne"
       add_import_if_missing "$TO_FILE" "jakarta.persistence.FetchType"
+      add_import_if_missing "$TO_FILE" "com.fasterxml.jackson.annotation.JsonIgnoreProperties"
       add_field_before_last_brace "$TO_FILE" "$TO_BLOCK" "$TO_FIELD_NAME"
       sb_step "Aggiunto @OneToOne $TO_FIELD_NAME in ${CLEAN_TO}Entity.java"
     fi
@@ -313,7 +353,9 @@ EOF
 
   many-to-many)
     JOIN_TABLE="${FROM_SNAKE}_${TO_SNAKE}"
-    FROM_BLOCK=$(cat <<EOF
+    if [ "$UNIDIRECTIONAL" -eq 0 ]; then
+      FROM_BLOCK=$(cat <<EOF
+    @JsonIgnoreProperties("${TO_FIELD_NAME}")
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "${JOIN_TABLE}",
@@ -323,6 +365,19 @@ EOF
     private Set<${CLEAN_TO}Entity> ${FROM_FIELD_NAME} = new HashSet<>();
 EOF
 )
+      add_import_if_missing "$FROM_FILE" "com.fasterxml.jackson.annotation.JsonIgnoreProperties"
+    else
+      FROM_BLOCK=$(cat <<EOF
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "${JOIN_TABLE}",
+        joinColumns = @JoinColumn(name = "${FROM_SNAKE}_id"),
+        inverseJoinColumns = @JoinColumn(name = "${TO_SNAKE}_id")
+    )
+    private Set<${CLEAN_TO}Entity> ${FROM_FIELD_NAME} = new HashSet<>();
+EOF
+)
+    fi
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.ManyToMany"
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.JoinTable"
     add_import_if_missing "$FROM_FILE" "jakarta.persistence.JoinColumn"
@@ -334,6 +389,7 @@ EOF
 
     if [ "$UNIDIRECTIONAL" -eq 0 ]; then
       TO_BLOCK=$(cat <<EOF
+    @JsonIgnoreProperties("${FROM_FIELD_NAME}")
     @ManyToMany(mappedBy = "${FROM_FIELD_NAME}", fetch = FetchType.LAZY)
     private Set<${CLEAN_FROM}Entity> ${TO_FIELD_NAME} = new HashSet<>();
 EOF
@@ -342,6 +398,7 @@ EOF
       add_import_if_missing "$TO_FILE" "jakarta.persistence.FetchType"
       add_import_if_missing "$TO_FILE" "java.util.Set"
       add_import_if_missing "$TO_FILE" "java.util.HashSet"
+      add_import_if_missing "$TO_FILE" "com.fasterxml.jackson.annotation.JsonIgnoreProperties"
       add_field_before_last_brace "$TO_FILE" "$TO_BLOCK" "$TO_FIELD_NAME"
       sb_step "Aggiunto @ManyToMany $TO_FIELD_NAME in ${CLEAN_TO}Entity.java"
     fi
@@ -352,6 +409,72 @@ EOF
     exit 1
     ;;
 esac
+
+# --- Automazione DTO in DTO ---
+FROM_DTO_FILE=""
+TO_DTO_FILE=""
+if [ -d "$DEMO_DIR/common-dto/src/main/java" ]; then
+  FROM_DTO_FILE="$(find "$DEMO_DIR/common-dto/src/main/java" -name "${CLEAN_FROM}Dto.java" 2>/dev/null | head -n 1 || true)"
+  TO_DTO_FILE="$(find "$DEMO_DIR/common-dto/src/main/java" -name "${CLEAN_TO}Dto.java" 2>/dev/null | head -n 1 || true)"
+fi
+
+if [ -n "$FROM_DTO_FILE" ] && [ -n "$TO_DTO_FILE" ] && [ -f "$FROM_DTO_FILE" ] && [ -f "$TO_DTO_FILE" ]; then
+  SHOULD_UPDATE_DTO=$DTO
+  if [ "$DTO" -eq 0 ] && [ -t 0 ]; then
+    echo ""
+    echo "Trovati ${CLEAN_FROM}Dto e ${CLEAN_TO}Dto in common-dto."
+    printf "  Vuoi aggiornare ${CLEAN_FROM}Dto col pattern DTO in DTO (${CLEAN_TO}Dto annidato) e il Service? [S/n] > "
+    read -r ANS
+    case "$ANS" in
+      [nN]*) SHOULD_UPDATE_DTO=0 ;;
+      *) SHOULD_UPDATE_DTO=1 ;;
+    esac
+  fi
+
+  if [ "$SHOULD_UPDATE_DTO" -eq 1 ]; then
+    if ! grep -q "${CLEAN_TO}Dto" "$FROM_DTO_FILE"; then
+      python3 -c "
+with open('$FROM_DTO_FILE', 'r', encoding='utf-8') as f:
+    content = f.read()
+idx = content.rfind(')')
+if idx > 0:
+    before = content[:idx].rstrip()
+    after = content[idx:]
+    comma = ',' if not before.endswith(('(', ',')) else ''
+    new_param = f'{comma}\n    ${CLEAN_TO}Dto ${FROM_FIELD_NAME},\n    Long ${FROM_FIELD_NAME}Id\n'
+    with open('$FROM_DTO_FILE', 'w', encoding='utf-8') as f:
+        f.write(before + new_param + after)
+" 2>/dev/null || true
+      sb_step "Aggiornato DTO con ${CLEAN_TO}Dto ${FROM_FIELD_NAME}: $FROM_DTO_FILE"
+    fi
+
+    SERVICE_FILE="$MODULE_DIR/src/main/java/$PKG_PATH/service/${CLEAN_FROM}Service.java"
+    TO_REPO_FILE="$MODULE_DIR/src/main/java/$PKG_PATH/repository/${CLEAN_TO}Repository.java"
+    if [ -f "$SERVICE_FILE" ]; then
+      TO_CAMEL="$(to_camel "$CLEAN_TO")"
+      REPO_FIELD_NAME="${TO_CAMEL}Repository"
+      python3 -c "
+with open('$SERVICE_FILE', 'r', encoding='utf-8') as f:
+    s = f.read()
+if '$REPO_FIELD_NAME' not in s:
+    s = s.replace('repository;', 'repository;\n    private final $PKG.repository.${CLEAN_TO}Repository $REPO_FIELD_NAME;')
+if 'crea(' in s and 'set${CLEAN_TO}' not in s:
+    s = s.replace('entity.setId(null);', 'entity.setId(null);\n        if (nuovo.${FROM_FIELD_NAME}Id() != null) {\n            $REPO_FIELD_NAME.findById(nuovo.${FROM_FIELD_NAME}Id()).ifPresent(entity::set${CLEAN_TO});\n        }')
+if 'aggiorna(' in s and 'set${CLEAN_TO}' not in s:
+    s = s.replace('return toDto(repository.save(esistente));', 'if (dati.${FROM_FIELD_NAME}Id() != null) {\n            $REPO_FIELD_NAME.findById(dati.${FROM_FIELD_NAME}Id()).ifPresent(esistente::set${CLEAN_TO});\n        }\n        return toDto(repository.save(esistente));')
+if 'toDto(' in s and '${FROM_FIELD_NAME}Dto' not in s:
+    pascal = '${FROM_FIELD_NAME}'.capitalize()
+    mapping = '        ${CLEAN_TO}Dto ${FROM_FIELD_NAME}Dto = $PKG.service.${CLEAN_TO}Service.toDto(entity.get' + pascal + '());\n        Long ${FROM_FIELD_NAME}Id = entity.get' + pascal + '() != null ? entity.get' + pascal + '().getId() : null;\n'
+    s = s.replace('if (entity == null) return null;\n', 'if (entity == null) return null;\n' + mapping)
+    import re
+    s = re.sub(r'(return new ${CLEAN_FROM}Dto\([\s\S]*?entity\.\w+\(\))(\s*\);)', r'\1,\n            ${FROM_FIELD_NAME}Dto,\n            ${FROM_FIELD_NAME}Id\2', s)
+with open('$SERVICE_FILE', 'w', encoding='utf-8') as f:
+    f.write(s)
+" 2>/dev/null || true
+      sb_step "Aggiornato Service con mapper DTO in DTO: $SERVICE_FILE"
+    fi
+  fi
+fi
 
 echo ""
 echo "Relazione $TYPE configurata con successo!"

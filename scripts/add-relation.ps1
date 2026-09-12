@@ -39,7 +39,8 @@ param(
     [string]$To = '',
     [string]$Type = 'many-to-one',
     [string]$Field = '',
-    [switch]$Unidirectional
+    [switch]$Unidirectional,
+    [switch]$Dto
 )
 
 $ErrorActionPreference = 'Stop'
@@ -252,21 +253,35 @@ Write-Host "==> Configurazione relazione $cleanType tra $cleanFrom e $cleanTo in
 
 switch ($cleanType) {
     'many-to-one' {
-        $fromBlock = @"
+        $fromBlock = if (-not $Unidirectional) {
+@"
+    @JsonIgnoreProperties("${toFieldName}")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "${toSnake}_id")
     private ${cleanTo}Entity ${fromFieldName};
 "@
-        Add-ImportsToJava -FilePath $fromFile -NewImports @(
+        } else {
+@"
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "${toSnake}_id")
+    private ${cleanTo}Entity ${fromFieldName};
+"@
+        }
+        $fromImports = @(
             'jakarta.persistence.ManyToOne',
             'jakarta.persistence.JoinColumn',
             'jakarta.persistence.FetchType'
         )
+        if (-not $Unidirectional) {
+            $fromImports += 'com.fasterxml.jackson.annotation.JsonIgnoreProperties'
+        }
+        Add-ImportsToJava -FilePath $fromFile -NewImports $fromImports
         Add-FieldToEntity -FilePath $fromFile -FieldBlock $fromBlock -CheckFieldName $fromFieldName
         Write-Step "Aggiunto @ManyToOne $fromFieldName in ${cleanFrom}Entity.java"
 
         if (-not $Unidirectional) {
             $toBlock = @"
+    @JsonIgnoreProperties("${fromFieldName}")
     @OneToMany(mappedBy = "${fromFieldName}", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<${cleanFrom}Entity> ${toFieldName} = new ArrayList<>();
 "@
@@ -274,7 +289,8 @@ switch ($cleanType) {
                 'jakarta.persistence.OneToMany',
                 'jakarta.persistence.CascadeType',
                 'java.util.List',
-                'java.util.ArrayList'
+                'java.util.ArrayList',
+                'com.fasterxml.jackson.annotation.JsonIgnoreProperties'
             )
             Add-FieldToEntity -FilePath $toFile -FieldBlock $toBlock -CheckFieldName $toFieldName
             Write-Step "Aggiunto @OneToMany $toFieldName in ${cleanTo}Entity.java"
@@ -282,21 +298,34 @@ switch ($cleanType) {
     }
 
     'one-to-many' {
-        $fromBlock = @"
+        $fromBlock = if (-not $Unidirectional) {
+@"
+    @JsonIgnoreProperties("${toFieldName}")
     @OneToMany(mappedBy = "${toFieldName}", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<${cleanTo}Entity> ${fromFieldName} = new ArrayList<>();
 "@
-        Add-ImportsToJava -FilePath $fromFile -NewImports @(
+        } else {
+@"
+    @OneToMany(mappedBy = "${toFieldName}", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<${cleanTo}Entity> ${fromFieldName} = new ArrayList<>();
+"@
+        }
+        $fromImports = @(
             'jakarta.persistence.OneToMany',
             'jakarta.persistence.CascadeType',
             'java.util.List',
             'java.util.ArrayList'
         )
+        if (-not $Unidirectional) {
+            $fromImports += 'com.fasterxml.jackson.annotation.JsonIgnoreProperties'
+        }
+        Add-ImportsToJava -FilePath $fromFile -NewImports $fromImports
         Add-FieldToEntity -FilePath $fromFile -FieldBlock $fromBlock -CheckFieldName $fromFieldName
         Write-Step "Aggiunto @OneToMany $fromFieldName in ${cleanFrom}Entity.java"
 
         if (-not $Unidirectional) {
             $toBlock = @"
+    @JsonIgnoreProperties("${fromFieldName}")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "${fromSnake}_id")
     private ${cleanFrom}Entity ${toFieldName};
@@ -304,7 +333,8 @@ switch ($cleanType) {
             Add-ImportsToJava -FilePath $toFile -NewImports @(
                 'jakarta.persistence.ManyToOne',
                 'jakarta.persistence.JoinColumn',
-                'jakarta.persistence.FetchType'
+                'jakarta.persistence.FetchType',
+                'com.fasterxml.jackson.annotation.JsonIgnoreProperties'
             )
             Add-FieldToEntity -FilePath $toFile -FieldBlock $toBlock -CheckFieldName $toFieldName
             Write-Step "Aggiunto @ManyToOne $toFieldName in ${cleanTo}Entity.java"
@@ -312,28 +342,43 @@ switch ($cleanType) {
     }
 
     'one-to-one' {
-        $fromBlock = @"
+        $fromBlock = if (-not $Unidirectional) {
+@"
+    @JsonIgnoreProperties("${toFieldName}")
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "${toSnake}_id", unique = true)
     private ${cleanTo}Entity ${fromFieldName};
 "@
-        Add-ImportsToJava -FilePath $fromFile -NewImports @(
+        } else {
+@"
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "${toSnake}_id", unique = true)
+    private ${cleanTo}Entity ${fromFieldName};
+"@
+        }
+        $fromImports = @(
             'jakarta.persistence.OneToOne',
             'jakarta.persistence.JoinColumn',
             'jakarta.persistence.FetchType',
             'jakarta.persistence.CascadeType'
         )
+        if (-not $Unidirectional) {
+            $fromImports += 'com.fasterxml.jackson.annotation.JsonIgnoreProperties'
+        }
+        Add-ImportsToJava -FilePath $fromFile -NewImports $fromImports
         Add-FieldToEntity -FilePath $fromFile -FieldBlock $fromBlock -CheckFieldName $fromFieldName
         Write-Step "Aggiunto @OneToOne $fromFieldName in ${cleanFrom}Entity.java"
 
         if (-not $Unidirectional) {
             $toBlock = @"
+    @JsonIgnoreProperties("${fromFieldName}")
     @OneToOne(mappedBy = "${fromFieldName}", fetch = FetchType.LAZY)
     private ${cleanFrom}Entity ${toFieldName};
 "@
             Add-ImportsToJava -FilePath $toFile -NewImports @(
                 'jakarta.persistence.OneToOne',
-                'jakarta.persistence.FetchType'
+                'jakarta.persistence.FetchType',
+                'com.fasterxml.jackson.annotation.JsonIgnoreProperties'
             )
             Add-FieldToEntity -FilePath $toFile -FieldBlock $toBlock -CheckFieldName $toFieldName
             Write-Step "Aggiunto @OneToOne $toFieldName in ${cleanTo}Entity.java"
@@ -342,7 +387,9 @@ switch ($cleanType) {
 
     'many-to-many' {
         $joinTable = "${fromSnake}_${toSnake}"
-        $fromBlock = @"
+        $fromBlock = if (-not $Unidirectional) {
+@"
+    @JsonIgnoreProperties("${toFieldName}")
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "${joinTable}",
@@ -351,7 +398,18 @@ switch ($cleanType) {
     )
     private Set<${cleanTo}Entity> ${fromFieldName} = new HashSet<>();
 "@
-        Add-ImportsToJava -FilePath $fromFile -NewImports @(
+        } else {
+@"
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "${joinTable}",
+        joinColumns = @JoinColumn(name = "${fromSnake}_id"),
+        inverseJoinColumns = @JoinColumn(name = "${toSnake}_id")
+    )
+    private Set<${cleanTo}Entity> ${fromFieldName} = new HashSet<>();
+"@
+        }
+        $fromImports = @(
             'jakarta.persistence.ManyToMany',
             'jakarta.persistence.JoinTable',
             'jakarta.persistence.JoinColumn',
@@ -359,11 +417,16 @@ switch ($cleanType) {
             'java.util.Set',
             'java.util.HashSet'
         )
+        if (-not $Unidirectional) {
+            $fromImports += 'com.fasterxml.jackson.annotation.JsonIgnoreProperties'
+        }
+        Add-ImportsToJava -FilePath $fromFile -NewImports $fromImports
         Add-FieldToEntity -FilePath $fromFile -FieldBlock $fromBlock -CheckFieldName $fromFieldName
         Write-Step "Aggiunto @ManyToMany $fromFieldName in ${cleanFrom}Entity.java"
 
         if (-not $Unidirectional) {
             $toBlock = @"
+    @JsonIgnoreProperties("${fromFieldName}")
     @ManyToMany(mappedBy = "${fromFieldName}", fetch = FetchType.LAZY)
     private Set<${cleanFrom}Entity> ${toFieldName} = new HashSet<>();
 "@
@@ -371,10 +434,81 @@ switch ($cleanType) {
                 'jakarta.persistence.ManyToMany',
                 'jakarta.persistence.FetchType',
                 'java.util.Set',
-                'java.util.HashSet'
+                'java.util.HashSet',
+                'com.fasterxml.jackson.annotation.JsonIgnoreProperties'
             )
             Add-FieldToEntity -FilePath $toFile -FieldBlock $toBlock -CheckFieldName $toFieldName
             Write-Step "Aggiunto @ManyToMany $toFieldName in ${cleanTo}Entity.java"
+        }
+    }
+}
+
+# --- Automazione DTO in DTO ---
+$commonDtoDir = Join-Path $demoDir 'common-dto/src/main/java'
+$fromDtoFiles = @(Get-ChildItem -Path $commonDtoDir -Recurse -Filter "${cleanFrom}Dto.java" -ErrorAction SilentlyContinue)
+$toDtoFiles = @(Get-ChildItem -Path $commonDtoDir -Recurse -Filter "${cleanTo}Dto.java" -ErrorAction SilentlyContinue)
+
+if ($fromDtoFiles.Count -gt 0 -and $toDtoFiles.Count -gt 0) {
+    $fromDtoPath = $fromDtoFiles[0].FullName
+    $toDtoPath = $toDtoFiles[0].FullName
+
+    $shouldUpdateDto = $Dto
+    if (-not $Dto -and -not [Console]::IsInputRedirected) {
+        Write-Host ''
+        Write-Host "Trovati ${cleanFrom}Dto e ${cleanTo}Dto in common-dto." -ForegroundColor Cyan
+        $ans = Read-Host "  Vuoi aggiornare ${cleanFrom}Dto col pattern DTO in DTO (${cleanTo}Dto annidato) e il Service? [S/n] >"
+        if ($ans -match '^(s|si|y|yes)?$' -or -not $ans) { $shouldUpdateDto = $true }
+    }
+
+    if ($shouldUpdateDto) {
+        # 1. Aggiorna FromDto.java
+        $dtoContent = Read-TextFile $fromDtoPath
+        if ($dtoContent -notmatch "\b${cleanTo}Dto\b") {
+            $lastCloseParen = $dtoContent.LastIndexOf(')')
+            if ($lastCloseParen -gt 0) {
+                $beforeParen = $dtoContent.Substring(0, $lastCloseParen).TrimEnd()
+                $afterParen = $dtoContent.Substring($lastCloseParen)
+                $eol = Get-TextEol $dtoContent
+                $needsComma = ($beforeParen.TrimEnd() -notmatch '[\(\,]$')
+                $newParams = if ($needsComma) { ",${eol}    ${cleanTo}Dto ${fromFieldName},${eol}    Long ${fromFieldName}Id" } else { "${eol}    ${cleanTo}Dto ${fromFieldName},${eol}    Long ${fromFieldName}Id" }
+                $updatedDtoContent = $beforeParen + $newParams + $eol + $afterParen
+                Write-TextFile -Path $fromDtoPath -Text $updatedDtoContent
+                Write-Step "Aggiornato DTO con ${cleanTo}Dto ${fromFieldName}: $fromDtoPath"
+            }
+        }
+
+        # 2. Aggiorna FromService.java se esiste
+        $serviceFile = Join-Path $moduleDir "src/main/java/$packagePath/service/${cleanFrom}Service.java"
+        $toRepoFile = Join-Path $moduleDir "src/main/java/$packagePath/repository/${cleanTo}Repository.java"
+        if (Test-Path $serviceFile) {
+            $svcContent = Read-TextFile $serviceFile
+            $eol = Get-TextEol $svcContent
+
+            $toCamel = $cleanTo.Substring(0, 1).ToLowerInvariant() + $cleanTo.Substring(1)
+            $repoFieldName = "${toCamel}Repository"
+
+            if ((Test-Path $toRepoFile) -and ($svcContent -notmatch "\b$repoFieldName\b")) {
+                $svcContent = $svcContent -replace "(private final ${cleanFrom}Repository\s+repository;)", "`$1${eol}    private final ${package}.repository.${cleanTo}Repository ${repoFieldName};"
+            }
+
+            if ($svcContent -match "public ${cleanFrom}Dto crea\(" -and $svcContent -notmatch "set${cleanTo}") {
+                $svcContent = $svcContent -replace "(entity\.setId\(null\);)", "`$1${eol}        if (nuovo.${fromFieldName}Id() != null) {${eol}            ${repoFieldName}.findById(nuovo.${fromFieldName}Id()).ifPresent(entity::set${cleanTo});${eol}        }"
+            }
+
+            if ($svcContent -match "public ${cleanFrom}Dto aggiorna\(" -and $svcContent -notmatch "esistente\.set${cleanTo}") {
+                $svcContent = $svcContent -replace "(return toDto\(repository\.save\(esistente\)\);)", "if (dati.${fromFieldName}Id() != null) {${eol}            ${repoFieldName}.findById(dati.${fromFieldName}Id()).ifPresent(esistente::set${cleanTo});${eol}        }${eol}        `$1"
+            }
+
+            if ($svcContent -match "public static ${cleanFrom}Dto toDto\(${cleanFrom}Entity entity\)" -and $svcContent -notmatch "${fromFieldName}Dto") {
+                $pascalFromField = $fromFieldName.Substring(0, 1).ToUpperInvariant() + $fromFieldName.Substring(1)
+                $mappingCode = "        ${cleanTo}Dto ${fromFieldName}Dto = ${package}.service.${cleanTo}Service.toDto(entity.get${pascalFromField}());${eol}        Long ${fromFieldName}Id = entity.get${pascalFromField}() != null ? entity.get${pascalFromField}().getId() : null;"
+                $svcContent = $svcContent -replace "(if \(entity == null\) return null;)", "`$1${eol}$mappingCode"
+
+                $svcContent = $svcContent -replace "(return new ${cleanFrom}Dto\([\s\S]*?)(entity\.get\w+\(\)|entity\.getId\(\))([\r\n\s]*\);)", "`$1`$2,${eol}            ${fromFieldName}Dto,${eol}            ${fromFieldName}Id`$3"
+            }
+
+            Write-TextFile -Path $serviceFile -Text $svcContent
+            Write-Step "Aggiornato Service con mapper DTO in DTO: $serviceFile"
         }
     }
 }
