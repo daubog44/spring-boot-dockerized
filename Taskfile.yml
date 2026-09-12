@@ -83,7 +83,7 @@ tasks:
 
       Esempi:
         task wizard
-        task wizard SERVICE=tourist-service
+        task wizard SERVICE=ordini-service
 
       Serve un terminale vero: fa domande.
     cmds:
@@ -274,13 +274,14 @@ tasks:
         TYPE=<tipo>            many-to-one (default) | one-to-many | one-to-one | many-to-many
         FIELD=<nomeCampo>      nome del campo Java (default: to in camelCase o plurale)
         UNIDIRECTIONAL=1       non aggiungere il campo inverso nell'altra entity
+        DTO=1                  aggiorna anche i DTO in common-dto (pattern DTO-in-DTO) e il Service
 
       Esempi:
         task add-relation
         task add-relation SERVICE=catalogo-service FROM=Libro TO=Categoria TYPE=many-to-one
         task add-relation SERVICE=catalogo-service FROM=Ordine TO=RigaOrdine TYPE=one-to-many
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/add-relation.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .FROM}} -From {{.FROM}}{{end}}{{if .TO}} -To {{.TO}}{{end}}{{if .TYPE}} -Type {{.TYPE}}{{end}}{{if .FIELD}} -Field {{.FIELD}}{{end}}{{if .UNIDIRECTIONAL}} -Unidirectional{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/add-relation.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .FROM}} --from {{.FROM}}{{end}}{{if .TO}} --to {{.TO}}{{end}}{{if .TYPE}} --type {{.TYPE}}{{end}}{{if .FIELD}} --field {{.FIELD}}{{end}}{{if .UNIDIRECTIONAL}} --unidirectional{{end}} {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/add-relation.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .FROM}} -From {{.FROM}}{{end}}{{if .TO}} -To {{.TO}}{{end}}{{if .TYPE}} -Type {{.TYPE}}{{end}}{{if .FIELD}} -Field {{.FIELD}}{{end}}{{if .UNIDIRECTIONAL}} -Unidirectional{{end}}{{if .DTO}} -Dto{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/add-relation.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .FROM}} --from {{.FROM}}{{end}}{{if .TO}} --to {{.TO}}{{end}}{{if .TYPE}} --type {{.TYPE}}{{end}}{{if .FIELD}} --field {{.FIELD}}{{end}}{{if .UNIDIRECTIONAL}} --unidirectional{{end}}{{if .DTO}} --dto{{end}} {{.CLI_ARGS}}{{end}}'
 
   new-dto:
     desc: "Genera un DTO/Record in common-dto (task new-dto NAME=Libro FIELDS=...)"
@@ -334,17 +335,20 @@ tasks:
       Genera in un modulo UI:
         1. Il controller Spring MVC (@Controller) con GET (lista) e POST (salvataggio)
         2. Il template HTML (templates/<nome>.html) con tabella reattiva e form con validazione
+        3. Se specificato CLIENT o presente un Feign client nel modulo, collega automaticamente
+           i dati (getAll) e il salvataggio (create) via Feign!
 
       Variabili:
         SERVICE=<modulo>   OBBLIGATORIA: modulo UI (es. event-ui)
         NAME=<Nome>        OBBLIGATORIA: PascalCase (es. Libri, Eventi)
         ROUTE=<percorso>   facoltativa: default /<nome>
         FIELDS=<campi>     facoltativa: nome:tipo[:required]* (string, int, long, decimal, bool, date)
+        CLIENT=<client>    facoltativa: nome del Feign client da collegare alla vista
 
       Esempio:
         task new-view SERVICE=event-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int
     cmds:
-      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-view.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .ROUTE}} -Route {{.ROUTE}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-view.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .ROUTE}} --route {{.ROUTE}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}} {{.CLI_ARGS}}{{end}}'
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-view.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .ROUTE}} -Route {{.ROUTE}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .CLIENT}} -Client {{.CLIENT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-view.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .ROUTE}} --route {{.ROUTE}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .CLIENT}} --client {{.CLIENT}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   new-auth:
     desc: "Configura autenticazione Spring Security (task new-auth SERVICE=<modulo> [TYPE=inmemory|db|form])"
@@ -636,7 +640,7 @@ tasks:
 
       Esempi:
         task seed-data
-        task seed-data SERVICE=tourist-service ROWS=10
+        task seed-data SERVICE=ordini-service ROWS=10
         task seed-data ROWS=0
 
       Un data.sql scritto da te continua a valere: le tabelle che riempie lui
@@ -775,6 +779,11 @@ tasks:
 
   docker-up:
     desc: Compila le immagini e avvia lo stack completo in Docker
+    summary: |
+      Costruisce le immagini e avvia lo stack in container: e' quello che
+      presenterai. Prima controlla che il progetto sia coerente e che le porte
+      siano usabili, perche' scoprirlo dopo dieci minuti di build non aiuta;
+      poi ferma lo stack locale, che userebbe le stesse porte.
     cmds:
       # Meglio fermarsi subito che a build finita: `task check` vede anche le
       # porte che Windows si e' riservato, e su quelle Docker non riesce a

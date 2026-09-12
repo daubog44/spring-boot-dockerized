@@ -22,12 +22,8 @@ port_name() {
   fi
   case "$1" in
     8761) echo "eureka" ;;
-    8081) echo "tourist" ;;
-    8082) echo "random" ;;
-    8083) echo "store" ;;
-    8080) echo "ui" ;;
     5432) echo "postgres" ;;
-    *)    echo "ui (--ui-port)" ;;
+    *)    echo "?" ;;
   esac
 }
 
