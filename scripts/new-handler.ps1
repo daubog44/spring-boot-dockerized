@@ -63,7 +63,8 @@ if (-not (Test-Path $controllerDir)) {
 
 $handlerFile = Join-Path $controllerDir 'GlobalExceptionHandler.java'
 if (Test-Path $handlerFile) {
-    throw "C'e' gia' $handlerFile."
+    Write-Host "  GlobalExceptionHandler gia' presente in $Service." -ForegroundColor Yellow
+    exit 0
 }
 
 $code = @"
