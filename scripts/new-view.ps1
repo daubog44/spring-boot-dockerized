@@ -30,7 +30,8 @@ param(
     [string]$Service = '',
     [string]$Name = '',
     [string]$Route = '',
-    [string]$Fields = ''
+    [string]$Fields = '',
+    [string]$Client = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -146,10 +147,128 @@ if ($fieldList.Count -eq 0) {
     $fieldList += [pscustomobject]@{ Name = 'descrizione'; JavaType = 'String'; InputType = 'text'; Required = $false }
 }
 
+# --- Rilevamento / Configurazione Client Feign ---
+if (-not $Client -and -not [Console]::IsInputRedirected) {
+    $existingClients = @(Get-ChildItem -Path (Join-Path $javaDir 'client') -Filter '*Client.java' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty BaseName)
+    if ($existingClients.Count -eq 1) {
+        $cName = $existingClients[0]
+        $ans = Read-Host "  Trovato Feign Client '$cName'. Vuoi collegarlo automaticamente alla vista? [S/n] >"
+        if ($ans -match '^(s|si|y|yes)?$' -or -not $ans) { $Client = $cName }
+    } elseif ($existingClients.Count -gt 1) {
+        Write-Host "  Trovati $($existingClients.Count) Feign Client nel modulo. Scegli quale collegare:" -ForegroundColor Cyan
+        for ($i = 0; $i -lt $existingClients.Count; $i++) {
+            Write-Host "    $($i + 1)) $($existingClients[$i])"
+        }
+        $cIdx = Read-Host "    [1] (premi Invio per primo, o 'n' per nessuno) >"
+        if ($cIdx -match '^\d+$') {
+            $Client = $existingClients[[int]$cIdx - 1]
+        } elseif ($cIdx -ne 'n') {
+            $Client = $existingClients[0]
+        }
+    }
+}
+
+$hasClient = $false
+$clientInject = ''
+$clientCallGetAll = @"
+        // Sostituisci questa lista con i dati caricati dal Feign client
+        List<${Name}Form> items = new ArrayList<>();
+        model.addAttribute("items", items);
+"@
+$clientCallCreate = @"
+        // TODO: Invia 'form' al microservizio corrispondente tramite Feign client
+        // client.create(form);
+"@
+$clientErrorCatch = @"
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("items", new ArrayList<${Name}Form>());
+            return "$slug";
+        }
+"@
+
+if ($Client) {
+    $clientFile = Join-Path $javaDir "client/$Client.java"
+    if (-not (Test-Path $clientFile)) {
+        $candidates = @(Get-ChildItem -Path (Join-Path $javaDir 'client') -Filter "${Client}*.java" -ErrorAction SilentlyContinue)
+        if ($candidates.Count -gt 0) { $clientFile = $candidates[0].FullName; $Client = $candidates[0].BaseName }
+    }
+
+    if (Test-Path $clientFile) {
+        $hasClient = $true
+        $clientCamel = $Client.Substring(0, 1).ToLowerInvariant() + $Client.Substring(1)
+        $clientInject = "    private final $package.client.$Client $clientCamel;`n"
+        $clientCallGetAll = @"
+        try {
+            model.addAttribute("items", ${clientCamel}.getAll());
+        } catch (Exception e) {
+            model.addAttribute("items", new ArrayList<>());
+            model.addAttribute("errorMessage", "Impossibile recuperare i dati dal microservizio: " + e.getMessage());
+        }
+"@
+
+        $clientErrorCatch = @"
+        if (bindingResult.hasErrors()) {
+            try { model.addAttribute("items", ${clientCamel}.getAll()); } catch (Exception e) { model.addAttribute("items", new ArrayList<>()); }
+            return "$slug";
+        }
+"@
+
+        # Cerca DTO target
+        $cContent = Read-TextFile $clientFile
+        $targetDtoName = $null
+        if ($cContent -match 'create\s*\(\s*@RequestBody\s*(\w+)\s+body\)') {
+            $targetDtoName = $Matches[1]
+        } elseif ($cContent -match 'List<(\w+)>\s+getAll\(') {
+            $targetDtoName = $Matches[1]
+        }
+
+        if ($targetDtoName -and $targetDtoName -ne 'Object') {
+            $commonDtoDir = Join-Path $demoDir 'common-dto/src/main/java'
+            $dtoFiles = @(Get-ChildItem -Path $commonDtoDir -Recurse -Filter "$targetDtoName.java" -ErrorAction SilentlyContinue)
+            if ($dtoFiles.Count -gt 0) {
+                $dtoContent = Read-TextFile $dtoFiles[0].FullName
+                $m = [regex]::Match($dtoContent, 'public\s+record\s+\w+\s*\(([\s\S]*?)\)\s*\{')
+                if ($m.Success) {
+                    $rawParams = $m.Groups[1].Value -split ','
+                    $argExprs = @()
+                    foreach ($rp in $rawParams) {
+                        $rp = $rp.Trim()
+                        if (-not $rp) { continue }
+                        $pTokens = ($rp -replace '@\w+(\([^)]*\))?', '').Trim() -split '\s+'
+                        $pName = $pTokens[-1].Trim()
+                        $pPascal = $pName.Substring(0, 1).ToUpperInvariant() + $pName.Substring(1)
+                        if ($pName -eq 'id') {
+                            $argExprs += 'null'
+                        } elseif ($fieldList | Where-Object { $_.Name -eq $pName }) {
+                            $argExprs += "form.get$pPascal()"
+                        } elseif ($pName -in @('disponibile', 'attivo')) {
+                            $argExprs += 'true'
+                        } else {
+                            $argExprs += 'null'
+                        }
+                    }
+                    $dtoArgsStr = ($argExprs | ForEach-Object { "                $_" }) -join ",`n"
+                    $clientCallCreate = @"
+        try {
+            ${clientCamel}.create(new esame.common.dto.$targetDtoName(
+$dtoArgsStr
+            ));
+        } catch (Exception e) {
+            model.addAttribute("errorMessage", "Errore nel salvataggio: " + e.getMessage());
+            try { model.addAttribute("items", ${clientCamel}.getAll()); } catch (Exception ex) { model.addAttribute("items", new ArrayList<>()); }
+            return "$slug";
+        }
+"@
+                }
+            }
+        }
+    }
+}
+
 # --- Form DTO static class dentro il Controller ---
 $formFieldLines = foreach ($f in $fieldList) {
-    $val = if ($f.Required) { "        @jakarta.validation.constraints.NotNull\n" } else { "" }
-    if ($f.Required -and $f.JavaType -eq 'String') { $val = "        @jakarta.validation.constraints.NotBlank(message = `"${f.Name} e' obbligatorio`")\n" }
+    $val = if ($f.Required) { "        @jakarta.validation.constraints.NotNull`n" } else { "" }
+    if ($f.Required -and $f.JavaType -eq 'String') { $val = "        @jakarta.validation.constraints.NotBlank(message = `"${f.Name} e' obbligatorio`")`n" }
     "${val}        private $($f.JavaType) $($f.Name);"
 }
 $formFieldsStr = $formFieldLines -join "`n"
@@ -161,7 +280,7 @@ import jakarta.validation.Valid;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.stereotype.Controller;
+$(if ($hasClient) { "import lombok.RequiredArgsConstructor;`n" })import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
@@ -174,12 +293,10 @@ import java.util.List;
  * Generato da task new-view.
  */
 @Controller
-@RequestMapping("$routePath")
+@RequestMapping("$routePath")$(if ($hasClient) { "`n@RequiredArgsConstructor" })
 public class $controllerName {
 
-    // Esempio: inietta qui il tuo client Feign per caricare i dati reali dal microservizio:
-    // private final MioServizioClient client;
-
+$clientInject
     @Getter @Setter @NoArgsConstructor
     public static class ${Name}Form {
 $formFieldsStr
@@ -187,9 +304,7 @@ $formFieldsStr
 
     @GetMapping
     public String index(Model model) {
-        // Sostituisci questa lista con i dati caricati dal Feign client
-        List<${Name}Form> items = new ArrayList<>();
-        model.addAttribute("items", items);
+$clientCallGetAll
         model.addAttribute("form", new ${Name}Form());
         return "$slug";
     }
@@ -198,15 +313,8 @@ $formFieldsStr
     public String save(@Valid @ModelAttribute("form") ${Name}Form form,
                        BindingResult bindingResult,
                        Model model) {
-        if (bindingResult.hasErrors()) {
-            // Se ci sono errori di validazione, ricarica la pagina mostrando i messaggi
-            model.addAttribute("items", new ArrayList<${Name}Form>());
-            return "$slug";
-        }
-
-        // TODO: Invia 'form' al microservizio corrispondente tramite Feign client
-        // client.create(form);
-
+$clientErrorCatch
+$clientCallCreate
         return "redirect:$routePath?success";
     }
 }
@@ -275,6 +383,10 @@ $htmlSrc = @"
 
         <div th:if="`$`{param.success}" class="alert-success">
             Operazione completata con successo!
+        </div>
+
+        <div th:if="`$`{errorMessage}" style="background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem;">
+            <span th:text="`$`{errorMessage}">Messaggio errore</span>
         </div>
 
         <h2>Elenco</h2>

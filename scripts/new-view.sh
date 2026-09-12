@@ -15,6 +15,7 @@ SERVICE=""
 NAME=""
 ROUTE=""
 FIELDS=""
+CLIENT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -22,6 +23,7 @@ while [ $# -gt 0 ]; do
     -Name|--name) NAME="$2"; shift 2 ;;
     -Route|--route) ROUTE="$2"; shift 2 ;;
     -Fields|--fields) FIELDS="$2"; shift 2 ;;
+    -Client|--client) CLIENT="$2"; shift 2 ;;
     *) echo "Argomento non riconosciuto: $1" >&2; exit 1 ;;
   esac
 done
@@ -109,6 +111,138 @@ to_pascal() {
   printf '%s%s' "$first" "$rest"
 }
 
+to_camel() {
+  local s="$1"
+  local first rest
+  first="$(printf '%s' "$s" | cut -c1 | tr '[:upper:]' '[:lower:]')"
+  rest="$(printf '%s' "$s" | cut -c2-)"
+  printf '%s%s' "$first" "$rest"
+}
+
+if [ -z "$CLIENT" ] && [ -t 0 ]; then
+  CLIENT_DIR="$JAVA_DIR/client"
+  if [ -d "$CLIENT_DIR" ]; then
+    CLIENT_FILES=()
+    for cf in "$CLIENT_DIR"/*Client.java; do
+      [ -f "$cf" ] && CLIENT_FILES+=("$(basename "$cf" .java)")
+    done
+    if [ "${#CLIENT_FILES[@]}" -eq 1 ]; then
+      CNAME="${CLIENT_FILES[0]}"
+      printf "  Trovato Feign Client '%s'. Vuoi collegarlo automaticamente alla vista? [S/n] > " "$CNAME"
+      read -r ANS
+      case "$ANS" in
+        [nN]*) ;;
+        *) CLIENT="$CNAME" ;;
+      esac
+    elif [ "${#CLIENT_FILES[@]}" -gt 1 ]; then
+      echo "  Trovati ${#CLIENT_FILES[@]} Feign Client nel modulo. Scegli quale collegare:"
+      for i in "${!CLIENT_FILES[@]}"; do
+        echo "    $((i+1))) ${CLIENT_FILES[$i]}"
+      done
+      printf "    [1] (premi Invio per primo, o 'n' per nessuno) > "
+      read -r CIDX
+      if printf '%s' "$CIDX" | grep -qE '^[0-9]+$'; then
+        CLIENT="${CLIENT_FILES[$((CIDX-1))]}"
+      elif [ "$CIDX" != "n" ]; then
+        CLIENT="${CLIENT_FILES[0]}"
+      fi
+    fi
+  fi
+fi
+
+HAS_CLIENT=0
+CLIENT_INJECT=""
+CLIENT_LOMBOK_IMPORT=""
+CLIENT_CLASS_ANNOTATION=""
+CLIENT_CALL_GET_ALL="        // Sostituisci questa lista con i dati caricati dal Feign client
+        List<${NAME}Form> items = new ArrayList<>();
+        model.addAttribute(\"items\", items);"
+CLIENT_CALL_CREATE="        // TODO: Invia 'form' al microservizio corrispondente tramite Feign client
+        // client.create(form);"
+CLIENT_ERROR_CATCH="        if (bindingResult.hasErrors()) {
+            model.addAttribute(\"items\", new ArrayList<${NAME}Form>());
+            return \"$SLUG\";
+        }"
+
+if [ -n "$CLIENT" ]; then
+  CLIENT_FILE="$JAVA_DIR/client/$CLIENT.java"
+  if [ ! -f "$CLIENT_FILE" ]; then
+    CANDIDATE="$(find "$JAVA_DIR/client" -name "${CLIENT}*.java" 2>/dev/null | head -n 1 || true)"
+    if [ -n "$CANDIDATE" ]; then
+      CLIENT_FILE="$CANDIDATE"
+      CLIENT="$(basename "$CANDIDATE" .java)"
+    fi
+  fi
+
+  if [ -f "$CLIENT_FILE" ]; then
+    HAS_CLIENT=1
+    CLIENT_CAMEL="$(to_camel "$CLIENT")"
+    CLIENT_INJECT="    private final $PACKAGE.client.$CLIENT $CLIENT_CAMEL;\n"
+    CLIENT_LOMBOK_IMPORT="import lombok.RequiredArgsConstructor;"
+    CLIENT_CLASS_ANNOTATION=$'\n@RequiredArgsConstructor'
+    CLIENT_CALL_GET_ALL="        try {
+            model.addAttribute(\"items\", ${CLIENT_CAMEL}.getAll());
+        } catch (Exception e) {
+            model.addAttribute(\"items\", new ArrayList<>());
+            model.addAttribute(\"errorMessage\", \"Impossibile recuperare i dati dal microservizio: \" + e.getMessage());
+        }"
+    CLIENT_ERROR_CATCH="        if (bindingResult.hasErrors()) {
+            try { model.addAttribute(\"items\", ${CLIENT_CAMEL}.getAll()); } catch (Exception e) { model.addAttribute(\"items\", new ArrayList<>()); }
+            return \"$SLUG\";
+        }"
+
+    TARGET_DTO_NAME="$(grep -oE 'create\s*\(\s*@RequestBody\s*([a-zA-Z0-9_]+)\s+body\)' "$CLIENT_FILE" | sed -E 's/.*@RequestBody\s*([a-zA-Z0-9_]+)\s+body\)/\1/' || true)"
+    if [ -z "$TARGET_DTO_NAME" ]; then
+      TARGET_DTO_NAME="$(grep -oE 'List<([a-zA-Z0-9_]+)>\s+getAll\(' "$CLIENT_FILE" | sed -E 's/.*List<([a-zA-Z0-9_]+)>\s+getAll\(/\1/' || true)"
+    fi
+
+    if [ -n "$TARGET_DTO_NAME" ] && [ "$TARGET_DTO_NAME" != "Object" ] && [ -d "$DEMO_DIR/common-dto/src/main/java" ]; then
+      DTO_FILE="$(find "$DEMO_DIR/common-dto/src/main/java" -name "$TARGET_DTO_NAME.java" 2>/dev/null | head -n 1 || true)"
+      if [ -n "$DTO_FILE" ] && [ -f "$DTO_FILE" ]; then
+        DTO_ARGS="$(python3 -c "
+with open('$DTO_FILE', 'r', encoding='utf-8') as f:
+    c = f.read()
+import re
+m = re.search(r'public\s+record\s+\w+\s*\(([\s\S]*?)\)\s*\{', c)
+if m:
+    raw_params = m.group(1).split(',')
+    field_names = [r.split(':')[0].strip() for r in '${FIELDS:-}'.split(',') if r.strip()]
+    args = []
+    for p in raw_params:
+        p = p.strip()
+        if not p: continue
+        clean_p = re.sub(r'@\w+(\([^)]*\))?', '', p).strip()
+        tokens = clean_p.split()
+        if not tokens: continue
+        p_name = tokens[-1].strip()
+        p_pascal = p_name[0].upper() + p_name[1:]
+        if p_name == 'id':
+            args.append('null')
+        elif p_name in field_names:
+            args.append(f'form.get{p_pascal}()')
+        elif p_name in ['disponibile', 'attivo']:
+            args.append('true')
+        else:
+            args.append('null')
+    print(',\n'.join('                ' + a for a in args))
+" 2>/dev/null || true)"
+
+        if [ -n "$DTO_ARGS" ]; then
+          CLIENT_CALL_CREATE="        try {
+            ${CLIENT_CAMEL}.create(new esame.common.dto.$TARGET_DTO_NAME(
+$DTO_ARGS
+            ));
+        } catch (Exception e) {
+            model.addAttribute(\"errorMessage\", \"Errore nel salvataggio: \" + e.getMessage());
+            try { model.addAttribute(\"items\", ${CLIENT_CAMEL}.getAll()); } catch (Exception ex) { model.addAttribute(\"items\", new ArrayList<>()); }
+            return \"$SLUG\";
+        }"
+        fi
+      fi
+    fi
+  fi
+fi
+
 # Parsing campi
 FORM_FIELDS=""
 TH_HEADERS=""
@@ -190,6 +324,7 @@ import jakarta.validation.Valid;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+${CLIENT_LOMBOK_IMPORT}
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -203,17 +338,17 @@ import java.util.List;
  * Generato da task new-view.
  */
 @Controller
-@RequestMapping("$ROUTE_PATH")
+@RequestMapping("$ROUTE_PATH")${CLIENT_CLASS_ANNOTATION}
 public class $CONTROLLER_NAME {
 
+$CLIENT_INJECT
     @Getter @Setter @NoArgsConstructor
     public static class ${NAME}Form {
 $FORM_FIELDS    }
 
     @GetMapping
     public String index(Model model) {
-        List<${NAME}Form> items = new ArrayList<>();
-        model.addAttribute("items", items);
+$CLIENT_CALL_GET_ALL
         model.addAttribute("form", new ${NAME}Form());
         return "$SLUG";
     }
@@ -222,11 +357,8 @@ $FORM_FIELDS    }
     public String save(@Valid @ModelAttribute("form") ${NAME}Form form,
                        BindingResult bindingResult,
                        Model model) {
-        if (bindingResult.hasErrors()) {
-            model.addAttribute("items", new ArrayList<${NAME}Form>());
-            return "$SLUG";
-        }
-
+$CLIENT_ERROR_CATCH
+$CLIENT_CALL_CREATE
         return "redirect:$ROUTE_PATH?success";
     }
 }
@@ -266,6 +398,10 @@ cat > "$TEMPLATE_FILE" <<EOF
 
         <div th:if="\${param.success}" class="alert-success">
             Operazione completata con successo!
+        </div>
+
+        <div th:if="\${errorMessage}" style="background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem;">
+            <span th:text="\${errorMessage}">Messaggio errore</span>
         </div>
 
         <h2>Elenco</h2>

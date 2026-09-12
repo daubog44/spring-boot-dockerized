@@ -430,7 +430,6 @@ L'API REST risponde con un JSON pulito e senza campi superflui:
 | **Rischio LazyInitException** | Possibile se accedi all'oggetto fuori da transazione senza `JOIN FETCH`. | Nessuno: il mapping avviene dentro il Service. |
 | **Documentazione Swagger** | Mostra l'intera Entity con tutti i dettagli interni. | Mostra solo lo schema esatto dei dati esposti. |
 | **Flessibilità per Feign/UI** | I client devono importare le annotazioni di serializzazione. | I client usano direttamente il record DTO condiviso. |
->>>>>>> c99fe42 (docs: documentazione JsonIgnoreProperties e pattern DTO-in-DTO per join completi)
 
 ### Configurare le relazioni in 5 secondi: `task add-relation`
 
@@ -450,8 +449,13 @@ Cosa fa per te:
 - Inserisce l'annotazione corretta con `fetch = FetchType.LAZY`.
 - Configura `@JoinColumn(name = "autore_id")` sul lato proprietario.
 - Configura il lato inverso con `mappedBy` e lista già inizializzata (`= new ArrayList<>()`).
-- Aggiunge automaticamente tutti gli `import` necessari (`jakarta.persistence.*`, `java.util.List`, ecc.).
+- Inserisce automaticamente `@JsonIgnoreProperties` su entrambi i lati per spezzare i cicli Jackson ed evitare a monte `StackOverflowError`!
+- Aggiunge automaticamente tutti gli `import` necessari (`jakarta.persistence.*`, `java.util.List`, `com.fasterxml.jackson.annotation.JsonIgnoreProperties`).
 - Con `UNIDIRECTIONAL=1` evita di aggiungere il campo inverso se ti serve unidirezionale.
+
+> 💡 **Tutti i comandi hanno il Wizard Interattivo**:
+> Non ricordi la sintassi di un comando? Lancialo **senza argomenti**!
+> `task new-entity`, `task add-relation`, `task new-dto`, `task new-client`, `task new-view`, `task new-auth`, `task new-handler`, `task add-dep`, `task set-port`, `task use-postgres`, `task remove-service`, `task consegna`: **tutti** ti fanno domande guidate passo-passo nel terminale!
 
 ---
 

@@ -350,20 +350,21 @@ html.video .stage { width: 1280px; height: 720px; border-radius: 0; box-shadow: 
   {
     "id": "dominio",
     "ora": "09:00", "durata": "45 min",
-    "titolo": "Il dominio: entity, dati di prova, schema",
-    "obiettivo": "Scrivere le classi @Entity della traccia e avere subito le tabelle piene di dati plausibili, e lo schema pronto per l'allegato tecnico.",
+    "titolo": "Il dominio: entity, relazioni, dati di prova, schema",
+    "obiettivo": "Generare le classi @Entity e relazioni della traccia (anche via wizard interattivo) e avere subito le tabelle piene di dati e lo schema pronto per l'allegato.",
     "passi": [
-      {"testo": "Scrivi le classi @Entity nel servizio: JPA e H2 sono già collegati, Hibernate crea le tabelle all'avvio."},
+      {"cmd": "task new-entity", "testo": "Genera Entity, Repository, DTO, Service e Controller: lancialo senza argomenti per il wizard interattivo!"},
+      {"cmd": "task add-relation", "testo": "Collega due entità (ManyToOne, OneToMany...) con @JsonIgnoreProperties automatico anti-loop Jackson. Guidato se lanciato da solo."},
       {"cmd": "task seed-data", "testo": "Da ora, a ogni avvio, le tabelle vuote si riempiono da sole, passando da Hibernate: id, relazioni, enum, @Size, @Email, @Pattern rispettati. Anche su PostgreSQL e in Docker."},
       {"cmd": "task seed-data SERVICE=ordini-service ROWS=10", "testo": "Un servizio solo, dieci righe per tabella. ROWS=0 li spegne."},
       {"cmd": "task db-schema", "testo": "Lo schema concettuale e logico, letto dal database dopo che Hibernate l'ha creato, con il diagramma ER."}
     ],
     "output": "==> Prova su un database H2 usa-e-getta\n  compilo con Maven...\n\n  ordini-service\n    ClienteEntity: 5 righe nuove\n    OrdineEntity: 5 righe nuove\n    RigaOrdineEntity: 5 righe nuove\n    dati di prova: 3 entity riempite\n\nDati di prova pronti.",
-    "nota": "Servono i dati precisi della traccia? Un data.sql tuo vale ancora: quelle tabelle non le tocca.",
-    "esercizio": "Aggiungi a un'entity un campo targa con @Pattern(regexp = \"[A-Z]{2}[0-9]{3}[A-Z]{2}\") e rilancia task seed-data: guarda le targhe inventate.",
+    "nota": "Tutti i comandi (new-entity, add-relation, new-client, new-auth...) funzionano in modalità interattiva se lanciati senza argomenti!",
+    "esercizio": "Lancia task add-relation senza parametri e segui le domande a schermo per collegare due entità.",
     "scene": [
-      {"mostra": "intro", "dice": "Adesso il cuore della traccia: il dominio. Scrivi le classi entity nel servizio: JPA e il database H2 sono già collegati, e Hibernate crea le tabelle all'avvio."},
-      {"mostra": "passi", "dice": "Poi task seed-data. Da quel momento, a ogni avvio, le tabelle vuote si riempiono da sole con dati plausibili, salvati passando da Hibernate: id, relazioni, enum e validazioni sono rispettati. Il comando prova subito su un database usa e getta e ti dice tabella per tabella com'è andata. task db-schema invece legge lo schema dal database e te lo scrive pronto per l'allegato, con il diagramma."}
+      {"mostra": "intro", "dice": "Adesso il cuore della traccia: il dominio. Con task new-entity e task add-relation crei entità, DTO e relazioni JPA senza errori: se li lanci senza argomenti si aprono i wizard interattivi."},
+      {"mostra": "passi", "dice": "Poi task seed-data. Da quel momento, a ogni avvio, le tabelle vuote si riempiono da sole con dati plausibili, salvati passando da Hibernate. E task db-schema legge lo schema dal database e te lo scrive pronto per l'allegato, con il diagramma."}
     ]
   },
   {
@@ -378,8 +379,14 @@ html.video .stage { width: 1280px; height: 720px; border-radius: 0; box-shadow: 
       {"cmd": "task status", "testo": "Quando qualcosa non risponde, prima di ogni ipotesi: chi c'è su ogni porta, chi è registrato su Eureka."}
     ],
     "tabella": {
-      "titolo": "Quando cambi la struttura",
+      "titolo": "Quando cambi la struttura (tutti usabili senza argomenti per il wizard!)",
       "righe": [
+        ["un'entity + CRUD + DTO", "task new-entity (o con SERVICE=... NAME=...)"],
+        ["una relazione JPA", "task add-relation (o con FROM=... TO=...)"],
+        ["un client Feign inter-servizio", "task new-client (o con FROM=... TO=...)"],
+        ["una vista Thymeleaf", "task new-view (o con SERVICE=... NAME=...)"],
+        ["sicurezza Spring Security", "task new-auth (o con SERVICE=... TYPE=...)"],
+        ["gestore errori globale REST", "task new-handler (o con SERVICE=...)"],
         ["una dipendenza", "task add-dep SERVICE=ordini-service DEPS=security,mail"],
         ["una porta", "task set-port SERVICE=ordini-service PORT=9080"],
         ["un servizio in più", "task new-service NAME=spedizioni-service"],
