@@ -95,11 +95,8 @@ task new-service NAME=ordini-service
 task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=numero:string:required,totale:decimal
 ```
 
-<<<<<<< HEAD
-=======
 e per i DTO condivisi, i client Feign, le viste Thymeleaf, la sicurezza e la gestione errori:
 
->>>>>>> d61b740 (feat: new-auth, new-handler, auto-dto in new-client, remove-h2 option, lesson 18 security)
 ```bash
 task new-dto NAME=Ordine FIELDS=id:long,numero:string:required,totale:decimal
 task new-client FROM=report-service TO=ordini-service DTO=OrdineDto FIELDS=id:long,numero:string:required
@@ -118,6 +115,7 @@ task set-port SERVICE=event-ui PORT=9080
 
 ```bash
 task remove-service SERVICE=ordini-service
+```
 ```
 
 Dopo una dipendenza o un modulo nuovo ci vuole `task dev`: `task compile` non
