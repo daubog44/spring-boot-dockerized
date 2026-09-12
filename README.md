@@ -54,7 +54,7 @@ e le regole della tua traccia.
 task learn
 ```
 
-Apre il corso: una pagina statica (niente server, niente rete) con diciassette
+Apre il corso: una pagina statica (niente server, niente rete) con diciotto
 lezioni dalla A alla Z — com'è fatto il template, come si parlano i servizi,
 `common-dto`, le entity e i repository JPA con tutti gli esempi, la rete
 dell'esame, e la traccia Biblioteca svolta pezzo per pezzo. Su **questo**
@@ -118,8 +118,8 @@ che trova in `JAVA_HOME` o, se manca, nel `PATH`.
 **Pubblicare una versione nuova** (dopo il push di `main` e dei branch):
 
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.2.1
+git push origin v1.2.1
 ```
 
 Il resto lo fa la GitHub Action [`release.yml`](./.github/workflows/release.yml):
