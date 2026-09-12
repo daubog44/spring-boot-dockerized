@@ -26,12 +26,32 @@ env:
 tasks:
   default:
     desc: Stampa la guida ai comandi (come task help)
+    summary: |
+      `task`, lanciato senza nome, e' un alias di `task help`: stampa lo
+      stesso elenco.
+
+      Nessuna variabile.
+
+      Esempio:
+        task
     silent: true
     cmds:
       - task: help
 
   help:
     desc: Guida ai comandi, con le variabili di ognuno e gli esempi
+    summary: |
+      L'elenco dei comandi del progetto, raggruppati per fase (dall'inizio
+      alla consegna). Per il dettaglio di uno solo -- tutte le variabili,
+      i valori di default e un esempio -- usa `task --summary <comando>`
+      (`--help` non funziona sui singoli comandi: e' `task` stesso a
+      intercettarlo, prima che arrivi allo script).
+
+      Nessuna variabile.
+
+      Esempio:
+        task help
+        task --summary new-entity
     silent: true
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/help.ps1{{else}}bash ./scripts/help.sh{{end}}'
@@ -156,6 +176,16 @@ tasks:
 
   dev-down:
     desc: "STOP SVILUPPO: ferma i servizi locali e libera le porte"
+    summary: |
+      Ferma i processi avviati da `task dev` (li trova da .dev-logs/dev.pids)
+      e libera le porte dello stack. I dati nel database restano: se usi
+      PostgreSQL in Docker, quel container non lo tocca (per quello c'e'
+      `task docker-down`).
+
+      Nessuna variabile.
+
+      Esempio:
+        task dev-down
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-down.ps1 {{.CLI_ARGS}}{{else}}bash ./scripts/dev-down.sh {{.CLI_ARGS}}{{end}}'
 
@@ -179,11 +209,35 @@ tasks:
 
   status:
     desc: "Chi occupa le porte, quali container girano, cosa e' registrato su Eureka"
+    summary: |
+      Una foto dello stato attuale, comoda prima di lanciare `task dev` o
+      dopo un errore "porta occupata": porte dello stack (libere o di chi,
+      se lo trova), container Docker in esecuzione, servizi registrati su
+      Eureka. Non avvia e non ferma niente.
+
+      Nessuna variabile.
+
+      Esempio:
+        task status
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/status.ps1{{else}}bash ./scripts/status.sh{{end}}'
 
   compile:
     desc: Ricompila i moduli e fa ripartire i servizi gia' avviati (hot reload)
+    summary: |
+      Un `mvnw install` sull'aggregatore: serve quando lo stack e' gia' su
+      (`task dev`) e hai modificato qualcosa che i sorgenti da soli non
+      propagano da solo, come src/main/resources/application.yml (Spring
+      Boot DevTools guarda il classpath compilato, non i sorgenti grezzi).
+      Spring Boot DevTools nota i .class nuovi e fa ripartire da solo i
+      moduli gia' avviati.
+      Se lo stack non e' acceso e' solo una compilazione completa, uguale a
+      `task build` ma senza impacchettare i jar.
+
+      Nessuna variabile.
+
+      Esempio:
+        task compile
     dir: demo
     cmds:
       - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& .\mvnw.cmd -q install -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw -q install -Dmaven.test.skip=true{{end}}'
@@ -801,24 +855,63 @@ tasks:
 
   docker-down:
     desc: Ferma i container (i dati del database restano)
+    summary: |
+      Il contrario di `task docker-up`: ferma e rimuove i container, ma i
+      volumi restano, quindi il database su PostgreSQL non perde le righe.
+      Per ripartire da un database vuoto serve `task docker-reset`.
+
+      Nessuna variabile.
+
+      Esempio:
+        task docker-down
     dir: demo
     cmds:
       - docker compose down --remove-orphans
 
   docker-reset:
     desc: Ferma i container ED elimina i volumi (database ricreato da zero)
+    summary: |
+      Come `task docker-down`, ma con -v: elimina anche i volumi Docker,
+      quindi PostgreSQL riparte con un database vuoto (le tabelle si
+      ricreano da sole al prossimo avvio, per via di `ddl-auto: update`).
+      Distruttivo: tutte le righe che c'erano si perdono.
+
+      Nessuna variabile.
+
+      Esempio:
+        task docker-reset
     dir: demo
     cmds:
       - docker compose down -v --remove-orphans
 
   docker-logs:
     desc: Segue i log dei container
+    summary: |
+      Equivalente Docker di `task logs`, ma per lo stack avviato con
+      `task docker-up`: segue in tempo reale i log di tutti i container,
+      ogni riga prefissata dal nome del servizio. Ctrl+C chiude solo
+      questa vista, i container restano accesi.
+
+      Nessuna variabile.
+
+      Esempio:
+        task docker-logs
     dir: demo
     cmds:
       - docker compose logs -f
 
   run-db:
     desc: Avvia il solo PostgreSQL in Docker
+    summary: |
+      Accende solo il container postgres del docker-compose, senza
+      toccare i microservizi: comodo dopo `task use-postgres`, quando
+      vuoi sviluppare in locale (`task dev`) ma con un vero PostgreSQL
+      invece di H2.
+
+      Nessuna variabile.
+
+      Esempio:
+        task run-db
     dir: demo
     cmds:
       - docker compose up -d postgres
@@ -827,6 +920,16 @@ tasks:
 
   build:
     desc: Compila e impacchetta tutti i moduli Maven
+    summary: |
+      Un `mvnw clean package`: compila e impacchetta ogni modulo nel suo
+      jar, senza avviare niente. Utile prima della consegna per scoprire
+      un errore di compilazione che `task dev` da solo potrebbe non far
+      notare (un modulo mai toccato in quella sessione, per esempio).
+
+      Nessuna variabile.
+
+      Esempio:
+        task build
     dir: demo
     cmds:
       - '{{if eq OS "windows"}}cmd /c "set JAVA_HOME={{.JAVA_HOME_PATH}}&& .\mvnw.cmd clean package -Dmaven.test.skip=true"{{else}}JAVA_HOME="{{.JAVA_HOME_PATH}}" ./mvnw clean package -Dmaven.test.skip=true{{end}}'
@@ -835,11 +938,31 @@ tasks:
 
   clean-ports:
     desc: Libera le porte dello stack (come dev-down)
+    summary: |
+      Un alias di `task dev-down`, per chi cerca "libera le porte" invece
+      di "ferma i servizi": fa esattamente la stessa cosa.
+
+      Nessuna variabile.
+
+      Esempio:
+        task clean-ports
     cmds:
       - task: dev-down
 
   kill-java:
     desc: "ULTIMA SPIAGGIA: termina TUTTI i processi java della macchina, anche estranei al progetto"
+    summary: |
+      Non e' specifico del progetto: termina ogni processo java.exe della
+      macchina (taskkill /IM java.exe su Windows, pkill -f java altrove),
+      compresi IDE, altri progetti Java aperti o strumenti che girano
+      sopra la JVM. Usalo solo quando `task dev-down` non basta a liberare
+      una porta (un processo rimasto orfano, per esempio dopo un crash
+      dell'IDE) e sai che non hai altro Java aperto a cui tieni.
+
+      Nessuna variabile.
+
+      Esempio:
+        task kill-java
     cmds:
       - '{{if eq OS "windows"}}cmd /c "taskkill /F /IM java.exe /T 2>nul || ver >nul"{{else}}pkill -f java || true{{end}}'
 
@@ -847,6 +970,16 @@ tasks:
 
   run-eureka:
     desc: Avvia il solo Eureka server, in primo piano
+    summary: |
+      Scorciatoia per `task run SERVICE=naming-server`: avvia solo Eureka,
+      in primo piano (Ctrl+C lo ferma). Comodo per guardare la dashboard
+      (http://localhost:8761) senza accendere anche i microservizi, o per
+      isolare un problema di registrazione.
+
+      Nessuna variabile.
+
+      Esempio:
+        task run-eureka
     cmds:
       - task: run-module
         vars:

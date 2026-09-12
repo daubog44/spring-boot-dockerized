@@ -1,6 +1,6 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 15:22',
+  generato: '2026-09-12 18:09',
   progetto: {
     cartella: 'demo',
     pacchetto: 'esame',
@@ -1042,7 +1042,7 @@ Invece di creare a mano classi, costruttori, annotazioni e interfacce, hai a dis
 task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):required:unique,annoPubblicazione:int,disponibile:bool
 \`\`\`
 
-> 💡 **Modalità Interattiva**: se non ricordi i parametri a memoria, puoi anche lanciare semplicemente \`task new-entity\` senza argomenti. Un wizard ti chiederà a quale modulo applicarlo, il nome dell'entità, i campi e se desideri generare anche il DTO!
+> 💡 **Modalità Interattiva**: se non ricordi i parametri a memoria, puoi anche lanciare semplicemente \`task new-entity\` senza argomenti. Un wizard ti chiederà a quale modulo applicarlo, il nome dell'entità e se desideri generare anche il DTO. Per i campi ti chiede prima come preferisci procedere: **guidato uno alla volta** (nome, un menu numerato per il tipo — string, string(N), text, int, long, decimal, bool, date, datetime, email, enum — e i modificatori da scegliere per numero: required, unique, min(N), max(N), così non devi ricordare a memoria la sintassi \`nome:tipo:modificatore\`) oppure **tutto in una riga sola**, se conosci già la sintassi e vuoi incollarla direttamente come faresti con \`FIELDS=...\` da riga di comando.
 > 
 > ⚠️ **Quali moduli compaiono nel menu?** Il wizard mostra solo i microservizi che includono \`spring-boot-starter-data-jpa\` nel proprio \`pom.xml\`. Se stai sviluppando un modulo UI o creato senza database (\`NODB=1\`) che deve gestire tabelle locali (es. \`cup-ui\` con slot e medici), aggiungi JPA ed H2 con un comando:
 > \`\`\`bash
@@ -4515,6 +4515,13 @@ spring:
 \`\`\`
 
 I dati di prova valgono punti: una demo su tabelle vuote non si vede.
+
+> ⚠️ **Se lo stack è già acceso (\`task dev\` in corso)**: questo comando scrive
+> solo \`src/main/resources/application.yml\`, e \`mvnw spring-boot:run\` non lo
+> ricompila da solo — non è come salvare in un IDE con la build automatica. Il
+> comando se ne accorge e te lo dice; la riga giusta dopo \`task seed-data\` è
+> \`task compile\`, che ricompila e fa ripartire i moduli già avviati: da lì il
+> riempimento scatta. Lanciarlo prima di \`task dev\` resta il modo più diretto.
 
 
 ### Accendere Swagger dove manca

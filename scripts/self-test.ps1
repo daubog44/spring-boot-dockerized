@@ -317,6 +317,7 @@ Test-Case 'new-entity guidato campo per campo accetta tipo e modificatori dal me
     $lines = @(
         "$idx"                              # modulo: wizfields-service
         'Prova'                             # nome entity
+        '1'                                  # modalita': guidato campo per campo
         'codice', '2', '20', '1,2'          # campo: codice, string(N), required+unique
         ''                                   # un altro campo? si
         'durata', '9', '3,4', '1', '600'    # campo: durata, int, min(1)+max(600)
@@ -336,6 +337,32 @@ Test-Case 'new-entity guidato campo per campo accetta tipo e modificatori dal me
     Assert-Contains $entity 'private Integer durata;' 'il tipo int scelto dal menu non e'' stato applicato'
     Assert-Contains $entity '@Min(1)' 'min(N) scelto dal menu dei modificatori non applicato'
     Assert-Contains $entity '@Max(600)' 'max(N) scelto dal menu dei modificatori non applicato'
+}
+
+Test-Case 'new-entity guidato lascia scegliere anche la riga sola, stile FIELDS=' {
+    $jpaModules = @(Get-ChildItem -Path $demo -Directory | Where-Object {
+        $p = Join-Path $_.FullName 'pom.xml'
+        (Test-Path $p) -and ((Get-Content -Raw $p) -match 'spring-boot-starter-data-jpa')
+    } | Select-Object -ExpandProperty Name)
+    $idx = [array]::IndexOf($jpaModules, 'wizfields-service') + 1
+    Assert-That ($idx -gt 0) 'wizfields-service non risulta fra i moduli con JPA'
+
+    $answers = Join-Path $sandbox 'risposte-new-entity-riga.txt'
+    $lines = @(
+        "$idx"                                                       # modulo: wizfields-service
+        'Riga'                                                       # nome entity
+        '2'                                                          # modalita': riga sola
+        'codice:string(20):required,descrizione:string:required'     # campi in una riga
+        'n'                                                          # niente DTO
+    )
+    Write-TextFile -Path $answers -Text (($lines -join "`n") + "`n")
+    $env:WIZARD_ANSWERS = $answers
+    try { $r = Invoke-Tool 'new-entity.ps1' } finally { Remove-Item Env:WIZARD_ANSWERS -ErrorAction SilentlyContinue }
+    Assert-Ok $r 'new-entity riga sola e'' fallito'
+
+    $entity = Get-Text ('demo/wizfields-service/src/main/java/' + (Get-SandboxPackagePath 'wizfields-service') + '/entity/RigaEntity.java')
+    Assert-Contains $entity 'private String codice;' 'campo da riga sola non applicato'
+    Assert-Contains $entity 'private String descrizione;' 'secondo campo da riga sola non applicato'
 }
 
 Test-Case 'add-relation configura ManyToOne e OneToMany fra due entity' {
@@ -767,6 +794,21 @@ Test-Case 'seed-data scrive dev-data.rows e toglie il vecchio data.sql' {
     Assert-Contains $yml '  rows: 4' 'il numero di righe non e'' stato aggiornato'
 }
 
+Test-Case 'seed-data avvisa se lo stack e'' gia'' acceso (mvnw non si ricompila da solo)' {
+    $devLogDir = Join-Path $sandbox '.dev-logs'
+    New-Item -ItemType Directory -Path $devLogDir -Force | Out-Null
+    $pidsFile = Join-Path $devLogDir 'dev.pids'
+    Write-TextFile -Path $pidsFile -Text "99999 alfa`n"
+    try {
+        $r = Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '3', '-NoCheck')
+        Assert-Ok $r 'seed-data -NoCheck e'' fallito con lo stack acceso'
+        Assert-Contains $r.Output 'gia'' acceso' 'non avvisa che lo stack e'' gia'' acceso'
+        Assert-Contains $r.Output 'task compile' 'non suggerisce task compile'
+    } finally {
+        Remove-Item $pidsFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Test-Case 'seed-data riempie ogni tabella passando da Hibernate (Maven + H2)' {
     $r = Invoke-Tool 'seed-data.ps1' @('-Module', 'alfa-service', '-Rows', '12')
     Assert-Ok $r 'seed-data con la prova e'' fallito'
@@ -947,6 +989,26 @@ Test-Case 'rename-project rinomina la cartella e i file che la nominano' {
     Assert-That (Test-Path (Join-Path $sandbox "collaudo-modules/$omonimo/pom.xml")) "il modulo $omonimo non c'e' piu'"
     Assert-Contains (Get-Text 'scripts/dev.ps1') "Module = '$omonimo'" "il modulo $omonimo e' stato rinominato insieme alla cartella"
     Assert-Ok (Invoke-Tool 'check.ps1' @('-ProjectOnly')) 'dopo rename-project il progetto non e'' piu'' coerente'
+}
+
+Test-Case 'ogni comando ha un riepilogo dettagliato (task --summary)' {
+    $taskfile = Get-Text 'Taskfile.yml'
+    $lines = $taskfile -split "`n"
+    $missing = @()
+    $name = ''; $hasDesc = $false; $hasSummary = $false; $hasInternal = $false
+    foreach ($line in $lines) {
+        if ($line -match '^  [a-z][a-zA-Z0-9_-]*:$') {
+            if ($name -and $hasDesc -and -not $hasInternal -and -not $hasSummary) { $missing += $name }
+            $name = $line.Trim().TrimEnd(':')
+            $hasDesc = $false; $hasSummary = $false; $hasInternal = $false
+            continue
+        }
+        if ($line -match '^    desc:') { $hasDesc = $true }
+        if ($line -match '^    summary:') { $hasSummary = $true }
+        if ($line -match '^    internal:\s*true') { $hasInternal = $true }
+    }
+    if ($name -and $hasDesc -and -not $hasInternal -and -not $hasSummary) { $missing += $name }
+    Assert-That ($missing.Count -eq 0) ("comandi senza summary: " + ($missing -join ' '))
 }
 
 Test-Case 'gli script PowerShell hanno sintassi valida' {

@@ -43,6 +43,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'scaffold-lib.ps1')
+. (Join-Path $PSScriptRoot 'dev-lib.ps1')
 
 $repoRoot = Get-ScaffoldRepoRoot
 $all = @(Get-JpaModules -RepoRoot $repoRoot)
@@ -81,6 +82,17 @@ foreach ($target in $targets) {
     }
 }
 Write-Host ''
+
+# L'application.yml appena scritto arriva al modulo gia' acceso solo se
+# qualcosa lo ricompila: mvnw spring-boot:run non guarda da solo
+# src/main/resources. L'avviso va dato subito: sia -NoCheck sia Rows 0
+# escono prima della prova su H2, quindi e' l'unico punto comune a ogni caso.
+$devPidsFile = Join-Path (Get-DevLogDir) 'dev.pids'
+if ((Test-Path $devPidsFile) -and ((Get-Content $devPidsFile -ErrorAction SilentlyContinue) | Where-Object { $_ })) {
+    Write-Host 'Lo stack e'' gia'' acceso (task dev): questa configurazione non arriva da sola al processo gia'' partito.' -ForegroundColor Yellow
+    Write-Host '  task compile           ricompila e fa ripartire i moduli gia'' avviati: da qui il riempimento scatta'
+    Write-Host ''
+}
 
 if ($Rows -le 0) {
     Write-Host 'Dati di prova spenti: all''avvio non si aggiunge piu'' niente.' -ForegroundColor Green

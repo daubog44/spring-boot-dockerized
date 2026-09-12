@@ -93,6 +93,17 @@ if [ -z "$SERVICE" ] || [ -z "$NAME" ]; then
 
   if [ -z "$FIELDS" ]; then
     echo ""
+    echo "  Come vuoi definire i campi?"
+    echo "    1) guidato, un campo alla volta (tipo e modificatori da menu)"
+    echo "    2) tutti insieme, in una riga (come FIELDS=... da riga di comando)"
+    read_answer "  Modalita' [1]:"
+    F_MODE="$REPLY_TEXT"
+    if [ "$F_MODE" = "2" ]; then
+      echo "  Esempio: titolo:string(150):required,isbn:string(13):unique,annoPubblicazione:int:min(1450):max(2100)"
+      read_answer "  Campi:"
+      FIELDS="$REPLY_TEXT"
+      [ -n "$FIELDS" ] || { echo "Servono uno o piu' campi. Uso: FIELDS=<campo:tipo:modificatore,...>" >&2; exit 1; }
+    else
     echo "  Campi della entity, uno alla volta (Invio al nome per non aggiungerne altri):"
     FIELD_TOKENS=()
     while true; do
@@ -156,6 +167,7 @@ if [ -z "$SERVICE" ] || [ -z "$NAME" ]; then
     for tok in "${FIELD_TOKENS[@]}"; do
       if [ "$F_FIRST" = "1" ]; then FIELDS="$tok"; F_FIRST=0; else FIELDS="$FIELDS,$tok"; fi
     done
+    fi
   fi
 
   if [ "$DTO" = "0" ]; then

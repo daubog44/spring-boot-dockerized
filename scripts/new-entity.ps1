@@ -110,7 +110,17 @@ if (-not $Service -or -not $Name) {
 
     if (-not $Fields) {
         Write-Host ''
-        Write-Host '  Campi della entity, uno alla volta (Invio al nome per non aggiungerne altri):' -ForegroundColor DarkGray
+        Write-Host '  Come vuoi definire i campi?' -ForegroundColor DarkGray
+        Write-Host '    1) guidato, un campo alla volta (tipo e modificatori da menu)'
+        Write-Host '    2) tutti insieme, in una riga (come FIELDS=... da riga di comando)'
+        $fieldMode = (Read-Answer "  Modalita' [1]").Trim()
+        if ($fieldMode -eq '2') {
+            Write-Host '  Esempio: titolo:string(150):required,isbn:string(13):unique,annoPubblicazione:int:min(1450):max(2100)' -ForegroundColor DarkGray
+            $Fields = (Read-Answer '  Campi').Trim()
+            if (-not $Fields) {
+                throw "Servono uno o piu' campi. Uso: FIELDS=<campo:tipo:modificatore,...>"
+            }
+        } else {
         $fieldTokens = @()
         while ($true) {
             $fName = (Read-Answer '  Nome campo').Trim()
@@ -159,6 +169,7 @@ if (-not $Service -or -not $Name) {
             if ($again -eq 'n' -or $again -eq 'no') { break }
         }
         $Fields = $fieldTokens -join ','
+        }
     }
 
     if (-not $Dto) {

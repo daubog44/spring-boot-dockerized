@@ -16,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEMO_DIR="$REPO_ROOT/demo"
 . "$SCRIPT_DIR/scaffold-lib.sh"
+. "$SCRIPT_DIR/dev-lib.sh"
 
 MODULE=""
 ROWS=5
@@ -72,6 +73,17 @@ for row in "${TARGETS[@]}"; do
   fi
 done
 echo ""
+
+# L'application.yml appena scritto arriva al modulo gia' acceso solo se
+# qualcosa lo ricompila: mvnw spring-boot:run non guarda da solo
+# src/main/resources. L'avviso va dato subito: sia -NoCheck sia ROWS=0
+# escono prima della prova su H2, quindi e' l'unico punto comune a ogni caso.
+DEV_PIDS_FILE="$(dev_log_dir)/dev.pids"
+if [ -s "$DEV_PIDS_FILE" ]; then
+  echo "Lo stack e' gia' acceso (task dev): questa configurazione non arriva da sola al processo gia' partito."
+  echo "  task compile           ricompila e fa ripartire i moduli gia' avviati: da qui il riempimento scatta"
+  echo ""
+fi
 
 if [ "$ROWS" -eq 0 ]; then
   echo "Dati di prova spenti: all'avvio non si aggiunge piu' niente."

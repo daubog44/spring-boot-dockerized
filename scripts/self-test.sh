@@ -231,6 +231,7 @@ done
 printf '%s\n' \
   "$WIZ_JPA_IDX" \
   Prova \
+  1 \
   codice 2 20 1,2 \
   '' \
   durata 9 3,4 1 600 \
@@ -244,6 +245,19 @@ assert_ok "new-entity guidato campo per campo" &&
   assert_contains "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/ProvaEntity.java" "private Integer durata;" "tipo int dal menu" &&
   assert_contains "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/ProvaEntity.java" "@Min(1)" "min(N) dal menu" &&
   assert_contains "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/ProvaEntity.java" "@Max(600)" "max(N) dal menu"
+end_case
+
+start_case "new-entity guidato lascia scegliere anche la riga sola, stile FIELDS="
+printf '%s\n' \
+  "$WIZ_JPA_IDX" \
+  Riga \
+  2 \
+  'codice:string(20):required,descrizione:string:required' \
+  n >"$SANDBOX/risposte-new-entity-riga.txt"
+TOOL_OUT="$(WIZARD_ANSWERS="$SANDBOX/risposte-new-entity-riga.txt" bash "$SB_SCRIPTS/new-entity.sh" </dev/null 2>&1)"; TOOL_CODE=$?
+assert_ok "new-entity riga sola" &&
+  assert_contains "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/RigaEntity.java" "private String codice;" "campo da riga sola non applicato" &&
+  assert_contains "demo/wizfields-service/src/main/java/$(sb_package_path wizfields-service)/entity/RigaEntity.java" "private String descrizione;" "secondo campo da riga sola non applicato"
 end_case
 
 start_case "add-relation configura ManyToOne e OneToMany fra due entity"
@@ -671,6 +685,16 @@ assert_ok "seed-data rilanciato"
 assert_contains "demo/alfa-service/src/main/resources/application.yml" "  rows: 4" "il numero di righe aggiornato"
 end_case
 
+start_case "seed-data avvisa se lo stack e' gia' acceso (mvnw non si ricompila da solo)"
+mkdir -p "$SANDBOX/.dev-logs"
+printf '%s\n' "99999 alfa" >"$SANDBOX/.dev-logs/dev.pids"
+run_tool seed-data.sh --module alfa-service --rows 3 --no-check
+assert_ok "seed-data --no-check con lo stack acceso" &&
+  { case "$TOOL_OUT" in *"gia' acceso"*) : ;; *) fail "non avvisa che lo stack e' gia' acceso" ;; esac; } &&
+  { case "$TOOL_OUT" in *"task compile"*) : ;; *) fail "non suggerisce task compile" ;; esac; }
+rm -f "$SANDBOX/.dev-logs/dev.pids"
+end_case
+
 start_case "seed-data riempie ogni tabella passando da Hibernate (Maven + H2)"
 run_tool seed-data.sh --module alfa-service --rows 12
 assert_ok "seed-data con la prova"
@@ -847,6 +871,24 @@ assert_file "collaudo-modules/$OMONIMO/pom.xml"
 assert_contains "scripts/dev.sh" ":$OMONIMO:" "il modulo $OMONIMO rinominato insieme alla cartella"
 run_tool check.sh --project-only
 assert_ok "task check dopo rename-project"
+end_case
+
+start_case "ogni comando ha un riepilogo dettagliato (task --summary)"
+missing="$(awk '
+  /^  [a-z][a-zA-Z0-9_-]*:$/ {
+    if (name != "" && has_desc == 1 && has_internal == 0 && has_summary == 0) print name
+    name = $0; sub(/^  /, "", name); sub(/:$/, "", name)
+    has_desc = 0; has_summary = 0; has_internal = 0
+    next
+  }
+  /^    desc:/ { has_desc = 1 }
+  /^    summary:/ { has_summary = 1 }
+  /^    internal: *true/ { has_internal = 1 }
+  END {
+    if (name != "" && has_desc == 1 && has_internal == 0 && has_summary == 0) print name
+  }
+' "$SANDBOX/Taskfile.yml")"
+[ -z "$missing" ] || fail "comandi senza summary: $(printf '%s' "$missing" | tr '\n' ' ')"
 end_case
 
 start_case "gli script POSIX hanno sintassi valida"

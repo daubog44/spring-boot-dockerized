@@ -311,7 +311,9 @@ allo stesso modo: **variabili `NOME=valore`, senza trattini**.
 > Ognuno di essi aprirà un comodo menu interattivo guidato nel terminale che rileverà i moduli e le opzioni disponibili e ti farà le domande passo dopo passo.
 
 `task help` (o `task` da solo) stampa l'elenco; `task --summary <comando>` il
-dettaglio di uno.
+dettaglio di uno (variabili, valori di default, esempio). `task new-entity --help`
+**non funziona**: `--help` lo intercetta `task` stesso, prima che arrivi allo
+script — usa sempre `--summary`.
 
 ### Aggiungere una dipendenza a un microservizio
 
@@ -585,6 +587,13 @@ spring:
 ```
 
 I dati di prova valgono punti: una demo su tabelle vuote non si vede.
+
+> ⚠️ **Se lo stack è già acceso (`task dev` in corso)**: questo comando scrive
+> solo `src/main/resources/application.yml`, e `mvnw spring-boot:run` non lo
+> ricompila da solo — non è come salvare in un IDE con la build automatica. Il
+> comando se ne accorge e te lo dice; la riga giusta dopo `task seed-data` è
+> `task compile`, che ricompila e fa ripartire i moduli già avviati: da lì il
+> riempimento scatta. Lanciarlo prima di `task dev` resta il modo più diretto.
 
 
 ### Accendere Swagger dove manca
