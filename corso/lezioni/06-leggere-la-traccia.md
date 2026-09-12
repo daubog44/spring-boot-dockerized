@@ -47,6 +47,14 @@ numeri (diventano regole):
 | «ognuno il proprio database» | `task use-postgres`, con `DBNAME=prestiti` per il secondo |
 | Eureka, Docker Compose | già nel template |
 
+> 💡 **La catena dei comandi che trasforma questi pezzi in codice**:
+> 1. `task wizard`: crea l'infrastruttura, `catalogo-service`, `prestiti-service` e `biblioteca-ui`;
+> 2. `task new-entity`: genera `LibroEntity` e `PrestitoEntity` con repository, service e controller REST in un colpo solo;
+> 3. `task new-client`: genera `CatalogoClient` per chiamare il catalogo da `prestiti-service` e `biblioteca-ui`;
+> 4. `task new-view`: genera le pagine HTML Thymeleaf con form e tabelle;
+> 5. `task new-handler` e `task new-auth`: mettono al sicuro errori di validazione e autenticazione;
+> 6. `task seed-data` e `task dev`: popolano il database e avviano tutto lo stack a caldo!
+
 ## Chi possiede quali dati
 
 La regola dei microservizi è semplice: **ogni servizio possiede le sue

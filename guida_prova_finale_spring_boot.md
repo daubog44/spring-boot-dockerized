@@ -542,6 +542,12 @@ public class OrdineController {
 }
 ```
 
+> 💡 **Generazione automatica con `task new-view`**:
+> ```bash
+> task new-view SERVICE=ordini-ui NAME=Ordini FIELDS=cliente:string:required,quantita:int
+> ```
+> Genera contemporaneamente il controller Spring MVC (`OrdiniUiController.java`) e la vista HTML (`templates/ordini.html`) con tabella dinamica e form validato.
+
 ```java
 // demo/ordini-ui/src/main/java/.../OrdineWebController.java
 package esame.ordiniui;
@@ -768,6 +774,13 @@ public class Main {
 }
 ```
 
+> 💡 **Generazione automatica con `task new-client`**:
+> Invece di scrivere l'interfaccia Feign e i DTO a mano:
+> ```bash
+> task new-client FROM=ordini-ui TO=ordini-service DTO=OrdineDTO FIELDS=id:long,cliente:string:required,quantita:int
+> ```
+> Genera `OrdiniClient.java` già annotato con `@FeignClient(name = "ORDINI-SERVICE")` e, se non esiste già, crea anche il record `OrdineDTO` dentro `common-dto` con i relativi campi!
+
 ```java
 // demo/ordini-ui/src/main/java/.../OrdiniClient.java
 package esame.ordiniui;
@@ -845,6 +858,20 @@ public class OrdineFacade {
 | `@Transient` | Campo Entity | Indica a JPA di ignorare il campo (non verrà creata alcuna colonna sul DB). |
 | `@ManyToOne` / `@OneToMany` | Campo Entity | Definisce le relazioni tra tabelle (Molti-a-Uno, Uno-a-Molti) con gestione delle Foreign Key. |
 | `JpaRepository<Entity, IdType>` | Interfaccia Repo | Interfaccia Spring Data che fornisce gratuitamente tutti i metodi CRUD (`save`, `findById`, `findAll`, `deleteById`). |
+
+#### Generazione automatica in 5 secondi: `task new-entity`
+
+Invece di scrivere da zero l'Entity, il Repository, il Service e il Controller REST con decine di righe boilerplate:
+
+```bash
+task new-entity SERVICE=ordini-service NAME=Ordine FIELDS=cliente:string(120):required,quantita:int:required,consegna:date
+```
+
+Questo singolo comando genera un'architettura completa a 4 strati:
+1. **Entity JPA** (`OrdineEntity.java`): `@Entity`, `@Table(name = "ordini")`, chiave `@Id @GeneratedValue`, vincoli di validazione Jakarta (`@NotBlank`, `@NotNull`, ecc.) e getter/setter Lombok.
+2. **Spring Data Repository** (`OrdineRepository.java`): interfaccia estesa da `JpaRepository<OrdineEntity, Long>`.
+3. **Service di Business** (`OrdineService.java`): con metodi CRUD pronti (`tutti()`, `perId()`, `crea()`, `aggiorna()`, `elimina()`).
+4. **Controller REST** (`OrdineController.java`): con OpenAPI Swagger (`@Tag`, `@Operation`), rotte HTTP REST e validazione `@Valid`.
 
 #### Esempio completo — entity, repository, service, dati di prova
 
@@ -1126,7 +1153,13 @@ public OrdineDTO crea(@Valid @RequestBody OrdineDTO nuovo) {
 
 Senza altro, una richiesta non valida torna **400** con un corpo lungo e poco
 leggibile. Una classe sola lo trasforma in un messaggio pulito — e fa una bella
-figura in Swagger:
+figura in Swagger.
+
+> 💡 **Generazione automatica con `task new-handler`**:
+> ```bash
+> task new-handler SERVICE=ordini-service
+> ```
+> Genera `exception/GlobalExceptionHandler.java` con `@RestControllerAdvice`, gestione di `MethodArgumentNotValidException` (400), `ResponseStatusException`, `EntityNotFoundException` (404) ed errori generici (500).
 
 ```java
 // demo/ordini-service/src/main/java/.../GestioneErrori.java
