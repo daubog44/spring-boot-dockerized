@@ -83,6 +83,87 @@ Tre cose da portarsi via:
   transazione è seguita da Hibernate, e ogni modifica diventa un `UPDATE` alla
   fine del metodo, senza chiamare `save`.
 
+---
+
+## Dove e quando scrivere la Logica di Business della Traccia
+
+I comandi `task new-entity`, `task add-relation` e `task new-client` ti generano tutto il "plumbing" (struttura, database, CRUD, DTO, serializzazione, controller REST e client Feign).
+**Il tuo compito all'esame è scrivere solo la logica di business specifica richiesta dalla traccia.**
+
+### 1. DOVE si scrive?
+Sempre e soltanto dentro la classe `@Service` (es. `OrdineService.java`, `PrestitoService.java`), **MAI** nel Controller o nell'Entity:
+- **No nel Controller**: il controller deve solo ricevere la richiesta HTTP, validarla con `@Valid` e passarla al service.
+- **No nell'Entity**: le entity sono modelli dati mappati sul database relazionale.
+- **Sì nel Service**: il service contiene le decisioni, le formule di calcolo, i controlli di integrità e le chiamate Feign verso altri microservizi.
+
+### 2. QUANDO si scrive?
+Nel flusso operativo dell'esame, scrivi la business logic subito dopo aver creato lo scheletro:
+1. `task new-service` (crea i microservizi)
+2. `task new-entity ... DTO=1` (crea tabelle, repository, CRUD e DTO)
+3. `task add-relation` (collega le foreign key ManyToOne/OneToMany e DTO-in-DTO)
+4. `task new-client` (se un servizio deve interrogare l'altro via Feign)
+5. 👉 **ADESSO apri il file `...Service.java` e scrivi la logica!**
+
+### 3. Esempi concreti di Business Logic tipici dell'esame:
+
+#### Esempio A: Calcolo e validazione importi (es. Carrello o Ordine)
+```java
+@Transactional
+public OrdineDto creaOrdine(NuovoOrdineRequest req) {
+    // 1. Controllo di business
+    if (req.quantita() <= 0) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La quantita' deve essere maggiore di zero");
+    }
+
+    // 2. Chiamata Feign a un altro servizio per verificare disponibilità e prezzo
+    ArticoloDto articolo = catalogoClient.perId(req.articoloId());
+    if (!Boolean.TRUE.equals(articolo.disponibile())) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Articolo non disponibile a magazzino");
+    }
+
+    // 3. Formula di business (prezzo * quantita con eventuale sconto)
+    BigDecimal totale = articolo.prezzo().multiply(BigDecimal.valueOf(req.quantita()));
+    if (req.quantita() >= 10) {
+        totale = totale.multiply(BigDecimal.valueOf(0.90)); // 10% sconto quantità
+    }
+
+    // 4. Salvataggio e ritorno del DTO
+    OrdineEntity ordine = new OrdineEntity();
+    ordine.setArticoloId(req.articoloId());
+    ordine.setQuantita(req.quantita());
+    ordine.setTotale(totale);
+    ordine.setData(LocalDate.now());
+
+    return toDto(ordineRepository.save(ordine));
+}
+```
+
+#### Esempio B: Controllo disponibilità o regole temporali (es. Prenotazione o Prestito)
+```java
+@Transactional
+public PrestitoDto registraPrestito(NuovoPrestitoRequest req) {
+    // Verifica che l'utente non abbia già più di 3 prestiti attivi
+    long prestitiAttivi = prestitoRepository.countByUtenteEmailAndDataRestituzioneIsNull(req.email());
+    if (prestitiAttivi >= 3) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "L'utente ha gia' raggiunto il limite di 3 prestiti attivi");
+    }
+
+    // Segna la risorsa come occupata via Feign
+    catalogoClient.aggiornaDisponibilita(req.libroId(), false);
+
+    PrestitoEntity entity = new PrestitoEntity();
+    entity.setLibroId(req.libroId());
+    entity.setUtenteEmail(req.email());
+    entity.setDataInizio(LocalDate.now());
+    entity.setDataScadenza(LocalDate.now().plusDays(14));
+
+    return toDto(prestitoRepository.save(entity));
+}
+```
+
+### 4. Come collaudi la tua Business Logic?
+Salva il file `.java`, lancia `task compile` (che ricarica il servizio modificato in ~5 secondi con hot reload) e prova la richiesta direttamente da **Swagger UI** (`http://localhost:<porta>/swagger-ui.html`)!
+
 ## Il controller
 
 ```java demo/catalogo-service/src/main/java/esame/catalogoservice/controller/LibroController.java
