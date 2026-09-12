@@ -319,22 +319,25 @@ Test-Case 'add-relation configura ManyToOne e OneToMany fra due entity' {
 }
 
 Test-Case 'new-dto genera record in common-dto con validazione' {
-    Assert-Ok (Invoke-Tool 'new-dto.ps1' @('-Name', 'Libro', '-Fields', 'id:long,titolo:string(150):required,disponibile:bool')) 'new-dto e'' fallito'
-    $dtoFile = Join-Path $demo 'common-dto/src/main/java/esame/common/dto/LibroDto.java'
-    Assert-That (Test-Path $dtoFile) 'LibroDto.java non e'' in common-dto'
-    $dto = Get-Text 'demo/common-dto/src/main/java/esame/common/dto/LibroDto.java'
-    Assert-Contains $dto 'public record LibroDto' 'non e'' un record Java'
+    # "Volume", non "Libro": su example/biblioteca esiste gia' un vero
+    # LibroDto.java in common-dto, e il nome collide col progetto reale.
+    Assert-Ok (Invoke-Tool 'new-dto.ps1' @('-Name', 'Volume', '-Fields', 'id:long,titolo:string(150):required,disponibile:bool')) 'new-dto e'' fallito'
+    $basePkgPath = (Get-BasePackage -RepoRoot $sandbox) -replace '\.', '/'
+    $dtoFile = Join-Path $demo "common-dto/src/main/java/$basePkgPath/common/dto/VolumeDto.java"
+    Assert-That (Test-Path $dtoFile) 'VolumeDto.java non e'' in common-dto'
+    $dto = Get-Text "demo/common-dto/src/main/java/$basePkgPath/common/dto/VolumeDto.java"
+    Assert-Contains $dto 'public record VolumeDto' 'non e'' un record Java'
     Assert-Contains $dto '@Size(max = 150)' 'manca @Size'
     Assert-Contains $dto '@NotBlank' 'manca @NotBlank'
 }
 
 Test-Case 'new-client genera FeignClient collegato al servizio target' {
-    Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'epsilon-service', '-Dto', 'LibroDto')) 'new-client e'' fallito'
+    Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'epsilon-service', '-Dto', 'VolumeDto')) 'new-client e'' fallito'
     $clientFile = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/client/EpsilonClient.java')
     Assert-That (Test-Path $clientFile) 'EpsilonClient.java non e'' nel modulo chiamante'
     $client = Read-TextFile $clientFile
     Assert-Contains $client '@FeignClient(name = "EPSILON-SERVICE")' 'nome Eureka errato'
-    Assert-Contains $client 'List<LibroDto> getAll()' 'manca getAll'
+    Assert-Contains $client 'List<VolumeDto> getAll()' 'manca getAll'
 }
 
 Test-Case 'new-view genera controller e template thymeleaf nel modulo UI' {
@@ -352,10 +355,34 @@ Test-Case 'new-view genera controller e template thymeleaf nel modulo UI' {
 
 Test-Case 'new-client crea automaticamente il DTO in common-dto se sono passati FIELDS' {
     Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'beta-ui', '-Name', 'BetaClient', '-Dto', 'AutoreDto', '-Fields', 'nome:string:required')) 'new-client con FIELDS fallito'
-    $dtoFile = Join-Path $demo 'common-dto/src/main/java/esame/common/dto/AutoreDto.java'
+    $basePkgPath = (Get-BasePackage -RepoRoot $sandbox) -replace '\.', '/'
+    $dtoFile = Join-Path $demo "common-dto/src/main/java/$basePkgPath/common/dto/AutoreDto.java"
     $clientFile = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/client/BetaClient.java')
     Assert-That (Test-Path $dtoFile) 'AutoreDto.java non e'' stato creato automaticamente in common-dto'
     Assert-That (Test-Path $clientFile) 'BetaClient.java non e'' stato creato nel chiamante'
+}
+
+Test-Case 'task new-client (CLI reale, senza ROUTE) non spezza la riga di comando' {
+    # Passa per il Taskfile vero, non per lo script diretto come le altre prove:
+    # una variabile Task chiamata come una variabile d'ambiente di sistema
+    # (successo con PATH, prima di diventare ROUTE) viene risolta con quella
+    # del sistema anche se non la passi, e senza virgolette rompe il parsing
+    # di mvdan/sh sulla prima parentesi che trova (es. "Program Files (x86)").
+    $taskCmd = Get-Command task -ErrorAction SilentlyContinue
+    if (-not $taskCmd) { throw 'SALTATO: comando task non trovato sul PATH' }
+    Push-Location $sandbox
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & task new-client FROM=epsilon-service TO=gamma-service 2>&1 | Out-String
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+        Pop-Location
+    }
+    Assert-That ($code -eq 0) "task new-client FROM=epsilon-service TO=gamma-service e'' fallito:`n$output"
+    $clientFile = Join-Path $demo ('epsilon-service/src/main/java/' + (Get-SandboxPackagePath 'epsilon-service') + '/client/GammaClient.java')
+    Assert-That (Test-Path $clientFile) 'GammaClient.java non e'' stato creato (task new-client via CLI reale)'
 }
 
 Test-Case 'new-auth configura la sicurezza su database (UtenteEntity, Repo, UserDetailsService, BCrypt)' {
