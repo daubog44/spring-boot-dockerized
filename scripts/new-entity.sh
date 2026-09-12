@@ -31,8 +31,56 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-USAGE="Uso: task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=<campo:tipo:modificatore,...>"
-{ [ -n "$SERVICE" ] && [ -n "$NAME" ]; } || { echo "$USAGE" >&2; exit 1; }
+if [ -z "$SERVICE" ] || [ -z "$NAME" ]; then
+  if [ ! -t 0 ]; then
+    echo "Uso: task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=<campo:tipo:modificatore,...>" >&2
+    exit 1
+  fi
+
+  JPA_MODULES=()
+  for d in "$DEMO_DIR"/*; do
+    if [ -f "$d/pom.xml" ] && grep -q 'spring-boot-starter-data-jpa' "$d/pom.xml"; then
+      JPA_MODULES+=("$(basename "$d")")
+    fi
+  done
+  if [ "${#JPA_MODULES[@]}" -eq 0 ]; then
+    echo "Non ci sono moduli con JPA (database) in demo/. Creane uno con task new-service." >&2
+    exit 1
+  fi
+
+  echo ""
+  echo "CREAZIONE ENTITY GUIDATA"
+  if [ -z "$SERVICE" ]; then
+    echo "Seleziona il microservizio con database:"
+    for i in "${!JPA_MODULES[@]}"; do
+      echo "  $((i+1))) ${JPA_MODULES[$i]}"
+    done
+    printf "  [1] > "
+    read -r IDX
+    [ -n "$IDX" ] || IDX=1
+    SERVICE="${JPA_MODULES[$((IDX-1))]}"
+  fi
+
+  if [ -z "$NAME" ]; then
+    printf "  Nome dell'Entity in PascalCase (es. Libro, Ordine, Articolo): "
+    read -r NAME
+    [ -n "$NAME" ] || { echo "Nome obbligatorio." >&2; exit 1; }
+  fi
+
+  if [ -z "$FIELDS" ]; then
+    echo "  Campi (es. nome:string:required,prezzo:decimal,disponibile:bool):"
+    printf "  Campi (premi Invio se nessuno): "
+    read -r FIELDS
+  fi
+
+  if [ "$DTO" = "0" ]; then
+    printf "  Generare anche il DTO in common-dto e mappare Service/Controller? [S/n]: "
+    read -r DANS
+    if [ "$DANS" != "n" ] && [ "$DANS" != "N" ]; then
+      DTO=1
+    fi
+  fi
+fi
 if ! printf '%s' "$NAME" | grep -qE '^[A-Z][a-zA-Z0-9]*$'; then
   echo "Nome non valido: '$NAME'. Usa il PascalCase, come lo scriveresti in Java: Libro, RigaOrdine." >&2
   exit 1

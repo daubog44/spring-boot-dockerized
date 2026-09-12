@@ -25,11 +25,37 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
-$moduleDir = Join-Path $demoDir $Module
-
 if (-not $Module) {
-    throw "Uso: task remove-service SERVICE=<modulo>"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task remove-service SERVICE=<modulo>"
+    }
+
+    $allModules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object {
+        Test-Path (Join-Path $_.FullName 'pom.xml')
+    } | Select-Object -ExpandProperty Name)
+
+    if ($allModules.Count -eq 0) {
+        throw "Nessun modulo trovato in demo/."
+    }
+
+    Write-Host ''
+    Write-Host 'RIMOZIONE SERVIZIO GUIDATA' -ForegroundColor Yellow
+    Write-Host 'Seleziona il modulo da rimuovere:' -ForegroundColor Cyan
+    for ($i = 0; $i -lt $allModules.Count; $i++) {
+        Write-Host "  $($i + 1)) $($allModules[$i])"
+    }
+    $idx = Read-Host "  [1] >"
+    $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
+    if ($idxNum -lt 1 -or $idxNum -gt $allModules.Count) { $idxNum = 1 }
+    $Module = $allModules[$idxNum - 1]
+
+    $confirm = Read-Host "Sei sicuro di voler eliminare definitivamente '$Module'? [s/N]"
+    if ($confirm.Trim().ToLower() -ne 's' -and $confirm.Trim().ToLower() -ne 'si' -and $confirm.Trim().ToLower() -ne 'y') {
+        Write-Host "Operazione annullata." -ForegroundColor Yellow
+        exit 0
+    }
 }
+$moduleDir = Join-Path $demoDir $Module
 if (-not (Test-Path (Join-Path $moduleDir 'pom.xml'))) {
     $available = (Get-ChildItem -Path $demoDir -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'pom.xml') } | ForEach-Object { $_.Name }) -join ', '
     throw "Modulo '$Module' non trovato. Moduli disponibili: $available"

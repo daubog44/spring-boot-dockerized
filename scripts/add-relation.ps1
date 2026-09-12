@@ -118,6 +118,22 @@ if (-not $To) {
     $To = $candidates[$idxNum - 1]
 }
 
+if (-not $PSBoundParameters.ContainsKey('Type') -and -not [Console]::IsInputRedirected) {
+    Write-Host ''
+    Write-Host "Tipo di relazione:" -ForegroundColor Cyan
+    Write-Host "  1) many-to-one (es. Un Articolo appartiene a una Categoria) [default]"
+    Write-Host "  2) one-to-many"
+    Write-Host "  3) many-to-many"
+    Write-Host "  4) one-to-one"
+    $tChoice = Read-Host "  [1] >"
+    switch ($tChoice.Trim()) {
+        '2' { $Type = 'one-to-many' }
+        '3' { $Type = 'many-to-many' }
+        '4' { $Type = 'one-to-one' }
+        default { $Type = 'many-to-one' }
+    }
+}
+
 $cleanFrom = $From -replace 'Entity$', ''
 $cleanTo = $To -replace 'Entity$', ''
 

@@ -43,6 +43,8 @@ Puoi generare l'interfaccia `@FeignClient` collegata al servizio target direttam
 task new-client FROM=prestiti-service TO=catalogo-service DTO=LibroDto
 ```
 
+> 💡 **Modalità Interattiva**: puoi anche lanciare semplicemente `task new-client` senza argomenti. Ti mostrerà l'elenco dei microservizi presenti da cui scegliere il modulo chiamante e il target, e ti chiederà il nome del DTO!
+
 Oppure, se il DTO non esiste ancora in `common-dto`, puoi specificare anche i campi:
 
 ```bash

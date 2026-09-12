@@ -56,8 +56,50 @@ $demoDir = Join-Path $repoRoot 'demo'
 # --- Argomenti ------------------------------------------------------------
 
 if (-not $Service -or -not $Name) {
-    throw "Uso: task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=<campo:tipo:modificatore,...>`n" +
-          "Esempio: task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):unique"
+    if ([Console]::IsInputRedirected) {
+        throw "Uso: task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=<campo:tipo:modificatore,...>`n" +
+              "Esempio: task new-entity SERVICE=catalogo-service NAME=Libro FIELDS=titolo:string(150):required,isbn:string(13):unique"
+    }
+
+    $jpaModules = @(Get-ChildItem -Path $demoDir -Directory | Where-Object {
+        $p = Join-Path $_.FullName 'pom.xml'
+        (Test-Path $p) -and ((Read-TextFile $p) -match 'spring-boot-starter-data-jpa')
+    } | Select-Object -ExpandProperty Name)
+
+    if ($jpaModules.Count -eq 0) {
+        throw "Non ci sono moduli con JPA (database) in demo/. Creane uno con task new-service."
+    }
+
+    Write-Host ''
+    Write-Host 'CREAZIONE ENTITY GUIDATA' -ForegroundColor Cyan
+    if (-not $Service) {
+        Write-Host "Seleziona il microservizio con database:" -ForegroundColor DarkGray
+        for ($i = 0; $i -lt $jpaModules.Count; $i++) {
+            Write-Host "  $($i + 1)) $($jpaModules[$i])"
+        }
+        $idx = Read-Host "  [1] >"
+        $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
+        $Service = $jpaModules[$idxNum - 1]
+    }
+
+    if (-not $Name) {
+        $Name = (Read-Host "  Nome dell'Entity in PascalCase (es. Libro, Ordine, Articolo)").Trim()
+        if (-not $Name) {
+            throw "Uso: task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=<campo:tipo:modificatore,...>"
+        }
+    }
+
+    if (-not $Fields) {
+        Write-Host "  Campi (formato nome:tipo[:modificatore], es. nome:string:required,prezzo:decimal,disponibile:bool):" -ForegroundColor DarkGray
+        $Fields = (Read-Host "  Campi (premi Invio se nessuno)").Trim()
+    }
+
+    if (-not $Dto) {
+        $dAns = (Read-Host "  Generare anche il DTO in common-dto e mappare Service/Controller? [S/n]").Trim().ToLowerInvariant()
+        if ($dAns -ne 'n' -and $dAns -ne 'no') {
+            $Dto = $true
+        }
+    }
 }
 if ($Name -cnotmatch '^[A-Z][a-zA-Z0-9]*$') {
     throw "Nome non valido: '$Name'. Usa il PascalCase, come lo scriveresti in Java: Libro, RigaOrdine."

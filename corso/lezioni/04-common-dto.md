@@ -72,6 +72,8 @@ Crea il file in `demo/common-dto/src/main/java/esame/common/dto/` come Java `rec
 moderno con le annotazioni di validazione (`@NotNull`, `@NotBlank`, `@Email`, `@Min`, `@Max`).
 Se preferisci una classe classica con getter e setter Lombok, aggiungi `CLASS=1`.
 
+> 💡 **Modalità Interattiva**: puoi anche lanciare `task new-dto` senza parametri. Un comodo wizard ti chiederà nome del record, campi da inserire e se preferisci un record o una classe!
+
 
 Il record è la forma giusta per un DTO: immutabile, con costruttore,
 accessori, `equals` e `toString` già fatti, e Jackson lo trasforma in JSON e

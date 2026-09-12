@@ -24,8 +24,52 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$MODULE" ]; then
-  echo "Uso: task use-postgres SERVICE=<modulo> [DBNAME=<database>] [REMOVE_H2=1]" >&2
-  exit 1
+  if [ ! -t 0 ]; then
+    echo "Uso: task use-postgres SERVICE=<modulo> [DBNAME=<database>] [REMOVE_H2=1]" >&2
+    exit 1
+  fi
+
+  ALL_MODULES=()
+  for d in "$DEMO_DIR"/*; do
+    if [ -f "$d/pom.xml" ]; then
+      ALL_MODULES+=("$(basename "$d")")
+    fi
+  done
+  if [ "${#ALL_MODULES[@]}" -eq 0 ]; then
+    echo "Nessun modulo trovato in demo/." >&2
+    exit 1
+  fi
+
+  echo ""
+  echo "COLLEGAMENTO A POSTGRESQL GUIDATO"
+  echo "Seleziona il microservizio da collegare a PostgreSQL:"
+  for i in "${!ALL_MODULES[@]}"; do
+    echo "  $((i+1))) ${ALL_MODULES[$i]}"
+  done
+  printf "  [1] > "
+  read -r IDX
+  [ -n "$IDX" ] || IDX=1
+  MODULE="${ALL_MODULES[$((IDX-1))]}"
+
+  if [ -z "$DB_NAME" ]; then
+    DEFAULT_SUGG="$(printf '%s' "$MODULE" | sed -E 's/-service$//' | sed -E 's/-ui$//')"
+    printf "  Nome database dedicato [%s]: " "$DEFAULT_SUGG"
+    read -r DB_IN
+    if [ -n "$DB_IN" ]; then
+      DB_NAME="$DB_IN"
+    else
+      DB_NAME="$DEFAULT_SUGG"
+    fi
+  fi
+
+  if [ "$REMOVE_H2" -eq 0 ]; then
+    printf "  Rimuovere la dipendenza H2 in memoria? [s/N]: "
+    read -r H2_ANS
+    H2_ANS="$(printf '%s' "$H2_ANS" | tr '[:upper:]' '[:lower:]')"
+    if [ "$H2_ANS" = "s" ] || [ "$H2_ANS" = "si" ] || [ "$H2_ANS" = "y" ]; then
+      REMOVE_H2=1
+    fi
+  fi
 fi
 if [ ! -f "$DEMO_DIR/$MODULE/pom.xml" ]; then
   available=""

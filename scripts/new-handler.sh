@@ -21,8 +21,32 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$SERVICE" ]; then
-  echo "Uso: task new-handler SERVICE=<modulo>" >&2
-  exit 1
+  if [ ! -t 0 ]; then
+    echo "Uso: task new-handler SERVICE=<modulo>" >&2
+    exit 1
+  fi
+
+  ALL_MODULES=()
+  for d in "$DEMO_DIR"/*; do
+    if [ -f "$d/pom.xml" ] && [ "$(basename "$d")" != "common-dto" ]; then
+      ALL_MODULES+=("$(basename "$d")")
+    fi
+  done
+  if [ "${#ALL_MODULES[@]}" -eq 0 ]; then
+    echo "Non ci sono moduli in demo/." >&2
+    exit 1
+  fi
+
+  echo ""
+  echo "GENERATORE GLOBAL EXCEPTION HANDLER"
+  echo "Seleziona il modulo in cui inserire GlobalExceptionHandler:"
+  for i in "${!ALL_MODULES[@]}"; do
+    echo "  $((i+1))) ${ALL_MODULES[$i]}"
+  done
+  printf "  [1] > "
+  read -r IDX
+  [ -n "$IDX" ] || IDX=1
+  SERVICE="${ALL_MODULES[$((IDX-1))]}"
 fi
 
 MODULE_DIR="$DEMO_DIR/$SERVICE"

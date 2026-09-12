@@ -89,8 +89,36 @@ if [ "$LIST" = "1" ]; then
 fi
 
 if [ -z "$MODULE" ] || [ -z "$DEPS" ]; then
-  echo "Uso: task add-dep SERVICE=<modulo> DEPS=<dip1,dip2>   (elenco: task add-dep LIST=1)" >&2
-  exit 1
+  if [ ! -t 0 ]; then
+    echo "Uso: task add-dep SERVICE=<modulo> DEPS=<dip1,dip2>   (elenco: task add-dep LIST=1)" >&2
+    exit 1
+  fi
+
+  ALL_MODULES=()
+  for d in "$DEMO_DIR"/*; do
+    [ -f "$d/pom.xml" ] && ALL_MODULES+=("$(basename "$d")")
+  done
+
+  echo ""
+  echo "AGGIUNTA DIPENDENZE GUIDATA"
+  if [ -z "$MODULE" ]; then
+    echo "Seleziona il modulo a cui aggiungere dipendenze:"
+    for i in "${!ALL_MODULES[@]}"; do
+      echo "  $((i+1))) ${ALL_MODULES[$i]}"
+    done
+    printf "  [1] > "
+    read -r IDX
+    [ -n "$IDX" ] || IDX=1
+    MODULE="${ALL_MODULES[$((IDX-1))]}"
+  fi
+
+  if [ -z "$DEPS" ]; then
+    echo "Inserisci le dipendenze da aggiungere separate da virgola (es. security, mail, kafka, validation)."
+    echo "Nomi brevi noti: security, mail, kafka, data-jpa, validation, thymeleaf, feign..."
+    printf "  Dipendenze: "
+    read -r DEPS
+    [ -n "$DEPS" ] || { echo "Uso: task add-dep SERVICE=<modulo> DEPS=<dip1,dip2>" >&2; exit 1; }
+  fi
 fi
 
 POM="$DEMO_DIR/$MODULE/pom.xml"
