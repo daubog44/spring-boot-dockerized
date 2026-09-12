@@ -221,6 +221,15 @@ Per non perdere ore a scrivere codice boilerplate e classi ripetitive durante l'
 | `:required` | vincolo | `@NotNull` / `@NotBlank` + `nullable = false` |
 | `:unique` | vincolo | vincolo di unicità `unique = true` |
 
+### 3.2 Relazioni JPA, Serializzazione JSON & Join Completi
+
+Quando definisci relazioni tra tabelle dello stesso microservizio (`task add-relation`):
+
+| Approccio | Come si fa | Risultato / Vantaggi |
+| :--- | :--- | :--- |
+| **Senza DTO (`@JsonIgnoreProperties`)** | Metti `@JsonIgnoreProperties("articoli")` sul `@ManyToOne` e `@JsonIgnoreProperties("categoria")` sul `@OneToMany`. | Spezza il loop Jackson ricorsivo ed espone l'entità correlata intera. Usa `@Query("... LEFT JOIN FETCH ...")` nel repository per eseguire il JOIN SQL in una sola query ed evitare `LazyInitializationException`. |
+| **Con DTO ("DTO in DTO")** *(Consigliato)* | Crei `CategoriaDto` e lo annidi in `ArticoloDto(..., CategoriaDto categoria)`. | Massima robustezza, contratti OpenAPI stabili, zero eccezioni di lazy loading o loop di serializzazione. Mappi nel Service dentro `toDto()`. |
+
 ---
 
 ## 4. Collaudo Rapido
