@@ -128,11 +128,16 @@ if [ -z "$DTO_NAME" ]; then
     BASE_TO="$(printf '%s' "$TO" | sed -E 's/-(service|app|api)$//')"
     DTO_NAME="$(to_pascal "$BASE_TO")Dto"
   else
-    BASE_TO="$(printf '%s' "$TO" | sed -E 's/-(service|app|api)$//')"
-    CANDIDATE="$(to_pascal "$BASE_TO")Dto"
     BASE_PKG="$(base_package "$DEMO_DIR")"
     BASE_PKG_PATH="$(printf '%s' "$BASE_PKG" | tr '.' '/')"
-    if [ -f "$DEMO_DIR/common-dto/src/main/java/$BASE_PKG_PATH/common/dto/$CANDIDATE.java" ]; then
+    COMMON_DIR="$DEMO_DIR/common-dto/src/main/java/$BASE_PKG_PATH/common/dto"
+    ROUTE_TOKEN="$(basename "$ROUTE_PATH")"
+    ROUTE_DTO="$(to_pascal "$ROUTE_TOKEN")Dto"
+    BASE_TO="$(printf '%s' "$TO" | sed -E 's/-(service|app|api)$//')"
+    CANDIDATE="$(to_pascal "$BASE_TO")Dto"
+    if [ -f "$COMMON_DIR/$ROUTE_DTO.java" ]; then
+      DTO_NAME="$ROUTE_DTO"
+    elif [ -f "$COMMON_DIR/$CANDIDATE.java" ]; then
       DTO_NAME="$CANDIDATE"
     else
       DTO_NAME="Object"

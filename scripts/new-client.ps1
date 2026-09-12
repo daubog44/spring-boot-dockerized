@@ -140,12 +140,18 @@ if (-not $dtoName) {
         $targetBase = $To -replace '-(service|app|api)$', ''
         $dtoName = (Convert-ToPascal $targetBase) + 'Dto'
     } else {
-        $targetBase = $To -replace '-(service|app|api)$', ''
-        $candidateDto = (Convert-ToPascal $targetBase) + 'Dto'
         $basePkg = Get-BasePackage
         $basePkgPath = $basePkg -replace '\.', '/'
         $commonDtoDir = Join-Path $demoDir "common-dto/src/main/java/$basePkgPath/common/dto"
-        if (Test-Path (Join-Path $commonDtoDir "$candidateDto.java")) {
+
+        $routeToken = ($routePath.Trim('/') -split '/')[-1]
+        $routeDto = (Convert-ToPascal $routeToken) + 'Dto'
+        $targetBase = $To -replace '-(service|app|api)$', ''
+        $candidateDto = (Convert-ToPascal $targetBase) + 'Dto'
+
+        if (Test-Path (Join-Path $commonDtoDir "$routeDto.java")) {
+            $dtoName = $routeDto
+        } elseif (Test-Path (Join-Path $commonDtoDir "$candidateDto.java")) {
             $dtoName = $candidateDto
         } else {
             $dtoName = 'Object'
