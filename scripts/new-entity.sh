@@ -230,8 +230,19 @@ pascal_field() {
   printf '%s%s' "$(printf '%s' "${f:0:1}" | tr 'a-z' 'A-Z')" "${f:1}"
 }
 
+is_sql_keyword() {
+  case "$(printf '%s' "$1" | tr 'A-Z' 'a-z')" in
+    user|order|group|table|check|primary|limit|offset|role|condition|read|select|where|from|join|index|values|references|key|rank|value|filter|password) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 TABLE_NAME="${TABLE:-$(to_snake_case "$NAME")}"
 ROUTE_BASE="$(printf '%s' "$TABLE_NAME" | tr '_' '-')"
+ESCAPED_TABLE_NAME="$TABLE_NAME"
+if is_sql_keyword "$TABLE_NAME"; then
+  ESCAPED_TABLE_NAME="\\\"$TABLE_NAME\\\""
+fi
 
 # --- Interpretazione di FIELDS -------------------------------------------------
 
@@ -352,6 +363,10 @@ EOF
     fi
 
     COLUMN_ATTRS=()
+    COL_NAME="$(to_snake_case "$FIELD_NAME")"
+    if is_sql_keyword "$COL_NAME"; then
+      COLUMN_ATTRS+=("name = \"\\\"$COL_NAME\\\"\"")
+    fi
     if [ "$REQUIRED" = "1" ]; then
       COLUMN_ATTRS+=("nullable = false")
       if [ "$JAVA_TYPE" = "String" ] && [ -z "$ENUM_NAME" ]; then VALIDATION_LINES+=("@NotBlank")
@@ -416,7 +431,7 @@ ${EXTRA_IMPORTS}
 // servizio niente relazione: solo un id (Long) e una chiamata Feign, vedi
 // la lezione 8 e la 10 del corso (task learn).
 @Entity
-@Table(name = "$TABLE_NAME")
+@Table(name = "$ESCAPED_TABLE_NAME")
 @Getter
 @Setter
 @NoArgsConstructor

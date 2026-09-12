@@ -42,18 +42,25 @@ Write-Host '==> Generazione e verifica Allegato Tecnico' -ForegroundColor Cyan
 
 $services = @()
 $textDev = Read-TextFile $devPs1
-foreach ($match in [regex]::Matches($textDev, "Name\s*=\s*'([^']+)';\s*Module\s*=\s*'([^']+)';\s*Port\s*=\s*(\d+)")) {
+$uiPortDefault = 0
+$hitUi = [regex]::Match($textDev, '\[int\]\$UiPort\s*=\s*(\d+)')
+if ($hitUi.Success) { $uiPortDefault = [int]$hitUi.Groups[1].Value }
+
+foreach ($match in [regex]::Matches($textDev, "Name\s*=\s*'([^']+)';\s*Module\s*=\s*'([^']+)';\s*Port\s*=\s*(\`$UiPort|\d+)")) {
     $mName = $match.Groups[2].Value
     $mDir = Join-Path $demoDir $mName
     if (-not (Test-Path $mDir)) { continue }
 
+    $port = if ($match.Groups[3].Value -eq '$UiPort') { $uiPortDefault } else { [int]$match.Groups[3].Value }
+
     $appName = $mName.ToUpper()
-    $yml = Join-Path $mDir 'src/main/resources/application.yml'
-    if (Test-Path $yml) {
-        $hit = [regex]::Match((Read-TextFile $yml), '(?m)^\s*application:\s*[\r\n]+\s*name:\s*([^\r\n]+)')
+    $cfg = Get-ModuleConfigFile -ModuleDir $mDir
+    if ($cfg) {
+        $cfgText = Read-TextFile $cfg
+        $hit = [regex]::Match($cfgText, '(?m)^\s*application:\s*[\r\n]+\s*name:\s*([^\r\n]+)')
         if ($hit.Success) { $appName = $hit.Groups[1].Value.Trim() }
         else {
-            $hit2 = [regex]::Match((Read-TextFile $yml), '(?m)^\s*spring\.application\.name:\s*([^\r\n]+)')
+            $hit2 = [regex]::Match($cfgText, '(?m)^\s*spring\.application\.name\s*[:=]\s*([^\r\n]+)')
             if ($hit2.Success) { $appName = $hit2.Groups[1].Value.Trim() }
         }
     }
@@ -65,14 +72,16 @@ foreach ($match in [regex]::Matches($textDev, "Name\s*=\s*'([^']+)';\s*Module\s*
         foreach ($jf in (Get-ChildItem -Path $javaDir -Recurse -Filter '*.java')) {
             $cText = Read-TextFile $jf.FullName
             $prefix = ''
-            $mReq = [regex]::Match($cText, '@RequestMapping\(\s*(?:value\s*=\s*)?"([^"]+)"\)')
+            $mReq = [regex]::Match($cText, '@RequestMapping\s*\(\s*(?:(?:value|path)\s*=\s*)?"([^"]+)"\)')
             if ($mReq.Success) { $prefix = $mReq.Groups[1].Value }
 
-            foreach ($em in [regex]::Matches($cText, '@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping)\(\s*(?:(?:value|path)\s*=\s*)?"?([^"\)]*)"?\s*\)')) {
+            foreach ($em in [regex]::Matches($cText, '@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping)\s*(?:\(\s*(?:(?:value|path)\s*=\s*)?"?([^"\)]*)"?\s*\))?')) {
                 $verb = $em.Groups[1].Value.Replace('Mapping', '').ToUpper()
                 $p = $em.Groups[2].Value
-                $fullPath = ($prefix + '/' + $p) -replace '//+', '/'
-                if (-not $fullPath.StartsWith('/')) { $fullPath = '/' + $fullPath }
+                $pClean = if ($p) { if ($p.StartsWith('/')) { $p } else { "/$p" } } else { '' }
+                $prefClean = $prefix.TrimEnd('/')
+                $fullPath = $prefClean + $pClean
+                if (-not $fullPath) { $fullPath = '/' }
                 $endpoints += "$verb $fullPath"
             }
         }
@@ -81,7 +90,7 @@ foreach ($match in [regex]::Matches($textDev, "Name\s*=\s*'([^']+)';\s*Module\s*
     $services += [pscustomobject]@{
         Short     = $match.Groups[1].Value
         Module    = $mName
-        Port      = [int]$match.Groups[3].Value
+        Port      = $port
         AppName   = $appName
         Endpoints = $endpoints
     }

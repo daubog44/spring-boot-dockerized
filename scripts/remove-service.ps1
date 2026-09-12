@@ -122,6 +122,34 @@ if ($moduleLine -ge 0) {
     Write-Step 'demo/docker-compose.yml'
 }
 
+# Se nessun modulo rimasto usa PostgreSQL, spegni l'avvio del container in dev
+$hasPostgres = $false
+foreach ($m in (Get-ChildItem -Path $demoDir -Directory)) {
+    $cfg = Get-ModuleConfigFile -ModuleDir $m.FullName
+    if ($cfg -and (Read-TextFile $cfg) -match 'jdbc:postgresql') {
+        $hasPostgres = $true
+        break
+    }
+}
+if (-not $hasPostgres) {
+    $devPs1 = Join-Path $PSScriptRoot 'dev.ps1'
+    if (Test-Path $devPs1) {
+        $t = Read-TextFile $devPs1
+        if ($t -match '\$usesPostgres\s*=\s*\$true') {
+            Write-TextFile -Path $devPs1 -Text ($t -replace '\$usesPostgres\s*=\s*\$true', '$usesPostgres = $false')
+            Write-Step 'scripts/dev.ps1: disabilitato avvio automatico PostgreSQL'
+        }
+    }
+    $devSh = Join-Path $PSScriptRoot 'dev.sh'
+    if (Test-Path $devSh) {
+        $t = Read-TextFile $devSh
+        if ($t -match 'USES_POSTGRES=1') {
+            Write-TextFile -Path $devSh -Text ($t -replace 'USES_POSTGRES=1', 'USES_POSTGRES=0')
+            Write-Step 'scripts/dev.sh: disabilitato avvio automatico PostgreSQL'
+        }
+    }
+}
+
 # --- Gli editor ---------------------------------------------------------------
 # Un launch.json che elenca servizi che non esistono e' peggio di non averlo.
 

@@ -48,12 +48,9 @@ if (-not $Module -or $Port -eq 0) {
     if (-not $Module) {
         Write-Host "Seleziona il modulo di cui cambiare la porta:" -ForegroundColor DarkGray
         for ($i = 0; $i -lt $allModules.Count; $i++) {
-            $mYml = Join-Path $demoDir (Join-Path $allModules[$i] 'src/main/resources/application.yml')
-            $currPort = '?'
-            if (Test-Path $mYml) {
-                $pm = [regex]::Match((Read-TextFile $mYml), 'SERVER_PORT:(\d+)')
-                if ($pm.Success) { $currPort = $pm.Groups[1].Value }
-            }
+            $mDir = Join-Path $demoDir $allModules[$i]
+            $p = Get-ModulePort -ModuleDir $mDir
+            $currPort = if ($p -gt 0) { "$p" } else { '?' }
             Write-Host "  $($i + 1)) $($allModules[$i]) (porta attuale: $currPort)"
         }
         $idx = Read-Host "  [1] >"
@@ -76,12 +73,11 @@ if (-not (Test-Path (Join-Path $moduleDir 'pom.xml'))) {
     throw "Modulo '$Module' non trovato. Moduli disponibili: $available"
 }
 
-$ymlPath = Join-Path $moduleDir 'src/main/resources/application.yml'
-if (-not (Test-Path $ymlPath)) { throw "Non trovo $ymlPath." }
+$cfgPath = Get-ModuleConfigFile -ModuleDir $moduleDir
+if (-not $cfgPath) { throw "Non trovo file di configurazione (application.yml, application.yaml o application.properties) in $moduleDir." }
 
-$oldMatch = [regex]::Match((Read-TextFile $ymlPath), 'SERVER_PORT:(\d+)')
-if (-not $oldMatch.Success) { throw "In $ymlPath non c'e' un 'port: `${SERVER_PORT:N}': cambiala a mano." }
-$oldPort = [int]$oldMatch.Groups[1].Value
+$oldPort = Get-ModulePort -ModuleDir $moduleDir
+if ($oldPort -eq 0) { throw "In $cfgPath non c'e' una porta riconosciuta (es. 'port: `${SERVER_PORT:N}'): impostala prima nel file." }
 
 if ($oldPort -eq $Port) {
     Write-Host "$Module e' gia' sulla porta ${Port}: niente da fare."
@@ -92,10 +88,8 @@ if ($oldPort -eq $Port) {
 # avvierebbe due servizi sulla stessa porta e il secondo morirebbe.
 foreach ($dir in (Get-ChildItem -Path $demoDir -Directory)) {
     if ($dir.Name -eq $Module) { continue }
-    $other = Join-Path $dir.FullName 'src/main/resources/application.yml'
-    if (-not (Test-Path $other)) { continue }
-    $hit = [regex]::Match((Read-TextFile $other), 'SERVER_PORT:(\d+)')
-    if ($hit.Success -and [int]$hit.Groups[1].Value -eq $Port) {
+    $otherPort = Get-ModulePort -ModuleDir $dir.FullName
+    if ($otherPort -eq $Port) {
         throw "La porta $Port e' gia' di $($dir.Name). Spostati su un'altra."
     }
 }
@@ -106,10 +100,25 @@ Write-Host ''
 Write-Host "==> $Module : $oldPort -> $Port" -ForegroundColor Cyan
 Write-Host ''
 
-# --- 1. application.yml del modulo -------------------------------------------
+# --- 1. file di configurazione del modulo --------------------------------------
 
-[void](Edit-TextFile -Path $ymlPath -Pattern "SERVER_PORT:$oldPort" -Replacement "SERVER_PORT:$Port")
-Write-Step "demo/$Module/src/main/resources/application.yml"
+$cfgText = Read-TextFile $cfgPath
+if ($cfgText -match "SERVER_PORT:$oldPort") {
+    $cfgText = [regex]::Replace($cfgText, "SERVER_PORT:$oldPort", "SERVER_PORT:$Port")
+} elseif ($cfgText -match '(?m)^\s*port:\s*' + $oldPort) {
+    $cfgText = [regex]::Replace($cfgText, '(?m)^\s*port:\s*' + $oldPort, "  port: `${SERVER_PORT:$Port}")
+} elseif ($cfgText -match '(?m)^\s*server\.port\s*[:=]\s*' + $oldPort) {
+    if ($cfgPath.EndsWith('.properties')) {
+        $cfgText = [regex]::Replace($cfgText, '(?m)^\s*server\.port\s*=\s*' + $oldPort, "server.port=`${SERVER_PORT:$Port}")
+    } else {
+        $cfgText = [regex]::Replace($cfgText, '(?m)^\s*server\.port\s*:\s*' + $oldPort, "server.port: `${SERVER_PORT:$Port}")
+    }
+} else {
+    $cfgText = [regex]::Replace($cfgText, "\b$oldPort\b", "$Port")
+}
+Write-TextFile -Path $cfgPath -Text $cfgText
+$cfgRel = $cfgPath.Substring($demoDir.Length + 1) -replace '\\', '/'
+Write-Step "demo/$cfgRel"
 
 # --- 2. docker-compose.yml ----------------------------------------------------
 
@@ -174,10 +183,11 @@ if ($isEureka) {
     Write-Host ''
     Write-Host '  Eureka si e'' spostato: aggiorno chi lo cerca.' -ForegroundColor Cyan
     foreach ($dir in (Get-ChildItem -Path $demoDir -Directory)) {
-        $yml = Join-Path $dir.FullName 'src/main/resources/application.yml'
-        if (-not (Test-Path $yml)) { continue }
-        if ((Edit-TextFile -Path $yml -Pattern "localhost:$oldPort" -Replacement "localhost:$Port") -gt 0) {
-            Write-Step "demo/$($dir.Name)/src/main/resources/application.yml"
+        $cfg = Get-ModuleConfigFile -ModuleDir $dir.FullName
+        if (-not $cfg) { continue }
+        if ((Edit-TextFile -Path $cfg -Pattern "localhost:$oldPort" -Replacement "localhost:$Port") -gt 0) {
+            $rel = $cfg.Substring($demoDir.Length + 1) -replace '\\', '/'
+            Write-Step "demo/$rel"
         }
     }
     if ((Edit-TextFile -Path $compose -Pattern "eureka-server:$oldPort" -Replacement "eureka-server:$Port") -gt 0) {

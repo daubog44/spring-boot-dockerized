@@ -162,6 +162,27 @@ function Get-ModulePackage {
     return ($Base + '.' + ($Module -replace '[^a-zA-Z0-9]', ''))
 }
 
+function Get-ModuleConfigFile {
+    param([Parameter(Mandatory = $true)][string]$ModuleDir)
+    foreach ($cand in @('src/main/resources/application.yml', 'src/main/resources/application.yaml', 'src/main/resources/application.properties')) {
+        $p = Join-Path $ModuleDir $cand
+        if (Test-Path $p) { return $p }
+    }
+    return $null
+}
+
+function Get-ModulePort {
+    param([Parameter(Mandatory = $true)][string]$ModuleDir)
+    $cfg = Get-ModuleConfigFile -ModuleDir $ModuleDir
+    if (-not $cfg) { return 0 }
+    $text = Read-TextFile $cfg
+    $m = [regex]::Match($text, 'SERVER_PORT:(\d+)')
+    if ($m.Success) { return [int]$m.Groups[1].Value }
+    $m = [regex]::Match($text, '(?m)^\s*(?:server\.)?port\s*[:=]\s*(\d+)')
+    if ($m.Success) { return [int]$m.Groups[1].Value }
+    return 0
+}
+
 function Get-MachineJdk {
     # Il JDK con cui Maven compilera': quello di JAVA_HOME se c'e', se no il
     # java del PATH. Restituisce versione (17, 21, 25...) e cartella, o $null.

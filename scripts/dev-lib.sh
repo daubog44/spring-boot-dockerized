@@ -38,6 +38,13 @@ unset _compose_env
 dev_ports() {
   local log_dir="$1"
   local ports="$DEV_DEFAULT_PORTS"
+  local dev_sh
+  dev_sh="$(dirname "${BASH_SOURCE[0]}")/dev.sh"
+  if [ -f "$dev_sh" ]; then
+    local from_dev
+    from_dev="$(grep -oE ':[0-9]+' "$dev_sh" 2>/dev/null | tr -d ':' || true)"
+    ports="$ports $from_dev"
+  fi
   if [ -f "$log_dir/dev.ports" ]; then
     ports="$ports $(tr '\n' ' ' <"$log_dir/dev.ports")"
   fi

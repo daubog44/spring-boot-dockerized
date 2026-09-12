@@ -77,20 +77,23 @@ $problems += $errors
 
 # --- Porte dichiarate dai moduli ---------------------------------------------
 
-# Un modulo e' "avviabile" se ha un application.yml: common-dto non lo e'.
+# Un modulo e' "avviabile" se ha un file di configurazione (application.yml, yaml o properties): common-dto non lo e'.
 $modulePorts = [ordered]@{}
 foreach ($m in $onDisk) {
-    $yml = Join-Path $demoDir (Join-Path $m 'src/main/resources/application.yml')
-    if (-not (Test-Path $yml)) { continue }
-    $hit = [regex]::Match((Read-TextFile $yml), 'SERVER_PORT:(\d+)')
-    if ($hit.Success) { $modulePorts[$m] = [int]$hit.Groups[1].Value }
-    else { $modulePorts[$m] = 0 }
+    $mDir = Join-Path $demoDir $m
+    $cfg = Get-ModuleConfigFile -ModuleDir $mDir
+    if (-not $cfg) { continue }
+    $p = Get-ModulePort -ModuleDir $mDir
+    $modulePorts[$m] = $p
 }
 
 $errors = @()
 foreach ($m in $modulePorts.Keys) {
     if ($modulePorts[$m] -eq 0) {
-        $errors += "demo/$m/src/main/resources/application.yml non ha 'port: `${SERVER_PORT:N}'"
+        $mDir = Join-Path $demoDir $m
+        $cfg = Get-ModuleConfigFile -ModuleDir $mDir
+        $rel = $cfg.Substring($demoDir.Length + 1) -replace '\\', '/'
+        $errors += "demo/$rel non ha una porta configurata valida (es. 'port: `${SERVER_PORT:N}')"
     }
 }
 $duplicates = $modulePorts.GetEnumerator() | Where-Object { $_.Value -ne 0 } | Group-Object -Property Value | Where-Object { $_.Count -gt 1 }
@@ -141,11 +144,11 @@ foreach ($svc in $devServices) {
         continue
     }
     if (-not $modulePorts.Contains($svc.Module)) {
-        $errors += "dev.ps1 avvia $($svc.Module), che non ha un application.yml"
+        $errors += "dev.ps1 avvia $($svc.Module), che non ha un file di configurazione (application.yml/yaml/properties)"
         continue
     }
     if ($modulePorts[$svc.Module] -ne $svc.Port) {
-        $errors += "$($svc.Module): dev.ps1 dice porta $($svc.Port), application.yml dice $($modulePorts[$svc.Module]) (task set-port SERVICE=$($svc.Module) PORT=<porta>)"
+        $errors += "$($svc.Module): dev.ps1 dice porta $($svc.Port), configurazione modulo dice $($modulePorts[$svc.Module]) (task set-port SERVICE=$($svc.Module) PORT=<porta>)"
     }
 }
 foreach ($m in $modulePorts.Keys) {

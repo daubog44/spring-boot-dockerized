@@ -267,11 +267,15 @@ springdoc:
     Write-Step "application.yml: configurato Eureka client e porta $finalPort"
 } elseif (Test-Path $propPath) {
     $cfgText = Read-TextFile $propPath
+    if ($cfgText -match '(?m)^\s*server\.port\s*=\s*.*$') {
+        $cfgText = [regex]::Replace($cfgText, '(?m)^\s*server\.port\s*=\s*.*$', "server.port=`${SERVER_PORT:$finalPort}")
+    } else {
+        $cfgText = "server.port=`${SERVER_PORT:$finalPort}`n" + $cfgText
+    }
     if ($cfgText -notmatch 'eureka\.client') {
         $eurekaBlock = @"
 
 # Eureka & OpenAPI
-server.port=`${SERVER_PORT:$finalPort}
 spring.application.name=${module}
 eureka.client.service-url.defaultZone=`${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
 eureka.client.registry-fetch-interval-seconds=5

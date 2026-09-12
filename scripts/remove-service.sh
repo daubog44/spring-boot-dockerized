@@ -111,6 +111,28 @@ if [ -n "$ML" ]; then
   echo "  demo/docker-compose.yml"
 fi
 
+# Se nessun modulo rimasto usa PostgreSQL, spegni l'avvio del container in dev
+HAS_POSTGRES=0
+for mod_dir in "$DEMO_DIR"/*; do
+  [ -d "$mod_dir" ] || continue
+  cfg="$(module_config_file "$mod_dir")"
+  if [ -n "$cfg" ] && [ -f "$cfg" ] && grep -q 'jdbc:postgresql' "$cfg" 2>/dev/null; then
+    HAS_POSTGRES=1
+    break
+  fi
+done
+
+if [ "$HAS_POSTGRES" -eq 0 ]; then
+  if [ -f "$SCRIPT_DIR/dev.ps1" ] && grep -q '\$usesPostgres[[:space:]]*=[[:space:]]*\$true' "$SCRIPT_DIR/dev.ps1" 2>/dev/null; then
+    sed -E 's/\$usesPostgres[[:space:]]*=[[:space:]]*\$true/\$usesPostgres = \$false/' "$SCRIPT_DIR/dev.ps1" >"$SCRIPT_DIR/dev.ps1.tmp" && mv "$SCRIPT_DIR/dev.ps1.tmp" "$SCRIPT_DIR/dev.ps1"
+    echo "  scripts/dev.ps1: disabilitato avvio automatico PostgreSQL"
+  fi
+  if [ -f "$SCRIPT_DIR/dev.sh" ] && grep -q 'USES_POSTGRES=1' "$SCRIPT_DIR/dev.sh" 2>/dev/null; then
+    sed -E 's/USES_POSTGRES=1/USES_POSTGRES=0/' "$SCRIPT_DIR/dev.sh" >"$SCRIPT_DIR/dev.sh.tmp" && mv "$SCRIPT_DIR/dev.sh.tmp" "$SCRIPT_DIR/dev.sh"
+    echo "  scripts/dev.sh: disabilitato avvio automatico PostgreSQL"
+  fi
+fi
+
 # --- Gli editor ---------------------------------------------------------------
 # Un launch.json che elenca servizi che non esistono e' peggio di non averlo.
 

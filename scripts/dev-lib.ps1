@@ -39,7 +39,14 @@ function Get-DevLogDir {
 function Get-DevPorts {
     param([string]$LogDir)
 
-    $ports = $DevDefaultPorts
+    $ports = @($DevDefaultPorts)
+    $devPs1 = Join-Path $PSScriptRoot 'dev.ps1'
+    if (Test-Path $devPs1) {
+        $devText = [System.IO.File]::ReadAllText($devPs1)
+        foreach ($m in ([regex]"Port\s*=\s*(\d+)").Matches($devText)) {
+            $ports += [int]$m.Groups[1].Value
+        }
+    }
     # L'ultimo avvio puo' aver usato una porta diversa per la UI (-UiPort).
     $portFile = Join-Path $LogDir 'dev.ports'
     if (Test-Path $portFile) {

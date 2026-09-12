@@ -211,23 +211,41 @@ SERVICES="$(grep -oE "Name = '[^']+'; +Module = '[^']+'; +Port = (\\\$UiPort|[0-
   sed "s/\\\$UiPort/$UI_PORT/")"
 
 app_name() { # modulo
-  local yml="$DEMO_DIR/$1/src/main/resources/application.yml"
-  [ -f "$yml" ] || return 0
-  grep -E '^[[:space:]]+name:' "$yml" 2>/dev/null | head -n 1 | awk '{print $2}' || true
-  return 0
+  local mod_dir="$DEMO_DIR/$1"
+  local cfg
+  cfg="$(module_config_file "$mod_dir")"
+  [ -n "$cfg" ] && [ -f "$cfg" ] || { printf '%s' "$1" | tr 'a-z' 'A-Z'; return 0; }
+  local name
+  name="$(awk '
+    /^[[:space:]]*application:[[:space:]]*$/ { in_app=1; next }
+    in_app && /^[[:space:]]+name:[[:space:]]*/ { sub(/^[[:space:]]+name:[[:space:]]*/, ""); print; exit }
+    in_app && /^[^[:space:]]/ { in_app=0 }
+    /^[[:space:]]*spring\.application\.name[[:space:]]*[:=][[:space:]]*/ {
+      sub(/^[[:space:]]*spring\.application\.name[[:space:]]*[:=][[:space:]]*/, ""); print; exit
+    }
+  ' "$cfg" | tr -d '\r')"
+  if [ -n "$name" ]; then echo "$name"; else printf '%s' "$1" | tr 'a-z' 'A-Z'; fi
 }
 
 endpoints() { # modulo
   local src="$DEMO_DIR/$1/src/main/java"
   [ -d "$src" ] || return 0
   grep -rl -E '@(Rest)?Controller' "$src" --include='*.java' 2>/dev/null | while read -r file; do
-    base="$(grep -oE '@RequestMapping\([[:space:]]*"[^"]*"' "$file" | head -n 1 | sed -E 's/.*"([^"]*)"/\1/')"
-    grep -oE '@(Get|Post|Put|Delete|Patch)Mapping(\([[:space:]]*(value[[:space:]]*=[[:space:]]*)?"[^"]*"[[:space:]]*\))?' "$file" |
+    base="$(grep -oE '@RequestMapping\([[:space:]]*(value[[:space:]]*=[[:space:]]*|path[[:space:]]*=[[:space:]]*)?"[^"]*"' "$file" | head -n 1 | sed -E 's/.*"([^"]*)"/\1/' || true)"
+    grep -oE '@(Get|Post|Put|Delete|Patch)Mapping(\([[:space:]]*(value[[:space:]]*=[[:space:]]*|path[[:space:]]*=[[:space:]]*)?"?[^"\)]*"?\))?' "$file" 2>/dev/null |
       while read -r mapping; do
         verb="$(printf '%s' "$mapping" | sed -E 's/@([A-Za-z]+)Mapping.*/\1/' | tr 'a-z' 'A-Z')"
-        path="$(printf '%s' "$mapping" | sed -E 's/[^"]*"([^"]*)".*/\1/')"
+        path="$(printf '%s' "$mapping" | sed -E 's/.*"([^"]*)".*/\1/' || true)"
         [ "$path" = "$mapping" ] && path=""
-        full="$base$path"
+        base_clean="${base%/}"
+        path_clean=""
+        if [ -n "$path" ]; then
+          case "$path" in
+            /*) path_clean="$path" ;;
+            *) path_clean="/$path" ;;
+          esac
+        fi
+        full="$base_clean$path_clean"
         [ -z "$full" ] && full="/"
         echo "$verb $full"
       done

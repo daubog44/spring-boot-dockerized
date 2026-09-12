@@ -17,6 +17,9 @@ COMPOSE="$DEMO_DIR/docker-compose.yml"
 DEV_PS1="$SCRIPT_DIR/dev.ps1"
 DEV_SH="$SCRIPT_DIR/dev.sh"
 
+# shellcheck source=scripts/scaffold-lib.sh
+. "$SCRIPT_DIR/scaffold-lib.sh"
+
 MODULE=""
 PORT=""
 while [ $# -gt 0 ]; do
@@ -50,12 +53,8 @@ if [ -z "$MODULE" ] || [ -z "$PORT" ]; then
     echo "Seleziona il modulo di cui cambiare la porta:"
     for i in "${!ALL_MODULES[@]}"; do
       m="${ALL_MODULES[$i]}"
-      mYml="$DEMO_DIR/$m/src/main/resources/application.yml"
-      currPort="?"
-      if [ -f "$mYml" ]; then
-        currPort="$(grep -oE 'SERVER_PORT:[0-9]+' "$mYml" | head -n 1 | cut -d: -f2 || true)"
-        [ -n "$currPort" ] || currPort="?"
-      fi
+      currPort="$(module_port "$DEMO_DIR/$m")"
+      [ "$currPort" = "0" ] && currPort="?"
       echo "  $((i+1))) $m (porta attuale: $currPort)"
     done
     printf "  [1] > "
@@ -76,15 +75,15 @@ if [ -z "$MODULE" ] || [ -z "$PORT" ]; then
   fi
 fi
 
-YML="$DEMO_DIR/$MODULE/src/main/resources/application.yml"
-if [ ! -f "$YML" ]; then
-  echo "Non trovo $YML: il modulo '$MODULE' esiste?" >&2
+CFG="$(module_config_file "$DEMO_DIR/$MODULE" || true)"
+if [ -z "$CFG" ] || [ ! -f "$CFG" ]; then
+  echo "Non trovo file di configurazione (application.yml, application.yaml o application.properties) in demo/$MODULE." >&2
   exit 1
 fi
 
-OLD_PORT="$(grep -oE 'SERVER_PORT:[0-9]+' "$YML" | head -n 1 | cut -d: -f2 || true)"
-if [ -z "$OLD_PORT" ]; then
-  echo "In $YML non c'e' un 'port: \${SERVER_PORT:N}': cambiala a mano." >&2
+OLD_PORT="$(module_port "$DEMO_DIR/$MODULE")"
+if [ "$OLD_PORT" = "0" ]; then
+  echo "In $CFG non c'e' una porta riconosciuta: impostala a mano." >&2
   exit 1
 fi
 if [ "$OLD_PORT" = "$PORT" ]; then
@@ -97,9 +96,8 @@ fi
 for dir in "$DEMO_DIR"/*/; do
   name="$(basename "$dir")"
   [ "$name" = "$MODULE" ] && continue
-  other="$dir/src/main/resources/application.yml"
-  [ -f "$other" ] || continue
-  if grep -qE "SERVER_PORT:$PORT([^0-9]|\$)" "$other"; then
+  otherPort="$(module_port "$dir")"
+  if [ "$otherPort" = "$PORT" ]; then
     echo "La porta $PORT e' gia' di $name. Spostati su un'altra." >&2
     exit 1
   fi
@@ -112,10 +110,21 @@ echo ""
 echo "==> $MODULE : $OLD_PORT -> $PORT"
 echo ""
 
-# --- 1. application.yml del modulo -------------------------------------------
+# --- 1. file di configurazione del modulo --------------------------------------
 
-sed -i.bak "s/SERVER_PORT:$OLD_PORT/SERVER_PORT:$PORT/g" "$YML" && rm -f "$YML.bak"
-echo "  demo/$MODULE/src/main/resources/application.yml"
+if grep -q "SERVER_PORT:$OLD_PORT" "$CFG"; then
+  sed -i.bak "s/SERVER_PORT:$OLD_PORT/SERVER_PORT:$PORT/g" "$CFG" && rm -f "$CFG.bak"
+elif grep -qE "^[[:space:]]*port:[[:space:]]*$OLD_PORT" "$CFG"; then
+  sed -i.bak -E "s/^[[:space:]]*port:[[:space:]]*$OLD_PORT/  port: \${SERVER_PORT:$PORT}/" "$CFG" && rm -f "$CFG.bak"
+elif grep -qE "^[[:space:]]*server\.port[[:space:]]*[:=][[:space:]]*$OLD_PORT" "$CFG"; then
+  case "$CFG" in
+    *.properties) sed -i.bak -E "s/^[[:space:]]*server\.port[[:space:]]*=[^\r\n]*/server.port=\${SERVER_PORT:$PORT}/" "$CFG" && rm -f "$CFG.bak" ;;
+    *) sed -i.bak -E "s/^[[:space:]]*server\.port[[:space:]]*:[^\r\n]*/server.port: \${SERVER_PORT:$PORT}/" "$CFG" && rm -f "$CFG.bak" ;;
+  esac
+else
+  sed -i.bak -E "s/\b$OLD_PORT\b/$PORT/g" "$CFG" && rm -f "$CFG.bak"
+fi
+echo "  demo/${CFG#$DEMO_DIR/}"
 
 # --- 2. docker-compose.yml ----------------------------------------------------
 
@@ -170,11 +179,11 @@ if [ "$IS_EUREKA" = "1" ]; then
   echo ""
   echo "  Eureka si e' spostato: aggiorno chi lo cerca."
   for dir in "$DEMO_DIR"/*/; do
-    yml="$dir/src/main/resources/application.yml"
-    [ -f "$yml" ] || continue
-    if grep -q "localhost:$OLD_PORT" "$yml"; then
-      sed -i.bak "s/localhost:$OLD_PORT/localhost:$PORT/g" "$yml" && rm -f "$yml.bak"
-      echo "  demo/$(basename "$dir")/src/main/resources/application.yml"
+    cfg="$(module_config_file "$dir" 2>/dev/null || true)"
+    [ -n "$cfg" ] && [ -f "$cfg" ] || continue
+    if grep -q "localhost:$OLD_PORT" "$cfg"; then
+      sed -i.bak "s/localhost:$OLD_PORT/localhost:$PORT/g" "$cfg" && rm -f "$cfg.bak"
+      echo "  demo/${cfg#$DEMO_DIR/}"
     fi
   done
   if grep -q "eureka-server:$OLD_PORT" "$COMPOSE"; then

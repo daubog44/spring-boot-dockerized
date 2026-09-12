@@ -214,8 +214,15 @@ function Convert-ToSnakeCase {
     return $withUnderscores.ToLowerInvariant()
 }
 
+$sqlKeywords = @(
+    'user', 'order', 'group', 'table', 'check', 'primary', 'limit', 'offset',
+    'role', 'condition', 'read', 'select', 'where', 'from', 'join', 'index',
+    'values', 'references', 'key', 'rank', 'value', 'filter', 'password'
+)
+
 $tableName = if ($Table) { $Table } else { Convert-ToSnakeCase $Name }
 $routeBase = $tableName -replace '_', '-'
+$escapedTableName = if ($sqlKeywords -contains $tableName.ToLowerInvariant()) { '\"{0}\"' -f $tableName } else { $tableName }
 
 # --- Il nome dei campi, in Java e nel resto -----------------------------------
 
@@ -301,6 +308,10 @@ if ($Fields) {
         } else {
             throw "Tipo non riconosciuto per '$fieldName': '$typeToken'. Vedi task --summary new-entity."
         }
+        $colName = Convert-ToSnakeCase $fieldName
+        if ($sqlKeywords -contains $colName) {
+            $columnAttrs += ('name = "\"{0}\""' -f $colName)
+        }
 
         if ($required) {
             $columnAttrs += 'nullable = false'
@@ -369,7 +380,7 @@ $(if ($usesBigDecimal) { "import java.math.BigDecimal;`n" })$(if ($usesLocalDate
 // servizio niente relazione: solo un id (Long) e una chiamata Feign, vedi
 // la lezione 8 e la 10 del corso (task learn).
 @Entity
-@Table(name = "$tableName")
+@Table(name = "$escapedTableName")
 @Getter
 @Setter
 @NoArgsConstructor

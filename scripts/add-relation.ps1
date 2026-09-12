@@ -48,7 +48,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
-$basePkg = Get-BasePackage -Aggregator $demoDir
+$basePkg = Get-BasePackage -RepoRoot $repoRoot
 
 # --- Modalità Interattiva se mancano parametri -----------------------------
 

@@ -165,13 +165,18 @@ ACTIVE_CFG=""
 [ -z "$ACTIVE_CFG" ] && [ -f "$YAML_PATH" ] && ACTIVE_CFG="$YAML_PATH"
 
 if [ -n "$ACTIVE_CFG" ]; then
+  if grep -qE '^[[:space:]]*port:[[:space:]]*[0-9]+' "$ACTIVE_CFG"; then
+    sed -i.bak -E "s/^[[:space:]]*port:[[:space:]]*[0-9]+/  port: \${SERVER_PORT:$FINAL_PORT}/" "$ACTIVE_CFG" && rm -f "${ACTIVE_CFG}.bak"
+  elif ! grep -q 'server:' "$ACTIVE_CFG"; then
+    printf 'server:\n  port: ${SERVER_PORT:%s}\n\n%s' "$FINAL_PORT" "$(cat "$ACTIVE_CFG")" >"$ACTIVE_CFG"
+  fi
   if ! grep -q "eureka:" "$ACTIVE_CFG"; then
-    cat << 'EOF' >> "$ACTIVE_CFG"
+    cat << EOF >> "$ACTIVE_CFG"
 
 eureka:
   client:
     service-url:
-      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+      defaultZone: \${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
     registry-fetch-interval-seconds: 5
   instance:
     prefer-ip-address: true
@@ -188,12 +193,16 @@ EOF
   fi
 elif [ -f "$PROP_PATH" ]; then
   if ! grep -q "eureka\.client" "$PROP_PATH"; then
-    cat << 'EOF' >> "$PROP_PATH"
+    if grep -qE '^[[:space:]]*server\.port[[:space:]]*=' "$PROP_PATH"; then
+      sed -i.bak -E "s/^[[:space:]]*server\.port[[:space:]]*=[^\r\n]*/server.port=\${SERVER_PORT:$FINAL_PORT}/" "$PROP_PATH" && rm -f "${PROP_PATH}.bak"
+    else
+      printf 'server.port=${SERVER_PORT:%s}\n' "$FINAL_PORT" >> "$PROP_PATH"
+    fi
+    cat << EOF >> "$PROP_PATH"
 
 # Eureka & OpenAPI
-server.port=${SERVER_PORT:8080}
-spring.application.name=imported-service
-eureka.client.service-url.defaultZone=${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+spring.application.name=$MODULE
+eureka.client.service-url.defaultZone=\${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
 eureka.client.registry-fetch-interval-seconds=5
 eureka.instance.prefer-ip-address=true
 eureka.instance.lease-renewal-interval-in-seconds=5
@@ -201,8 +210,34 @@ eureka.instance.lease-expiration-duration-in-seconds=15
 springdoc.api-docs.path=/v3/api-docs
 springdoc.swagger-ui.path=/swagger-ui.html
 EOF
-    echo "  application.properties: configurato Eureka client"
+    echo "  application.properties: configurato Eureka client e porta $FINAL_PORT"
   fi
+else
+  cat << EOF > "$MODULE_DIR/src/main/resources/application.yml"
+server:
+  port: \${SERVER_PORT:$FINAL_PORT}
+
+spring:
+  application:
+    name: $MODULE
+
+eureka:
+  client:
+    service-url:
+      defaultZone: \${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+EOF
+  echo "  creato application.yml con configurazione Eureka e porta $FINAL_PORT"
 fi
 
 # 6. pom aggregatore
@@ -216,17 +251,22 @@ fi
 # 7. demo/Dockerfile
 ROOT_DF="$DEMO_DIR/Dockerfile"
 if [ -f "$ROOT_DF" ] && ! grep -q "COPY $MODULE/pom.xml $MODULE/pom.xml" "$ROOT_DF"; then
-  sed -i.bak "/^COPY .\/pom\.xml .\/pom\.xml/a \\
-COPY $MODULE/pom.xml $MODULE/pom.xml" "$ROOT_DF" && rm -f "${ROOT_DF}.bak"
+  LAST_POM_LINE="$(grep -nE '^COPY .+/pom\.xml .+/pom\.xml$' "$ROOT_DF" | tail -n 1 | cut -d: -f1 || true)"
+  if [ -n "$LAST_POM_LINE" ]; then
+    awk -v n="$LAST_POM_LINE" -v line="COPY $MODULE/pom.xml $MODULE/pom.xml" '
+      { print }
+      NR == n { print line }
+    ' "$ROOT_DF" >"$ROOT_DF.tmp" && mv "$ROOT_DF.tmp" "$ROOT_DF"
+  else
+    echo "COPY $MODULE/pom.xml $MODULE/pom.xml" >> "$ROOT_DF"
+  fi
   echo "  demo/Dockerfile: aggiunta riga COPY $MODULE/pom.xml"
 fi
 
 # 8. docker-compose.yml
 COMPOSE="$DEMO_DIR/docker-compose.yml"
 if [ -f "$COMPOSE" ] && ! grep -q "^  ${MODULE}:" "$COMPOSE"; then
-  cat << EOF >> "$COMPOSE"
-
-  ${MODULE}:
+  COMPOSE_BLOCK="  ${MODULE}:
     build:
       context: .
       args:
@@ -235,27 +275,48 @@ if [ -f "$COMPOSE" ] && ! grep -q "^  ${MODULE}:" "$COMPOSE"; then
       SERVER_PORT: $FINAL_PORT
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
     ports:
-      - "${FINAL_PORT}:${FINAL_PORT}"
+      - \"${FINAL_PORT}:${FINAL_PORT}\"
     depends_on:
       eureka-server:
-        condition: service_healthy
-EOF
+        condition: service_healthy"
+
+  VOLUMES_LINE="$(grep -nE '^volumes:' "$COMPOSE" | head -n 1 | cut -d: -f1 || true)"
+  if [ -n "$VOLUMES_LINE" ]; then
+    awk -v n="$((VOLUMES_LINE - 1))" -v block="$COMPOSE_BLOCK" '
+      { print }
+      NR == n { printf "%s\n\n", block }
+    ' "$COMPOSE" >"$COMPOSE.tmp" && mv "$COMPOSE.tmp" "$COMPOSE"
+  else
+    printf '\n%s\n' "$COMPOSE_BLOCK" >>"$COMPOSE"
+  fi
   echo "  demo/docker-compose.yml: aggiunto container $MODULE"
 fi
 
 # 9. dev.ps1 e dev.sh
 SHORT="$(echo "$MODULE" | sed 's/-service$//')"
 if ! grep -q "'$MODULE'" "$DEV_PS1"; then
-  DEV_LINE="    [pscustomobject]@{ Name = '$SHORT'; Module = '$MODULE'; Port = $FINAL_PORT }"
-  sed -i.bak "/^\$services = @(/a \\
-$DEV_LINE" "$DEV_PS1" && rm -f "${DEV_PS1}.bak"
-  echo "  scripts/dev.ps1: registrato $SHORT -> $MODULE:$FINAL_PORT"
+  PS_START="$(grep -nE '^\$services = @\(' "$DEV_PS1" | head -n 1 | cut -d: -f1 || true)"
+  PS_END="$(awk -v s="$PS_START" 'NR > s && /^\)/ { print NR; exit }' "$DEV_PS1" || true)"
+  if [ -n "$PS_END" ]; then
+    PS_LINE="$(printf '    [pscustomobject]@{ Name = %-14s Module = %-18s Port = %s }' "'$SHORT';" "'$MODULE';" "$FINAL_PORT")"
+    awk -v n="$((PS_END - 1))" -v line="$PS_LINE" '
+      { print }
+      NR == n { print line }
+    ' "$DEV_PS1" >"$DEV_PS1.tmp" && mv "$DEV_PS1.tmp" "$DEV_PS1"
+    echo "  scripts/dev.ps1: registrato $SHORT -> $MODULE:$FINAL_PORT"
+  fi
 fi
 
 if [ -f "$DEV_SH" ] && ! grep -q ":${MODULE}:" "$DEV_SH"; then
-  sed -i.bak "/^SERVICES=(/a \\
-  \"${SHORT}:${MODULE}:${FINAL_PORT}\"" "$DEV_SH" && rm -f "${DEV_SH}.bak"
-  echo "  scripts/dev.sh: registrato $SHORT -> $MODULE:$FINAL_PORT"
+  SH_START="$(grep -nE '^SERVICES=\(' "$DEV_SH" | head -n 1 | cut -d: -f1 || true)"
+  SH_END="$(awk -v s="$SH_START" 'NR > s && /^\)/ { print NR; exit }' "$DEV_SH" || true)"
+  if [ -n "$SH_END" ]; then
+    awk -v n="$((SH_END - 1))" -v line="  \"$SHORT:$MODULE:$FINAL_PORT\"" '
+      { print }
+      NR == n { print line }
+    ' "$DEV_SH" >"$DEV_SH.tmp" && mv "$DEV_SH.tmp" "$DEV_SH"
+    echo "  scripts/dev.sh: registrato $SHORT -> $MODULE:$FINAL_PORT"
+  fi
 fi
 
 # 10. ide-sync

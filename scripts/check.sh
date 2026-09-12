@@ -58,14 +58,19 @@ report "moduli" "OK ($(printf '%s\n' "$DECLARED" | grep -c '.'))"
 
 # --- Porte dichiarate dai moduli ---------------------------------------------
 
-# Un modulo e' "avviabile" se ha un application.yml: common-dto non lo e'.
+# shellcheck source=scripts/scaffold-lib.sh
+. "$SCRIPT_DIR/scaffold-lib.sh"
+
+# --- Porte dichiarate dai moduli ---------------------------------------------
+
+# Un modulo e' "avviabile" se ha un file di configurazione: common-dto non lo e'.
 PORT_LINES=""   # "<modulo> <porta>"
 for m in $ON_DISK; do
-  yml="$DEMO_DIR/$m/src/main/resources/application.yml"
-  [ -f "$yml" ] || continue
-  port="$(grep -oE 'SERVER_PORT:[0-9]+' "$yml" | head -n 1 | cut -d: -f2)"
-  if [ -z "$port" ]; then
-    add_error "demo/$m/src/main/resources/application.yml non ha 'port: \${SERVER_PORT:N}'"
+  cfg="$(module_config_file "$DEMO_DIR/$m" 2>/dev/null || true)"
+  [ -n "$cfg" ] || continue
+  port="$(module_port "$DEMO_DIR/$m")"
+  if [ "$port" = "0" ]; then
+    add_error "demo/${cfg#$DEMO_DIR/} non ha una porta configurata valida (es. 'port: \${SERVER_PORT:N}')"
     continue
   fi
   PORT_LINES="$PORT_LINES$m $port"$'\n'
@@ -115,9 +120,9 @@ else
     fi
     declared_port="$(port_of "$module")"
     if [ -z "$declared_port" ]; then
-      add_error "dev.ps1 avvia $module, che non ha un application.yml"
+      add_error "dev.ps1 avvia $module, che non ha un file di configurazione (application.yml/yaml/properties)"
     elif [ "$declared_port" != "$port" ]; then
-      add_error "$module: dev.ps1 dice porta $port, application.yml dice $declared_port (task set-port SERVICE=$module PORT=<porta>)"
+      add_error "$module: dev.ps1 dice porta $port, configurazione modulo dice $declared_port (task set-port SERVICE=$module PORT=<porta>)"
     fi
   done <<<"$DEV_PS"
 

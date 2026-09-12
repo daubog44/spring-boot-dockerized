@@ -32,6 +32,28 @@ sb_module_package() { # modulo, cartella dell'aggregatore
   printf '%s.%s' "$(base_package "$2")" "$(printf '%s' "$1" | tr -cd 'a-zA-Z0-9')"
 }
 
+module_config_file() { # cartella_modulo
+  local mdir="$1"
+  for cand in "$mdir/src/main/resources/application.yml" "$mdir/src/main/resources/application.yaml" "$mdir/src/main/resources/application.properties"; do
+    if [ -f "$cand" ]; then
+      printf '%s\n' "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
+module_port() { # cartella_modulo
+  local cfg port
+  cfg="$(module_config_file "$1" 2>/dev/null || true)"
+  [ -n "$cfg" ] || { echo "0"; return 0; }
+  port="$(grep -oE 'SERVER_PORT:[0-9]+' "$cfg" | head -n 1 | cut -d: -f2 || true)"
+  if [ -z "$port" ]; then
+    port="$(grep -oE '^[[:space:]]*(server\.)?port[[:space:]]*[:=][[:space:]]*[0-9]+' "$cfg" | head -n 1 | grep -oE '[0-9]+' || true)"
+  fi
+  echo "${port:-0}"
+}
+
 # Una riga di avanzamento, indentata come le altre. Equivalente bash di
 # Write-Step in scaffold-lib.ps1.
 sb_step() { # messaggio

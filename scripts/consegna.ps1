@@ -248,11 +248,17 @@ foreach ($m in ([regex]"Name\s*=\s*'([^']+)';\s*Module\s*=\s*'([^']+)';\s*Port\s
     $moduleDir = Join-Path $demoDir $moduleName
 
     $appName = ''
-    $yml = Join-Path $moduleDir 'src/main/resources/application.yml'
-    if (Test-Path $yml) {
-        $nameHit = [regex]::Match((Read-TextFile $yml), '(?m)^\s+name:\s*(\S+)')
-        if ($nameHit.Success) { $appName = $nameHit.Groups[1].Value }
+    $cfg = Get-ModuleConfigFile -ModuleDir $moduleDir
+    if ($cfg) {
+        $cfgText = Read-TextFile $cfg
+        $hit = [regex]::Match($cfgText, '(?m)^\s*application:\s*[\r\n]+\s*name:\s*([^\r\n]+)')
+        if ($hit.Success) { $appName = $hit.Groups[1].Value.Trim() }
+        else {
+            $hit2 = [regex]::Match($cfgText, '(?m)^\s*spring\.application\.name\s*[:=]\s*([^\r\n]+)')
+            if ($hit2.Success) { $appName = $hit2.Groups[1].Value.Trim() }
+        }
     }
+    if (-not $appName) { $appName = $moduleName.ToUpper() }
 
     # Gli endpoint: prefisso della classe piu' percorso del metodo.
     $endpoints = @()
@@ -262,12 +268,14 @@ foreach ($m in ([regex]"Name\s*=\s*'([^']+)';\s*Module\s*=\s*'([^']+)';\s*Port\s
             $text = Read-TextFile $file.FullName
             if ($text -notmatch '@(Rest)?Controller') { continue }
             $base = ''
-            $baseHit = [regex]::Match($text, '@RequestMapping\s*\(\s*"([^"]*)"')
+            $baseHit = [regex]::Match($text, '@RequestMapping\s*\(\s*(?:(?:value|path)\s*=\s*)?"([^"]*)"')
             if ($baseHit.Success) { $base = $baseHit.Groups[1].Value }
-            foreach ($mapping in ([regex]'@(Get|Post|Put|Delete|Patch)Mapping\s*(?:\(\s*(?:value\s*=\s*)?"([^"]*)"\s*\))?').Matches($text)) {
+            foreach ($mapping in ([regex]'@(Get|Post|Put|Delete|Patch)Mapping\s*(?:\(\s*(?:(?:value|path)\s*=\s*)?"?([^"\)]*)"?\s*\))?').Matches($text)) {
                 $verb = $mapping.Groups[1].Value.ToUpper()
-                $path = $mapping.Groups[2].Value
-                $full = ($base + $path)
+                $p = $mapping.Groups[2].Value
+                $pClean = if ($p) { if ($p.StartsWith('/')) { $p } else { "/$p" } } else { '' }
+                $prefClean = $base.TrimEnd('/')
+                $full = $prefClean + $pClean
                 if (-not $full) { $full = '/' }
                 $endpoints += ("$verb $full")
             }
