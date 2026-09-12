@@ -346,16 +346,21 @@ if [ -n "$FIELDS" ]; then
       LENGTH=20
       [ "$LONGEST" -gt 20 ] && LENGTH="$LONGEST"
 
+      BASE_PKG="$(base_package "$DEMO_DIR")"
       ENUM_BODY="$(IFS=$'\n'; printf '%s,\n    ' "${UPPER_VALUES[@]}")"
       ENUM_BODY="${ENUM_BODY%,*}"
-      cat >"$ENTITY_DIR/$ENUM_NAME.java" <<EOF
+      if [ "$WITH_DTO" != "1" ]; then
+        cat >"$ENTITY_DIR/$ENUM_NAME.java" <<EOF
 package $PACKAGE.entity;
 
 public enum $ENUM_NAME {
     $ENUM_BODY
 }
 EOF
-      ENUM_FILES+=("demo/$SERVICE/src/main/java/$PACKAGE_PATH/entity/$ENUM_NAME.java")
+        ENUM_FILES+=("demo/$SERVICE/src/main/java/$PACKAGE_PATH/entity/$ENUM_NAME.java")
+      else
+        HAS_ENUM=1
+      fi
       VALIDATION_LINES+=("@Enumerated(EnumType.STRING)")
     else
       echo "Tipo non riconosciuto per '$FIELD_NAME': '$TYPE_TOKEN'. Vedi task --summary new-entity." >&2
@@ -413,6 +418,7 @@ if [ "${#FIELD_BLOCKS[@]}" -gt 0 ]; then
 fi
 
 EXTRA_IMPORTS=""
+[ "$WITH_DTO" = "1" ] && [ "${HAS_ENUM:-0}" = "1" ] && EXTRA_IMPORTS="${EXTRA_IMPORTS}import $BASE_PKG.common.dto.*;"$'\n'
 [ "$USES_BIGDECIMAL" = "1" ] && EXTRA_IMPORTS="${EXTRA_IMPORTS}import java.math.BigDecimal;"$'\n'
 [ "$USES_LOCALDATE" = "1" ] && EXTRA_IMPORTS="${EXTRA_IMPORTS}import java.time.LocalDate;"$'\n'
 [ "$USES_LOCALDATETIME" = "1" ] && EXTRA_IMPORTS="${EXTRA_IMPORTS}import java.time.LocalDateTime;"$'\n'

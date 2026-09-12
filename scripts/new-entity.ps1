@@ -340,22 +340,32 @@ $usesBigDecimal = @($fieldSpecs | Where-Object { $_.JavaType -eq 'BigDecimal' })
 $usesLocalDate = @($fieldSpecs | Where-Object { $_.JavaType -eq 'LocalDate' }).Count -gt 0
 $usesLocalDateTime = @($fieldSpecs | Where-Object { $_.JavaType -eq 'LocalDateTime' }).Count -gt 0
 
-# --- 1. Gli enum, uno per file --------------------------------------------
+$basePkg = Get-BasePackage -RepoRoot $repoRoot
 
-foreach ($f in ($fieldSpecs | Where-Object { $_.EnumName })) {
-    $enumBody = ($f.EnumValues -join ",`n    ")
-    $enumSrc = @"
+# --- 1. Gli enum, uno per file --------------------------------------------
+# Se DTO=1, gli enum vengono generati in common-dto (da new-dto) e condivisi,
+# cosi' entity e DTO usano lo stesso tipo senza conflitti di tipo.
+if (-not $Dto) {
+    foreach ($f in ($fieldSpecs | Where-Object { $_.EnumName })) {
+        $enumBody = ($f.EnumValues -join ",`n    ")
+        $enumSrc = @"
 package $package.entity;
 
 public enum $($f.EnumName) {
     $enumBody
 }
 "@
-    Write-TextFile -Path (Join-Path $entityDir "$($f.EnumName).java") -Text ($enumSrc + "`n")
-    Write-Step "demo/$Service/src/main/java/$packagePath/entity/$($f.EnumName).java"
+        Write-TextFile -Path (Join-Path $entityDir "$($f.EnumName).java") -Text ($enumSrc + "`n")
+        Write-Step "demo/$Service/src/main/java/$packagePath/entity/$($f.EnumName).java"
+    }
 }
 
 # --- 2. L'entity -----------------------------------------------------------
+
+$dtoEnumImports = ''
+if ($Dto -and (@($fieldSpecs | Where-Object { $_.EnumName }).Count -gt 0)) {
+    $dtoEnumImports = "import $basePkg.common.dto.*;`n"
+}
 
 $fieldLines = foreach ($f in $fieldSpecs) {
     $lines = @()
@@ -374,7 +384,7 @@ import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-$(if ($usesBigDecimal) { "import java.math.BigDecimal;`n" })$(if ($usesLocalDate) { "import java.time.LocalDate;`n" })$(if ($usesLocalDateTime) { "import java.time.LocalDateTime;`n" })
+$dtoEnumImports$(if ($usesBigDecimal) { "import java.math.BigDecimal;`n" })$(if ($usesLocalDate) { "import java.time.LocalDate;`n" })$(if ($usesLocalDateTime) { "import java.time.LocalDateTime;`n" })
 // Generata da task new-entity: aggiungi qui le relazioni (@ManyToOne,
 // @OneToMany...) con altre entity DI QUESTO STESSO SERVIZIO. Con un altro
 // servizio niente relazione: solo un id (Long) e una chiamata Feign, vedi
