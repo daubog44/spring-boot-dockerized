@@ -159,6 +159,26 @@ tasks:
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/consegna.ps1{{if .NOME}} -Nome {{.NOME}}{{end}}{{if .OUT}} -OutDir {{.OUT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/consegna.sh{{if .NOME}} --nome {{.NOME}}{{end}}{{if .OUT}} --out-dir {{.OUT}}{{end}} {{.CLI_ARGS}}{{end}}'
 
+  allegato:
+    desc: "Genera o aggiorna allegato.md e compila l'anteprima di ALLEGATO-TECNICO.md (task allegato)"
+    summary: |
+      Genera o sincronizza allegato.md con tutti i microservizi rilevati nel
+      progetto e compila ALLEGATO-TECNICO.md integrando la tabella delle porte,
+      i contratti REST, lo schema del database e i testi dell'allegato.
+
+      Segnala le sezioni che contengono ancora placeholder guida [DA COMPILARE],
+      consentendo di completare l'allegato tecnico prima della consegna finale.
+
+      Variabili (facoltative):
+        NOME=<Candidato>   nome del candidato da inserire nell'intestazione
+        OUT=<cartella>     dove generare il documento (default: radice)
+
+      Esempi:
+        task allegato
+        task allegato NOME="Mario Rossi"
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/allegato.ps1{{if .NOME}} -Nome "{{.NOME}}"{{end}}{{if .OUT}} -OutDir "{{.OUT}}"{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/allegato.sh{{if .NOME}} --nome "{{.NOME}}"{{end}}{{if .OUT}} --out-dir "{{.OUT}}"{{end}} {{.CLI_ARGS}}{{end}}'
+
   # --- Sviluppo quotidiano ----------------------------------------------------
 
   dev:
@@ -280,6 +300,32 @@ tasks:
       ancora in esecuzione.
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-service.ps1{{if .NAME}} -Name {{.NAME}}{{end}}{{if .PORT}} -Port {{.PORT}}{{end}}{{if .UI}} -Ui{{end}}{{if .NODB}} -NoDb{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-service.sh{{if .NAME}} --name {{.NAME}}{{end}}{{if .PORT}} --port {{.PORT}}{{end}}{{if .UI}} --ui{{end}}{{if .NODB}} --no-db{{end}} {{.CLI_ARGS}}{{end}}'
+
+  import-service:
+    desc: "Importa un microservizio da uno zip o una cartella esistente (task import-service SRC=... [NAME=...] [PORT=...])"
+    interactive: true
+    summary: |
+      Importa un microservizio (es. semilavorato o mock fornito dalla commissione
+      in formato .zip o cartella) e lo collega a tutto lo stack:
+        - Estrae o copia in demo/<nome-modulo>
+        - Aggiunge Eureka Client e SpringDoc OpenAPI al pom.xml se mancanti
+        - Configura application.yml/properties per registrarsi su Eureka
+        - Registra il modulo in demo/pom.xml, Dockerfile e docker-compose.yml
+        - Aggiunge il servizio a `task dev` (dev.ps1 e dev.sh)
+        - Sincronizza VS Code e Zed
+
+      Variabili:
+        SRC=<percorso>     OBBLIGATORIA: percorso del file .zip o cartella da importare
+        NAME=<nome-modulo> facoltativa: nome cartella in demo/ (default: dedotto da SRC)
+        PORT=<porta>       facoltativa: default letta da application.yml o prima libera
+
+      Esempi:
+        task import-service SRC="C:\Users\Utente\Downloads\prestazioni-service.zip"
+        task import-service SRC="../semilavorati/catalogo-mock" NAME=catalogo-service PORT=8082
+
+      Dopo serve `task dev` per avviare il modulo importato insieme agli altri.
+    cmds:
+      - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/import-service.ps1{{if .SRC}} -Src "{{.SRC}}"{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .PORT}} -Port {{.PORT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/import-service.sh{{if .SRC}} --src "{{.SRC}}"{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .PORT}} --port {{.PORT}}{{end}} {{.CLI_ARGS}}{{end}}'
 
   new-entity:
     desc: "Genera entity, repository, service e controller per una tabella (task new-entity SERVICE=<modulo> NAME=<Entita> FIELDS=...)"

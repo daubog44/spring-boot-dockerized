@@ -6,6 +6,8 @@
 
 # cartella prodotta da `task consegna`
 consegna/
+ALLEGATO-TECNICO.md
+SCHEMA-DATABASE.md
 
 # il video del corso lo rigenera corso/genera-video.ps1: sta nella release, non nel repository
 corso/*.mp4
