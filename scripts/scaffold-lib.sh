@@ -25,6 +25,13 @@ base_package() { # cartella dell'aggregatore
   echo "esame"
 }
 
+# Il pacchetto Java di un modulo: quello di base piu' il nome del modulo senza
+# trattini (product-service -> <base>.productservice). Equivalente bash di
+# Get-ModulePackage in scaffold-lib.ps1.
+sb_module_package() { # modulo, cartella dell'aggregatore
+  printf '%s.%s' "$(base_package "$2")" "$(printf '%s' "$1" | tr -cd 'a-zA-Z0-9')"
+}
+
 # Il JDK con cui Maven compilera': quello di JAVA_HOME se c'e', se no il java
 # del PATH. Stampa "versione|cartella" (25|/usr/lib/jvm/temurin-25), o niente
 # e ritorna 1 se non ne trova.

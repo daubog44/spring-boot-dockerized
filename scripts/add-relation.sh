@@ -62,7 +62,7 @@ if [ -z "$SERVICE" ] || [ -z "$FROM" ] || [ -z "$TO" ]; then
 
   MODULE_DIR="$DEMO_DIR/$SERVICE"
   [ -f "$MODULE_DIR/pom.xml" ] || { echo "Non trovo il modulo '$SERVICE' in demo/." >&2; exit 1; }
-  PKG="$(sb_module_package "$SERVICE")"
+  PKG="$(sb_module_package "$SERVICE" "$DEMO_DIR")"
   PKG_PATH="$(printf '%s' "$PKG" | tr '.' '/')"
   ENTITY_DIR="$MODULE_DIR/src/main/java/$PKG_PATH/entity"
   [ -d "$ENTITY_DIR" ] || { echo "Non trovo la cartella entity in $SERVICE ($ENTITY_DIR). Crea prima le entita' con task new-entity." >&2; exit 1; }
@@ -126,7 +126,7 @@ fi
 MODULE_DIR="$DEMO_DIR/$SERVICE"
 [ -f "$MODULE_DIR/pom.xml" ] || { echo "Non trovo il modulo '$SERVICE' in demo/." >&2; exit 1; }
 
-PKG="$(sb_module_package "$SERVICE")"
+PKG="$(sb_module_package "$SERVICE" "$DEMO_DIR")"
 PKG_PATH="$(printf '%s' "$PKG" | tr '.' '/')"
 BASE_PKG="$(base_package "$DEMO_DIR")"
 ENTITY_DIR="$MODULE_DIR/src/main/java/$PKG_PATH/entity"
