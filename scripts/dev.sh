@@ -31,6 +31,10 @@ LOG_DIR="$(dev_log_dir)"
 # Ordine di avvio: Eureka per primo, poi i servizi che vi si registrano.
 SERVICES=(
   "eureka:naming-server:8761"
+  "product:product-service:8081"
+  "crm:crm-service:8082"
+  "wms:wms-service:8083"
+  "wms-ui:wms-ui:$UI_PORT"
 )
 
 # Metti 1 se un tuo servizio punta a jdbc:postgresql://localhost:5432: `task dev`
