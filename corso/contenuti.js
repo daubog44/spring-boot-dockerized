@@ -1,6 +1,6 @@
 // Generato da task learn: non modificarlo, rilancia il comando.
 window.CORSO = {
-  generato: '2026-09-12 13:02',
+  generato: '2026-09-12 13:06',
   progetto: {
     cartella: 'demo',
     pacchetto: 'esame',
