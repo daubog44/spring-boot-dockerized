@@ -48,6 +48,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
+$basePkg = Get-BasePackage -Aggregator $demoDir
 
 # --- Modalità Interattiva se mancano parametri -----------------------------
 
@@ -481,6 +482,7 @@ if ($fromDtoFiles.Count -gt 0 -and $toDtoFiles.Count -gt 0) {
         $serviceFile = Join-Path $moduleDir "src/main/java/$packagePath/service/${cleanFrom}Service.java"
         $toRepoFile = Join-Path $moduleDir "src/main/java/$packagePath/repository/${cleanTo}Repository.java"
         if (Test-Path $serviceFile) {
+            Add-ImportsToJava -FilePath $serviceFile -NewImports @("${basePkg}.common.dto.${cleanTo}Dto")
             $svcContent = Read-TextFile $serviceFile
             $eol = Get-TextEol $svcContent
 
