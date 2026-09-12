@@ -43,6 +43,9 @@ $logDir = Get-DevLogDir
 # Ordine di avvio: Eureka per primo, poi i servizi che vi si registrano.
 $services = @(
     [pscustomobject]@{ Name = 'eureka';      Module = 'naming-server';   Port = 8761 }
+    [pscustomobject]@{ Name = 'catalogo';    Module = 'catalogo-service'; Port = 8081 }
+    [pscustomobject]@{ Name = 'prestiti';    Module = 'prestiti-service'; Port = 8082 }
+    [pscustomobject]@{ Name = 'biblioteca-ui'; Module = 'biblioteca-ui';   Port = 8090 }
 )
 
 # Metti $true se un tuo servizio punta a jdbc:postgresql://localhost:5432:
