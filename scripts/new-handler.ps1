@@ -85,9 +85,17 @@ import java.util.Map;
 /**
  * Gestore centralizzato delle eccezioni generato da task new-handler.
  * Trasforma errori di validazione (@Valid), 404 e 500 in risposte JSON strutturate.
+ *
+ * Punti di estensione per la traccia d'esame:
+ *   - Aggiungi @ExceptionHandler per eccezioni di business custom (es. PostiEsauritiException.class)
+ *   - Aggiungi @ExceptionHandler per feign.FeignException per intercettare errori da altri microservizi
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // TODO: Aggiungi qui gestori per eccezioni di business specifiche della tua traccia:
+    // @ExceptionHandler(PostiEsauritiException.class)
+    // public ResponseEntity<Map<String, Object>> handleCustom(PostiEsauritiException ex) { ... }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {

@@ -396,6 +396,87 @@ Test-Case 'new-dto genera record in common-dto con validazione' {
     Assert-Contains $dto '@NotBlank' 'manca @NotBlank'
 }
 
+Test-Case 'new-dto wizard guidato (WIZARD_ANSWERS mode=1) genera record con validazione' {
+    $answersFile = [System.IO.Path]::GetTempFileName()
+    # Flusso wizard new-dto mode=1:
+    #   [Persona]       nome DTO
+    #   [1]             modalita' guidata
+    #   [codiceFiscale] nome campo 1, [1]=string, [1]=required
+    #   [s]             un altro campo? si
+    #   [eta]           nome campo 2, [9]=int,    [3]=min(N) -> [18]
+    #   [n]             un altro campo? no
+    #   [1]             tipo: record moderno
+    [System.IO.File]::WriteAllLines($answersFile, @('Persona', '1', 'codiceFiscale', '1', '1', 's', 'eta', '9', '3', '18', 'n', '1'))
+    $env:WIZARD_ANSWERS = $answersFile
+    try {
+        Assert-Ok (Invoke-Tool 'new-dto.ps1' @()) 'new-dto wizard guidato fallito'
+        $basePkgPath = (Get-BasePackage -RepoRoot $sandbox) -replace '\.', '/'
+        $dtoFile = Join-Path $demo "common-dto/src/main/java/$basePkgPath/common/dto/PersonaDto.java"
+        Assert-That (Test-Path $dtoFile) 'PersonaDto.java non trovato in common-dto'
+        $dto = Read-TextFile $dtoFile
+        Assert-Contains $dto 'public record PersonaDto' 'non e'' un record'
+        Assert-Contains $dto '@NotBlank String codiceFiscale' 'codiceFiscale con @NotBlank mancante'
+        Assert-Contains $dto '@Min(18) Integer eta' 'eta con @Min(18) mancante'
+    } finally {
+        Remove-Item $answersFile -ErrorAction SilentlyContinue
+        $env:WIZARD_ANSWERS = $null
+    }
+}
+
+Test-Case 'new-dto con CLASS=1 genera classe classica con Lombok (@Getter, @Setter)' {
+    Assert-Ok (Invoke-Tool 'new-dto.ps1' @('-Name', 'Fattura', '-Fields', 'numero:string:required,importo:decimal:min(0)', '-Class')) 'new-dto CLASS=1 fallito'
+    $basePkgPath = (Get-BasePackage -RepoRoot $sandbox) -replace '\.', '/'
+    $dtoFile = Join-Path $demo "common-dto/src/main/java/$basePkgPath/common/dto/FatturaDto.java"
+    Assert-That (Test-Path $dtoFile) 'FatturaDto.java non trovato'
+    $dto = Read-TextFile $dtoFile
+    Assert-Contains $dto 'public class FatturaDto' 'non e'' una classe classica'
+    Assert-Contains $dto '@Getter' 'manca @Getter'
+    Assert-Contains $dto '@Setter' 'manca @Setter'
+    Assert-Contains $dto '@NoArgsConstructor' 'manca @NoArgsConstructor'
+    Assert-Contains $dto '@AllArgsConstructor' 'manca @AllArgsConstructor'
+    Assert-Contains $dto 'private BigDecimal importo;' 'manca campo importo BigDecimal'
+}
+
+Test-Case 'new-dto con campo enum genera file Enum separato e lo include nel record' {
+    Assert-Ok (Invoke-Tool 'new-dto.ps1' @('-Name', 'Spedizione', '-Fields', 'tracking:string:required,stato:enum(IN_TRANSITO|CONSEGNATO|ANNULLATO)')) 'new-dto con enum fallito'
+    $basePkgPath = (Get-BasePackage -RepoRoot $sandbox) -replace '\.', '/'
+    $enumFile = Join-Path $demo "common-dto/src/main/java/$basePkgPath/common/dto/Stato.java"
+    $dtoFile = Join-Path $demo "common-dto/src/main/java/$basePkgPath/common/dto/SpedizioneDto.java"
+    Assert-That (Test-Path $enumFile) 'Stato.java non trovato'
+    Assert-That (Test-Path $dtoFile) 'SpedizioneDto.java non trovato'
+    $enumSrc = Read-TextFile $enumFile
+    Assert-Contains $enumSrc 'public enum Stato' 'Stato non e'' un enum'
+    Assert-Contains $enumSrc 'IN_TRANSITO' 'manca valore IN_TRANSITO'
+    Assert-Contains $enumSrc 'CONSEGNATO' 'manca valore CONSEGNATO'
+    Assert-Contains $enumSrc 'ANNULLATO' 'manca valore ANNULLATO'
+    $dtoSrc = Read-TextFile $dtoFile
+    Assert-Contains $dtoSrc 'Stato stato' 'campo Stato mancante nel record'
+}
+
+Test-Case 'new-dto su servizio specifico (SERVICE=alfa-service) crea il DTO nel package del modulo' {
+    Assert-Ok (Invoke-Tool 'new-dto.ps1' @('-Service', 'alfa-service', '-Name', 'Interno', '-Fields', 'chiave:string:required')) 'new-dto su alfa-service fallito'
+    $pkgPath = Get-SandboxPackagePath 'alfa-service'
+    $dtoFile = Join-Path $demo ('alfa-service/src/main/java/' + $pkgPath + '/dto/InternoDto.java')
+    Assert-That (Test-Path $dtoFile) 'InternoDto.java non trovato nel modulo alfa-service'
+    $dto = Read-TextFile $dtoFile
+    Assert-Contains $dto 'package ' 'package mancante'
+    Assert-Contains $dto '.alfaservice.dto;' 'package del modulo non corretto'
+}
+
+Test-Case 'new-entity con DTO=1 ed enum genera Enum in common-dto e Service collegato' {
+    Assert-Ok (Invoke-Tool 'new-entity.ps1' @('-Service', 'epsilon-service', '-Name', 'Biglietto', '-Fields', 'codice:string:required,tipo:enum(STANDARD|VIP|STUDENTE)', '-Dto')) 'new-entity con enum e DTO=1 fallito'
+    $basePkgPath = (Get-BasePackage -RepoRoot $sandbox) -replace '\.', '/'
+    $enumFile = Join-Path $demo "common-dto/src/main/java/$basePkgPath/common/dto/Tipo.java"
+    $dtoFile = Join-Path $demo "common-dto/src/main/java/$basePkgPath/common/dto/BigliettoDto.java"
+    Assert-That (Test-Path $enumFile) 'Tipo.java enum non generato in common-dto'
+    Assert-That (Test-Path $dtoFile) 'BigliettoDto.java non generato in common-dto'
+    $enumSrc = Read-TextFile $enumFile
+    Assert-Contains $enumSrc 'public enum Tipo' 'Tipo non e'' un enum'
+    Assert-Contains $enumSrc 'STANDARD' 'manca valore STANDARD'
+    Assert-Contains $enumSrc 'VIP' 'manca valore VIP'
+    Assert-Contains $enumSrc 'STUDENTE' 'manca valore STUDENTE'
+}
+
 Test-Case 'new-client genera FeignClient collegato al servizio target' {
     Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'epsilon-service', '-Dto', 'VolumeDto')) 'new-client e'' fallito'
     $clientFile = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/client/EpsilonClient.java')
@@ -523,6 +604,38 @@ Test-Case 'new-client supporta client multipli verso lo stesso target con contex
     Assert-Contains $client 'name = "EPSILON-SERVICE"' 'nome Eureka errato nel secondo client'
     Assert-Contains $client 'contextId = "epsilonExtraClient"' 'contextId non corretto nel secondo client'
     Assert-Contains $client '@GetMapping("/api/extra")' 'rotta /api/extra non presente'
+}
+
+Test-Case 'new-client con trailing slash nel path normalizza la rotta senza doppi slash' {
+    Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'beta-ui', '-Name', 'NormClient', '-Path', '/api/norm/', '-Dto', 'VolumeDto')) 'new-client con trailing slash fallito'
+    $clientFile = Join-Path $demo ('alfa-service/src/main/java/' + (Get-SandboxPackagePath 'alfa-service') + '/client/NormClient.java')
+    Assert-That (Test-Path $clientFile) 'NormClient.java non trovato'
+    $client = Read-TextFile $clientFile
+    Assert-Contains $client '@GetMapping("/api/norm")' 'rotta base non normalizzata'
+    Assert-Contains $client '@GetMapping("/api/norm/{id}")' 'rotta per id ha doppi slash'
+    Assert-NotContains $client '//{id}' 'presente doppio slash non normalizzato'
+}
+
+Test-Case 'new-client con modulo target inesistente lancia errore chiaro' {
+    $result = Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'modulo-fantasma')
+    Assert-That ($result.ExitCode -ne 0) 'new-client doveva fallire per target inesistente'
+    $out = $result.Output + $result.Error
+    Assert-That ($out -match 'modulo-fantasma') 'il messaggio di errore non menziona il modulo mancante'
+}
+
+Test-Case 'new-auth su modulo inesistente lancia errore chiaro' {
+    $result = Invoke-Tool 'new-auth.ps1' @('-Service', 'modulo-fantasma', '-Type', 'inmemory')
+    Assert-That ($result.ExitCode -ne 0) 'new-auth doveva fallire per modulo inesistente'
+    $out = $result.Output + $result.Error
+    Assert-That ($out -match 'modulo-fantasma') 'il messaggio di errore non menziona il modulo mancante'
+}
+
+Test-Case 'new-handler esecuzione ripetuta e'' idempotente e non sovrascrive' {
+    Assert-Ok (Invoke-Tool 'new-handler.ps1' @('-Service', 'alfa-service')) 'prima esecuzione new-handler fallita'
+    $result = Invoke-Tool 'new-handler.ps1' @('-Service', 'alfa-service')
+    Assert-That ($result.ExitCode -eq 0) 'seconda esecuzione new-handler doveva terminare con successo'
+    $out = $result.Output + $result.Error
+    Assert-That ($out -match 'gia' -or $out -match 'presente') 'messaggio di gia presente mancante'
 }
 
 Test-Case 'task new-client (CLI reale, senza ROUTE) non spezza la riga di comando' {

@@ -519,6 +519,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+/**
+ * Service per la gestione di $NAME basato su DTO.
+ *
+ * Punti di estensione per la traccia d'esame:
+ *   - Inietta client OpenFeign (@RequiredArgsConstructor lo inietta automaticamente)
+ *   - Aggiungi controlli di business logic (es. validazioni, chiamate Feign) in crea() e aggiorna()
+ *   - Aggiungi metodi dedicati a casi d'uso specifici (es. cambio stato, calcolo totali)
+ */
 @Service
 @RequiredArgsConstructor
 public class ${NAME}Service {
@@ -534,6 +542,8 @@ public class ${NAME}Service {
     }
 
     public $DTO_NAME crea($DTO_NAME nuovo) {
+        // TODO: Inserisci qui eventuali controlli di business logic prima del salvataggio
+        // (es. verifica vincoli traccia, chiamate Feign a microservizi esterni, controllo disponibilita').
         ${NAME}Entity entity = toEntity(nuovo);
         entity.setId(null);
         return toDto(repository.save(entity));
@@ -541,6 +551,7 @@ public class ${NAME}Service {
 
     public $DTO_NAME aggiorna(Long id, $DTO_NAME dati) {
         ${NAME}Entity esistente = trovaEntity(id);
+        // TODO: Inserisci qui eventuali verifiche di stato o transizioni ammesse.
 $SETTER_LINES_FROM_DTO
         return toDto(repository.save(esistente));
     }
@@ -588,6 +599,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Controller REST per $NAME basato su DTO.
+ *
+ * Punti di estensione:
+ *   - Aggiungi endpoint di ricerca/filtro (es. @GetMapping("/cerca"))
+ *   - Aggiungi endpoint per operazioni di business specifiche (es. @PatchMapping("/{id}/stato"))
+ */
 @Tag(name = "$NAME", description = "CRUD per $NAME basato su DTO")
 @RestController
 @RequestMapping("/api/$ROUTE_BASE")
@@ -649,6 +667,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+/**
+ * Service per la gestione di $NAME.
+ *
+ * Punti di estensione per la traccia d'esame:
+ *   - Inietta client OpenFeign o altri componenti (@RequiredArgsConstructor lo inietta automaticamente)
+ *   - Aggiungi logica di business in crea() e aggiorna() (es. validazioni incrociate, verifica disponibilita')
+ *   - Aggiungi metodi dedicati a casi d'uso specifici
+ */
 @Service
 @RequiredArgsConstructor
 public class ${NAME}Service {
@@ -665,6 +691,8 @@ public class ${NAME}Service {
     }
 
     public ${NAME}Entity crea(${NAME}Entity nuovo) {
+        // TODO: Inserisci qui eventuali verifiche di business logic prima del salvataggio
+        // (es. controlli di validita', chiamate Feign a microservizi esterni).
         return repository.save(nuovo);
     }
 
@@ -672,6 +700,7 @@ public class ${NAME}Service {
     // righe dei campi che non vuoi toccare.
     public ${NAME}Entity aggiorna(Long id, ${NAME}Entity dati) {
         ${NAME}Entity esistente = trova(id);
+        // TODO: Inserisci qui eventuali verifiche su transizioni di stato consentite.
 $SETTER_BLOCK
         return repository.save(esistente);
     }
@@ -698,11 +727,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-// CRUD generato da task new-entity: aggiungi qui le regole della tua
-// traccia. Se questi dati li consuma anche un altro servizio (Feign), o non
-// vuoi esporre tutti i campi cosi' come sono in tabella, usa DTO=1 oppure sostituisci
-// ${NAME}Entity con un DTO tuo -- vedi la lezione 9 ("fuori dal servizio
-// esce il DTO, mai l'entity") e la lezione 4 su common-dto.
+/**
+ * Controller REST per $NAME.
+ *
+ * Punti di estensione:
+ *   - Aggiungi endpoint di ricerca o filtro (es. @GetMapping("/cerca"))
+ *   - Aggiungi endpoint per operazioni specifiche (es. @PatchMapping("/{id}/stato"))
+ */
 @Tag(name = "$NAME", description = "Generato da new-entity: descrivilo meglio")
 @RestController
 @RequestMapping("/api/$ROUTE_BASE")

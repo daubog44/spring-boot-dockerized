@@ -175,6 +175,8 @@ $routePath = if ($Path) {
 } else {
     '/api'
 }
+$routePath = $routePath.TrimEnd('/')
+if (-not $routePath.StartsWith('/')) { $routePath = "/$routePath" }
 
 # Avviso rotta non trovata sul target
 if ($knownRoutes.Count -gt 0 -and $knownRoutes -notcontains $routePath) {
@@ -253,6 +255,10 @@ import java.util.List;
 /**
  * Client OpenFeign per comunicare con $eurekaName via Eureka.
  * Generato da task new-client.
+ *
+ * Punti di estensione per la traccia d'esame:
+ *   - Aggiungi metodi con @RequestParam per ricerche/filtri (es. List<$dtoName> cerca(@RequestParam String query))
+ *   - Aggiungi metodi per rotte specifiche (es. @PatchMapping("$routePath/{id}/stato"))
  */
 @FeignClient(name = "$eurekaName", contextId = "$contextId")
 public interface $clientName {

@@ -41,25 +41,106 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
 
-if (-not $Name) {
-    if ([Console]::IsInputRedirected) {
-        throw "Uso: task new-dto NAME=<Nome> [FIELDS=<campo:tipo:modificatore,...>] [SERVICE=common-dto]`n" +
-              "Esempio: task new-dto NAME=Libro FIELDS=id:long,titolo:string(150):required,disponibile:bool"
+# --- Helper Read-Answer (supporta WIZARD_ANSWERS per test automatici) ---
+$script:answers = $null
+if ($env:WIZARD_ANSWERS) {
+    if (-not (Test-Path $env:WIZARD_ANSWERS)) { throw "WIZARD_ANSWERS: non trovo $env:WIZARD_ANSWERS" }
+    $script:answers = New-Object 'System.Collections.Generic.Queue[string]'
+    foreach ($line in [System.IO.File]::ReadAllLines($env:WIZARD_ANSWERS)) { $script:answers.Enqueue($line) }
+}
+function Read-Answer {
+    param([string]$Prompt = '  >')
+    if ($null -ne $script:answers) {
+        if ($script:answers.Count -eq 0) { throw 'WIZARD_ANSWERS: le risposte sono finite prima delle domande.' }
+        $answer = $script:answers.Dequeue()
+        Write-Host "$Prompt $answer"
+        return $answer
     }
-    Write-Host ''
-    Write-Host 'CREAZIONE DTO/RECORD GUIDATA' -ForegroundColor Cyan
-    $Name = (Read-Host "  Nome del DTO in PascalCase (es. LibroDto, OrdineDto, ArticoloDto)").Trim()
-    if (-not $Name) {
-        throw "Uso: task new-dto NAME=<Nome> [FIELDS=<campo:tipo:modificatore,...>] [SERVICE=common-dto]"
-    }
+    return (Read-Host $Prompt)
+}
 
-    if (-not $Fields) {
-        Write-Host "  Campi (formato nome:tipo[:modificatore], es. id:long,nome:string:required,prezzo:decimal):" -ForegroundColor DarkGray
-        $Fields = (Read-Host "  Campi (premi Invio se nessuno)").Trim()
-    }
+if (-not $Name -or -not $Fields) {
+    if ([Console]::IsInputRedirected -and $null -eq $script:answers) {
+        if (-not $Name) {
+            throw "Uso: task new-dto NAME=<Nome> [FIELDS=<campo:tipo:modificatore,...>] [SERVICE=common-dto]`n" +
+                  "Esempio: task new-dto NAME=Libro FIELDS=id:long,titolo:string(150):required,disponibile:bool"
+        }
+    } else {
+        if (-not $Name) {
+            Write-Host ''
+            Write-Host 'CREAZIONE DTO/RECORD GUIDATA' -ForegroundColor Cyan
+            $Name = (Read-Answer "  Nome del DTO in PascalCase (es. LibroDto, OrdineDto, ArticoloDto)").Trim()
+            if (-not $Name) {
+                throw "Uso: task new-dto NAME=<Nome> [FIELDS=<campo:tipo:modificatore,...>] [SERVICE=common-dto]"
+            }
+        }
 
-    $cAns = (Read-Host "  Tipo: [1] Record moderno (default), [2] Classe classica con Lombok (CLASS=1)").Trim()
-    if ($cAns -eq '2') { $Class = $true }
+        if (-not $Fields) {
+            Write-Host ''
+            Write-Host '  Come vuoi definire i campi?' -ForegroundColor DarkGray
+            Write-Host '    1) guidato, un campo alla volta (tipo e modificatori da menu)'
+            Write-Host '    2) tutti insieme, in una riga (come FIELDS=... da riga di comando)'
+            $fieldMode = (Read-Answer "  Modalita' [1]").Trim()
+            if ($fieldMode -eq '2') {
+                Write-Host '  Esempio: id:long,titolo:string(150):required,anno:int:min(1900),prezzo:decimal' -ForegroundColor DarkGray
+                $Fields = (Read-Answer '  Campi').Trim()
+            } else {
+                $fieldTokens = @()
+                while ($true) {
+                    $fName = (Read-Answer '  Nome campo (Invio per terminare)').Trim()
+                    if (-not $fName) { break }
+
+                    Write-Host '    1) string      4) long       7) date        10) email'
+                    Write-Host '    2) string(N)   5) decimal    8) datetime    11) enum(A|B|C)'
+                    Write-Host '    3) text        6) bool       9) int'
+                    $typeChoice = (Read-Answer '    Tipo [1]').Trim()
+                    $typeToken = switch ($typeChoice) {
+                        '2' { "string(" + (Read-Answer '    Lunghezza massima').Trim() + ")" }
+                        '3' { 'text' }
+                        '4' { 'long' }
+                        '5' { 'decimal' }
+                        '6' { 'bool' }
+                        '7' { 'date' }
+                        '8' { 'datetime' }
+                        '9' { 'int' }
+                        '10' { 'email' }
+                        '11' { "enum(" + (Read-Answer '    Valori separati da | (es. ATTIVO|SOSPESO)').Trim() + ")" }
+                        default { 'string' }
+                    }
+
+                    Write-Host '    Modificatori, numeri separati da virgola (Invio per nessuno):'
+                    Write-Host '      1) required   2) unique   3) min(N)   4) max(N)'
+                    $modChoice = (Read-Answer '    Modificatori').Trim()
+                    $mods = @()
+                    if ($modChoice) {
+                        foreach ($m in ($modChoice -split ',')) {
+                            switch ($m.Trim()) {
+                                '1' { $mods += 'required' }
+                                '2' { $mods += 'unique' }
+                                '3' { $mods += "min(" + (Read-Answer '      Minimo').Trim() + ")" }
+                                '4' { $mods += "max(" + (Read-Answer '      Massimo').Trim() + ")" }
+                            }
+                        }
+                    }
+
+                    $token = "${fName}:${typeToken}"
+                    if ($mods.Count -gt 0) { $token += ':' + ($mods -join ':') }
+                    $fieldTokens += $token
+                    Write-Host "    -> $token" -ForegroundColor DarkGray
+                    Write-Host ''
+
+                    $again = (Read-Answer '  Un altro campo? [S/n]').Trim().ToLowerInvariant()
+                    if ($again -eq 'n' -or $again -eq 'no') { break }
+                }
+                $Fields = $fieldTokens -join ','
+            }
+        }
+
+        if (-not $Class) {
+            $cAns = (Read-Answer "  Tipo: [1] Record moderno (default), [2] Classe classica con Lombok (CLASS=1)").Trim()
+            if ($cAns -eq '2') { $Class = $true }
+        }
+    }
 }
 
 if ($Name -cnotmatch '^[A-Z][a-zA-Z0-9]*$') {

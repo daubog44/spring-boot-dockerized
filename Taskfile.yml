@@ -403,10 +403,12 @@ tasks:
 
       Variabili:
         NAME=<Nome>        OBBLIGATORIA, in PascalCase: Libro, Ordine
-        FIELDS=<campi>     facoltativa: nome:tipo[:modificatore]*
+        FIELDS=<campi>     facoltativa: nome:tipo[:modificatore]*.
                            Tipi: string, string(N), text, int, long,
                            decimal, bool, date, datetime, email, enum(A|B)
                            Modificatori: required, min(N), max(N)
+                           Se omesso in modalita' interattiva, avvia il wizard
+                           guidato (un campo alla volta da menu o riga singola).
         SERVICE=<modulo>   facoltativa: default common-dto
         CLASS=1            genera una classe classica invece di un record
 

@@ -188,6 +188,12 @@ if [ -z "$ROUTE_PATH" ]; then
     ROUTE_PATH="/api"
   fi
 fi
+ROUTE_PATH="$(printf '%s' "$ROUTE_PATH" | sed -E 's#/+$##')"
+[ -z "$ROUTE_PATH" ] && ROUTE_PATH="/api"
+case "$ROUTE_PATH" in
+  /*) ;;
+  *) ROUTE_PATH="/$ROUTE_PATH" ;;
+esac
 
 # Avviso rotta non trovata sul target
 if [ "${#KNOWN_ROUTES[@]}" -gt 0 ]; then
@@ -276,6 +282,10 @@ import java.util.List;
 /**
  * Client OpenFeign per comunicare con $EUREKA_NAME via Eureka.
  * Generato da task new-client.
+ *
+ * Punti di estensione per la traccia d'esame:
+ *   - Aggiungi metodi con @RequestParam per ricerche/filtri (es. List<$DTO_NAME> cerca(@RequestParam String query))
+ *   - Aggiungi metodi per rotte specifiche (es. @PatchMapping("$ROUTE_PATH/{id}/stato"))
  */
 @FeignClient(name = "$EUREKA_NAME", contextId = "$CONTEXT_ID")
 public interface $CLIENT_NAME {
