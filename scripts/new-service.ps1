@@ -257,6 +257,14 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
+/**
+ * Controller principale per l'interfaccia web ($module).
+ * Generato da task new-service UI=1.
+ *
+ * Punti di estensione:
+ *   - Inietta Feign client per mostrare dati aggregati o riepiloghi nella dashboard.
+ *   - Aggiungi rotte di navigazione o collegamenti alle viste generate con task new-view.
+ */
 @Controller
 public class HomeController {
 
@@ -293,8 +301,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-// Endpoint minimo per verificare che il servizio sia vivo: sostituiscilo con
-// il tuo controller vero.
+/**
+ * Endpoint di verifica (health check) generato da new-service.
+ *
+ * Punti di estensione:
+ *   - Crea i controller REST per le entita' del tuo dominio con task new-entity.
+ *   - Questo controller puo' essere rimosso o sostituito una volta definiti i tuoi endpoint applicativi.
+ */
 @RestController
 @RequestMapping("/api")
 public class PingController {
@@ -327,7 +340,12 @@ import java.util.Map;
 
 /**
  * Gestore centralizzato delle eccezioni generato automaticamente da new-service.
- * Trasforma errori di validazione (@Valid), 404 e 500 in risposte JSON pulite.
+ * Trasforma errori di validazione (@Valid), ResponseStatusException e 500 in risposte JSON pulite.
+ *
+ * Punti di estensione:
+ *   - Aggiungi metodi @ExceptionHandler per le tue eccezioni di dominio personalizzate
+ *     (es. PrenotazioneNonTrovataException, PostiEsauritiException).
+ *   - Cattura feign.FeignException per gestire in modo pulito errori provenienti da altri microservizi.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -359,6 +377,29 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(ex.getStatusCode()).body(body);
     }
+
+    // TODO: Aggiungere qui eventuali gestori per eccezioni di business personalizzate.
+    // Esempio:
+    // @ExceptionHandler(MioDominioException.class)
+    // public ResponseEntity<Map<String, Object>> handleMioDominio(MioDominioException ex) {
+    //     Map<String, Object> body = new HashMap<>();
+    //     body.put("timestamp", LocalDateTime.now().toString());
+    //     body.put("status", HttpStatus.NOT_FOUND.value());
+    //     body.put("error", "Not Found");
+    //     body.put("message", ex.getMessage());
+    //     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    // }
+
+    // TODO: Per intercettare errori provenienti da Feign client (es. 404 dal catalogo):
+    // @ExceptionHandler(feign.FeignException.class)
+    // public ResponseEntity<Map<String, Object>> handleFeign(feign.FeignException ex) {
+    //     Map<String, Object> body = new HashMap<>();
+    //     body.put("timestamp", LocalDateTime.now().toString());
+    //     body.put("status", ex.status() > 0 ? ex.status() : HttpStatus.BAD_GATEWAY.value());
+    //     body.put("error", "Servizio Remoto Non Raggiungibile o Errore");
+    //     body.put("message", ex.getMessage());
+    //     return ResponseEntity.status(ex.status() > 0 ? ex.status() : 502).body(body);
+    // }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {

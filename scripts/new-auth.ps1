@@ -144,6 +144,15 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Entita' per la gestione degli utenti e delle credenziali nel database.
+ * Generata da task new-auth TYPE=db.
+ *
+ * Punti di estensione:
+ *   - Aggiungi campi profilo come email, nome, cognome o data di registrazione.
+ *   - Se l'applicazione richiede ruoli multipli, trasforma 'ruolo' in un Set<String> con @ElementCollection,
+ *     oppure crea un'entita' RuoloEntity con relazione @ManyToMany.
+ */
 @Entity
 @Table(name = "utenti")
 @Getter
@@ -211,6 +220,14 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 
+/**
+ * Caricamento credenziali utente da database per Spring Security.
+ * Generato da task new-auth TYPE=db.
+ *
+ * Punti di estensione:
+ *   - Se gestisci ruoli multipli: mappare ogni ruolo come SimpleGrantedAuthority.
+ *   - Verificare flag di stato se presenti nell'entita' (es. utente.isAttivo()).
+ */
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
@@ -221,6 +238,12 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         UtenteEntity utente = utenteRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Utente non trovato: " + username));
+
+        // TODO: Se l'utente supporta piu' ruoli, converti la collezione in SimpleGrantedAuthority.
+        // Esempio:
+        // List<SimpleGrantedAuthority> authorities = utente.getRuoli().stream()
+        //         .map(SimpleGrantedAuthority::new)
+        //         .toList();
 
         return new User(
                 utente.getUsername(),
@@ -251,6 +274,15 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * Configurazione di sicurezza per $Service (autenticazione su database).
+ * Generata da task new-auth TYPE=db.
+ *
+ * Punti di estensione:
+ *   - Modifica le autorizzazioni delle rotte in securityFilterChain().
+ *   - hasRole("ADMIN") verifica l'authority "ROLE_ADMIN".
+ *   - hasAuthority("ROLE_ADMIN") confronta la stringa esatta dell'authority.
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -263,8 +295,12 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/**", "/h2-console/**").permitAll()
-                // Regole di autorizzazione per ruolo:
+                // TODO: Regole di autorizzazione specifiche per le tue rotte (esempi):
+                // .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/**").permitAll()
+                // .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/**").hasAuthority("ROLE_ADMIN")
                 // .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
+                // TODO: Per proteggere tutti gli altri endpoint richiedendo autenticazione:
+                // sostituire la riga seguente con: .anyRequest().authenticated()
                 .anyRequest().permitAll()
             )
             .httpBasic(httpBasic -> {});
@@ -281,6 +317,7 @@ public class SecurityConfig {
     public CommandLineRunner seedUsers(UtenteRepository repo, PasswordEncoder encoder) {
         return args -> {
             if (repo.count() == 0) {
+                // TODO: Aggiungi qui gli utenti iniziali necessari per le prove della traccia d'esame.
                 repo.save(new UtenteEntity(null, "admin", encoder.encode("admin123"), "ROLE_ADMIN"));
                 repo.save(new UtenteEntity(null, "user", encoder.encode("user123"), "ROLE_USER"));
             }
@@ -302,6 +339,13 @@ package $package.controller;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
+/**
+ * Controller per la gestione della pagina di accesso (login).
+ * Generato da task new-auth TYPE=form.
+ *
+ * Punti di estensione:
+ *   - Aggiungi rotte per la registrazione utente (@GetMapping("/register"), @PostMapping("/register")).
+ */
 @Controller
 public class LoginController {
 
@@ -393,6 +437,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * Configurazione di sicurezza per l'interfaccia web $Service (form login).
+ * Generata da task new-auth TYPE=form.
+ *
+ * Punti di estensione:
+ *   - Proteggi specifiche aree della UI in base al ruolo (es. /admin/**).
+ *   - Personalizza defaultSuccessUrl o le pagine di errore.
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -403,8 +455,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/login", "/css/**", "/js/**", "/images/**", "/error").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
-                // Regole di autorizzazione per ruolo:
+                // TODO: Regole di autorizzazione per la UI (esempi):
                 // .requestMatchers("/admin/**").hasRole("ADMIN")
+                // .requestMatchers("/prenotazioni/**").hasAnyRole("USER", "ADMIN")
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form
@@ -467,6 +520,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * Configurazione di sicurezza per $Service (autenticazione in-memory).
+ * Generata da task new-auth TYPE=inmemory.
+ *
+ * Punti di estensione:
+ *   - Modifica le autorizzazioni delle rotte in securityFilterChain().
+ *   - Configura ruoli o utenti aggiuntivi in userDetailsService().
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -479,8 +540,12 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/**", "/h2-console/**").permitAll()
-                // Regole di autorizzazione per ruolo:
-                // .requestMatchers(HttpMethod.POST, "/api/**").hasRole("ADMIN")
+                // TODO: Regole di autorizzazione per ruolo (esempi):
+                // .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/**").permitAll()
+                // .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/**").hasRole("ADMIN")
+                // .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                // TODO: Per proteggere tutti gli altri endpoint richiedendo autenticazione:
+                // sostituire la riga seguente con: .anyRequest().authenticated()
                 .anyRequest().permitAll()
             )
             .httpBasic(httpBasic -> {});
