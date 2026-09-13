@@ -430,6 +430,82 @@ Test-Case 'new-view ricava automaticamente i campi dal Feign client se FIELDS e'
     Assert-Contains $ctrl 'volumiClient.create(new ' 'chiamata create non collegata'
 }
 
+Test-Case 'new-view con ROUTE custom usa la rotta specificata nel @RequestMapping' {
+    Assert-Ok (Invoke-Tool 'new-view.ps1' @('-Service', 'beta-ui', '-Name', 'Clienti', '-Fields', 'nome:string:required', '-Route', '/gestione/clienti')) 'new-view con ROUTE custom fallito'
+    $ctrlFile = Join-Path $demo ('beta-ui/src/main/java/' + (Get-SandboxPackagePath 'beta-ui') + '/controller/ClientiUiController.java')
+    Assert-That (Test-Path $ctrlFile) 'ClientiUiController.java non trovato'
+    $ctrl = Read-TextFile $ctrlFile
+    Assert-Contains $ctrl '@RequestMapping("/gestione/clienti")' 'rotta custom non usata nel @RequestMapping'
+    Assert-Contains $ctrl 'return "redirect:/gestione/clienti?success"' 'redirect non aggiornato con rotta custom'
+}
+
+Test-Case 'new-view con campo bool genera checkbox e tipo Boolean' {
+    Assert-Ok (Invoke-Tool 'new-view.ps1' @('-Service', 'beta-ui', '-Name', 'Prodotti', '-Fields', 'nome:string:required,attivo:bool')) 'new-view con campo bool fallito'
+    $ctrlFile = Join-Path $demo ('beta-ui/src/main/java/' + (Get-SandboxPackagePath 'beta-ui') + '/controller/ProdottiUiController.java')
+    $tplFile = Join-Path $demo 'beta-ui/src/main/resources/templates/prodotti.html'
+    Assert-That (Test-Path $ctrlFile) 'ProdottiUiController.java non trovato'
+    Assert-That (Test-Path $tplFile) 'prodotti.html non trovato'
+    $ctrl = Read-TextFile $ctrlFile
+    Assert-Contains $ctrl 'private Boolean attivo;' 'campo bool non genera private Boolean'
+    $tpl = Read-TextFile $tplFile
+    Assert-Contains $tpl 'type="checkbox"' 'campo bool non genera input checkbox nel template'
+}
+
+Test-Case 'new-view con campo int:min(1) genera annotazione @Min nel form DTO' {
+    Assert-Ok (Invoke-Tool 'new-view.ps1' @('-Service', 'beta-ui', '-Name', 'Ordini', '-Fields', 'codice:string:required,quantita:int:min(1)')) 'new-view con campo int:min fallito'
+    $ctrlFile = Join-Path $demo ('beta-ui/src/main/java/' + (Get-SandboxPackagePath 'beta-ui') + '/controller/OrdiniUiController.java')
+    Assert-That (Test-Path $ctrlFile) 'OrdiniUiController.java non trovato'
+    $ctrl = Read-TextFile $ctrlFile
+    Assert-Contains $ctrl 'private Integer quantita;' 'campo int non genera private Integer'
+    Assert-Contains $ctrl '@Min(1)' 'annotazione @Min(1) mancante per vincolo min'
+}
+
+Test-Case 'new-view su modulo non-UI lancia errore chiaro' {
+    $result = Invoke-Tool 'new-view.ps1' @('-Service', 'alfa-service', '-Name', 'Test', '-Fields', 'nome:string')
+    Assert-That ($result.ExitCode -ne 0) 'new-view su modulo non-UI doveva fallire'
+    $out = $result.Output + $result.Error
+    Assert-That ($out -match 'alfa-service') 'il nome del modulo non appare nel messaggio di errore'
+}
+
+Test-Case 'new-view con nome non-PascalCase lancia errore di validazione' {
+    $result = Invoke-Tool 'new-view.ps1' @('-Service', 'beta-ui', '-Name', 'libri', '-Fields', 'nome:string')
+    Assert-That ($result.ExitCode -ne 0) 'new-view con nome minuscolo doveva fallire'
+    $out = $result.Output + $result.Error
+    Assert-That ($out -match '[Pp]ascal[Cc]ase' -or $out -match '[Nn]ome non valido') 'messaggio di errore PascalCase mancante'
+}
+
+Test-Case 'new-view doppia esecuzione sulla stessa vista lancia errore file-gia-esistente' {
+    Assert-Ok (Invoke-Tool 'new-view.ps1' @('-Service', 'beta-ui', '-Name', 'Fatture', '-Fields', 'numero:string:required')) 'prima esecuzione new-view fallita'
+    $result = Invoke-Tool 'new-view.ps1' @('-Service', 'beta-ui', '-Name', 'Fatture', '-Fields', 'numero:string:required')
+    Assert-That ($result.ExitCode -ne 0) 'seconda esecuzione new-view doveva fallire'
+    $out = $result.Output + $result.Error
+    Assert-That ($out -match 'gia' -or $out -match 'already' -or $out -match 'esiste') 'messaggio di file-gia-esistente mancante'
+}
+
+Test-Case 'new-view wizard guidato (WIZARD_ANSWERS mode=1) costruisce campi campo-per-campo' {
+    $answersFile = [System.IO.Path]::GetTempFileName()
+    # SERVICE e NAME passati esplicitamente: il wizard salta servizio/nome e chiede solo i campi.
+    # Flusso:
+    #   [1]      modalita' guidata
+    #   [titolo] nome campo 1, [1]=string, [1]=required
+    #   [anno]   nome campo 2, [3]=int,    [2]=min(N) -> [1900]
+    #   []       fine campi
+    [System.IO.File]::WriteAllLines($answersFile, @('1', 'titolo', '1', '1', 'anno', '3', '2', '1900', ''))
+    $env:WIZARD_ANSWERS = $answersFile
+    try {
+        Assert-Ok (Invoke-Tool 'new-view.ps1' @('-Service', 'beta-ui', '-Name', 'Riviste')) 'new-view wizard guidato fallito'
+        $ctrlFile = Join-Path $demo ('beta-ui/src/main/java/' + (Get-SandboxPackagePath 'beta-ui') + '/controller/RivisteUiController.java')
+        Assert-That (Test-Path $ctrlFile) 'RivisteUiController.java non trovato'
+        $ctrl = Read-TextFile $ctrlFile
+        Assert-Contains $ctrl 'private String titolo;' 'campo titolo non generato dal wizard guidato'
+        Assert-Contains $ctrl 'private Integer anno;' 'campo anno non generato dal wizard guidato'
+        Assert-Contains $ctrl '@Min(1900)' 'annotazione @Min(1900) mancante dal wizard guidato'
+    } finally {
+        Remove-Item $answersFile -ErrorAction SilentlyContinue
+        $env:WIZARD_ANSWERS = $null
+    }
+}
+
 Test-Case 'new-client crea automaticamente il DTO in common-dto se sono passati FIELDS' {
     Assert-Ok (Invoke-Tool 'new-client.ps1' @('-From', 'alfa-service', '-To', 'beta-ui', '-Name', 'BetaClient', '-Dto', 'AutoreDto', '-Fields', 'nome:string:required')) 'new-client con FIELDS fallito'
     $basePkgPath = (Get-BasePackage -RepoRoot $sandbox) -replace '\.', '/'

@@ -2,7 +2,8 @@
 # Genera un Controller Thymeleaf e una vista HTML con tabella e form per un modulo UI.
 # Equivalente POSIX di scripts/new-view.ps1.
 #
-#   task new-view SERVICE=event-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int
+#   task new-view SERVICE=event-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int:min(1900)
+#   task new-view SERVICE=event-ui NAME=Libri CLIENT=LibriClient
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,8 +29,28 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+FIELDS_WIZARD_PENDING=0
+
+# --- Helper read_answer: supporta WIZARD_ANSWERS per test automatici ---
+read_answer() {
+  local prompt="${1:-> }"
+  if [ -n "${WIZARD_ANSWERS:-}" ] && [ -f "$WIZARD_ANSWERS" ]; then
+    local answer
+    answer="$(head -n 1 "$WIZARD_ANSWERS")"
+    # Rimuovi la prima riga dal file temporaneo (usa sed in-place)
+    sed -i '1d' "$WIZARD_ANSWERS" 2>/dev/null || true
+    printf '%s %s\n' "$prompt" "$answer"
+    printf '%s' "$answer"
+  else
+    printf '%s ' "$prompt" >&2
+    local ans
+    read -r ans
+    printf '%s' "$ans"
+  fi
+}
+
 if [ -z "$SERVICE" ] || [ -z "$NAME" ]; then
-  if [ ! -t 0 ]; then
+  if [ ! -t 0 ] && [ -z "${WIZARD_ANSWERS:-}" ]; then
     echo "Uso: task new-view SERVICE=<modulo-ui> NAME=<Nome> [ROUTE=<percorso>] [FIELDS=<campi>]" >&2
     exit 1
   fi
@@ -52,24 +73,20 @@ if [ -z "$SERVICE" ] || [ -z "$NAME" ]; then
     for i in "${!UI_MODULES[@]}"; do
       echo "  $((i+1))) ${UI_MODULES[$i]}"
     done
-    printf "  [1] > "
-    read -r IDX
+    IDX="$(read_answer "  [1] >")"
     [ -n "$IDX" ] || IDX=1
     SERVICE="${UI_MODULES[$((IDX-1))]}"
   fi
 
   if [ -z "$NAME" ]; then
-    printf "  Nome della Vista in PascalCase (es. Libri, Eventi, Clienti): "
-    read -r NAME
+    NAME="$(read_answer "  Nome della Vista in PascalCase (es. Libri, Eventi, Clienti)")"
     [ -n "$NAME" ] || { echo "Nome obbligatorio." >&2; exit 1; }
   fi
 
-  if [ -z "$FIELDS" ]; then
-    echo "  Campi (es. titolo:string:required,autore:string,anno:int):"
-    printf "  Campi (premi Invio se nessuno): "
-    read -r FIELDS
-  fi
+  # FIELDS verrà chiesto DOPO il rilevamento del Feign Client (potrebbe auto-derivarli).
+  [ -z "$FIELDS" ] && FIELDS_WIZARD_PENDING=1
 fi
+
 
 if ! printf '%s' "$NAME" | grep -qE '^[A-Z][a-zA-Z0-9]*$'; then
   echo "Nome non valido: '$NAME'. Usa il PascalCase: Libri, Eventi, Prenotazioni." >&2
@@ -280,6 +297,64 @@ $DTO_ARGS
   fi
 fi
 
+# --- Wizard interattivo per i campi (se non sono stati specificati / auto-derivati) ---
+if [ "$FIELDS_WIZARD_PENDING" -eq 1 ] && [ -z "${FIELDS:-}" ]; then
+  echo ""
+  echo "  Come vuoi definire i campi del form e della tabella?"
+  echo "    1) guidato, un campo alla volta (tipo e modificatori da menu)"
+  echo "    2) tutti insieme, in una riga (come FIELDS=... da riga di comando)"
+  FIELD_MODE="$(read_answer "  Modalita' [1]")"
+  if [ "$FIELD_MODE" = "2" ]; then
+    echo "  Esempio: titolo:string:required,autore:string,anno:int:min(1900)"
+    FIELDS="$(read_answer "  Campi")"
+  else
+    FIELD_TOKENS=""
+    while true; do
+      FNAME="$(read_answer "  Nome campo (Invio per finire)")"
+      [ -n "$FNAME" ] || break
+
+      echo "    1) string      4) long       7) date"
+      echo "    2) string(N)   5) decimal    8) enum(A|B|C)"
+      echo "    3) int         6) bool"
+      TYPE_CHOICE="$(read_answer "    Tipo [1]")"
+      case "$TYPE_CHOICE" in
+        2) SLEN="$(read_answer "    Lunghezza massima")"; TYPE_TOKEN="string($SLEN)" ;;
+        3) TYPE_TOKEN="int" ;;
+        4) TYPE_TOKEN="long" ;;
+        5) TYPE_TOKEN="decimal" ;;
+        6) TYPE_TOKEN="bool" ;;
+        7) TYPE_TOKEN="date" ;;
+        8) EVALS="$(read_answer "    Valori separati da | (es. ROSSO|VERDE|BLU)")"; TYPE_TOKEN="enum($EVALS)" ;;
+        *) TYPE_TOKEN="string" ;;
+      esac
+
+      echo "    Modificatori, numeri separati da virgola (Invio per nessuno):"
+      echo "      1) required   2) min(N)   3) max(N)   4) unique"
+      MOD_CHOICE="$(read_answer "    Modificatori")"
+      MODS=""
+      if [ -n "$MOD_CHOICE" ]; then
+        OLD_IFS="$IFS"; IFS=','
+        for m in $MOD_CHOICE; do
+          m="${m// /}"
+          case "$m" in
+            1) MODS="${MODS}:required" ;;
+            2) MV="$(read_answer "      Minimo")"; MODS="${MODS}:min($MV)" ;;
+            3) MV="$(read_answer "      Massimo")"; MODS="${MODS}:max($MV)" ;;
+            4) MODS="${MODS}:unique" ;;
+          esac
+        done
+        IFS="$OLD_IFS"
+      fi
+
+      TOKEN="${FNAME}:${TYPE_TOKEN}${MODS}"
+      echo "    -> $TOKEN"
+      echo ""
+      [ -z "$FIELD_TOKENS" ] && FIELD_TOKENS="$TOKEN" || FIELD_TOKENS="${FIELD_TOKENS},${TOKEN}"
+    done
+    FIELDS="$FIELD_TOKENS"
+  fi
+fi
+
 # Parsing campi
 FORM_FIELDS=""
 TH_HEADERS=""
@@ -299,15 +374,22 @@ for raw in "${FIELD_ARRAY[@]}"; do
   FNAME="$(printf '%s' "${TOKENS[0]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   FTYPE="string"
   REQUIRED=0
+  MIN_VAL=""
+  MAX_VAL=""
   if [ "${#TOKENS[@]}" -gt 1 ]; then
     FTYPE="$(printf '%s' "${TOKENS[1]}" | tr '[:upper:]' '[:lower:]' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   fi
-  if [ "${#TOKENS[@]}" -gt 2 ]; then
-    MOD="$(printf '%s' "${TOKENS[2]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-    if [ "$MOD" = "required" ]; then REQUIRED=1; fi
-  elif [ "$FTYPE" = "required" ]; then
+  if [ "${#TOKENS[@]}" -eq 2 ] && [ "$FTYPE" = "required" ]; then
     FTYPE="string"
     REQUIRED=1
+  fi
+  if [ "${#TOKENS[@]}" -gt 2 ]; then
+    for (( ti=2; ti<${#TOKENS[@]}; ti++ )); do
+      MOD="$(printf '%s' "${TOKENS[$ti]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      if [ "$MOD" = "required" ]; then REQUIRED=1; fi
+      if [[ "$MOD" =~ ^min\(([0-9]+)\)$ ]]; then MIN_VAL="${BASH_REMATCH[1]}"; fi
+      if [[ "$MOD" =~ ^max\(([0-9]+)\)$ ]]; then MAX_VAL="${BASH_REMATCH[1]}"; fi
+    done
   fi
 
   JTYPE="String"
@@ -326,10 +408,16 @@ for raw in "${FIELD_ARRAY[@]}"; do
   VAL=""
   if [ "$REQUIRED" -eq 1 ]; then
     if [ "$JTYPE" = "String" ]; then
-      VAL="        @jakarta.validation.constraints.NotBlank(message = \"$FNAME e' obbligatorio\")"$'\n'
+      VAL="        @NotBlank(message = \"$FNAME e' obbligatorio\")"$'\n'
     else
-      VAL="        @jakarta.validation.constraints.NotNull"$'\n'
+      VAL="        @NotNull"$'\n'
     fi
+  fi
+  if [ -n "$MIN_VAL" ]; then
+    VAL="${VAL}        @Min($MIN_VAL)"$'\n'
+  fi
+  if [ -n "$MAX_VAL" ]; then
+    VAL="${VAL}        @Max($MAX_VAL)"$'\n'
   fi
   FORM_FIELDS="${FORM_FIELDS}${VAL}        private ${JTYPE} ${FNAME};"$'\n'
 
@@ -358,6 +446,7 @@ cat > "$CONTROLLER_FILE" <<EOF
 package $PACKAGE.controller;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;

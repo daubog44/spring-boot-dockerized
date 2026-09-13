@@ -19,12 +19,20 @@
     Percorso URL della pagina (default: /<nome-in-minuscolo>, es. /libri).
 
 .PARAMETER Fields
-    Campi della tabella e del form: nome:tipo[:required]*.
+    Campi della tabella e del form: nome:tipo[:modificatore]*.
     Tipi: string, int, long, decimal, bool, date.
+    Modificatori: required, min(N), max(N).
+    Se omesso e specificato CLIENT, i campi vengono ricavati automaticamente dal DTO.
+    Se omesso senza CLIENT, viene avviato il wizard interattivo (un campo alla volta o tutti insieme).
+
+.PARAMETER Client
+    Nome del Feign Client da collegare alla vista (es. LibriClient). Se omesso in un
+    terminale interattivo, new-view elenca i client disponibili e propone il collegamento.
 
 .EXAMPLE
     task new-view SERVICE=event-ui NAME=Eventi FIELDS=titolo:string:required,luogo:string,data:date
-    task new-view SERVICE=wms-ui NAME=Prodotti ROUTE=/prodotti FIELDS=codice:string:required,descrizione:string,quantita:int
+    task new-view SERVICE=event-ui NAME=Eventi CLIENT=EventiClient
+    task new-view SERVICE=wms-ui NAME=Prodotti ROUTE=/prodotti FIELDS=codice:string:required,descrizione:string,quantita:int:min(1)
 #>
 param(
     [string]$Service = '',
@@ -40,8 +48,27 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Get-ScaffoldRepoRoot
 $demoDir = Join-Path $repoRoot 'demo'
 
+# --- Helper Read-Answer (supporta WIZARD_ANSWERS per test automatici) ---
+$script:_wizAnswers = $null
+if ($env:WIZARD_ANSWERS -and (Test-Path $env:WIZARD_ANSWERS)) {
+    $script:_wizAnswers = New-Object 'System.Collections.Generic.Queue[string]'
+    foreach ($line in [System.IO.File]::ReadAllLines($env:WIZARD_ANSWERS)) { $script:_wizAnswers.Enqueue($line) }
+}
+function Read-Answer {
+    param([string]$Prompt = '  >')
+    if ($null -ne $script:_wizAnswers) {
+        if ($script:_wizAnswers.Count -eq 0) { throw 'WIZARD_ANSWERS: le risposte sono finite prima delle domande.' }
+        $a = $script:_wizAnswers.Dequeue()
+        Write-Host "$Prompt $a"
+        return $a
+    }
+    return (Read-Host $Prompt)
+}
+
+$script:_fieldsAskedInWizard = $false
+
 if (-not $Service -or -not $Name) {
-    if ([Console]::IsInputRedirected) {
+    if ([Console]::IsInputRedirected -and $null -eq $script:_wizAnswers) {
         throw "Uso: task new-view SERVICE=<modulo-ui> NAME=<Nome> [ROUTE=<percorso>] [FIELDS=<campi>]`n" +
               "Esempio: task new-view SERVICE=event-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int"
     }
@@ -62,22 +89,27 @@ if (-not $Service -or -not $Name) {
         for ($i = 0; $i -lt $uiModules.Count; $i++) {
             Write-Host "  $($i + 1)) $($uiModules[$i])"
         }
-        $idx = Read-Host "  [1] >"
+        $idx = Read-Answer "  [1] >"
         $idxNum = if ($idx -match '^\d+$') { [int]$idx } else { 1 }
         $Service = $uiModules[$idxNum - 1]
     }
 
     if (-not $Name) {
-        $Name = (Read-Host "  Nome della Vista in PascalCase (es. Libri, Eventi, Clienti)").Trim()
+        $Name = (Read-Answer "  Nome della Vista in PascalCase (es. Libri, Eventi, Clienti)").Trim()
         if (-not $Name) {
             throw "Uso: task new-view SERVICE=<modulo-ui> NAME=<Nome> [ROUTE=<percorso>] [FIELDS=<campi>]"
         }
     }
 
-    if (-not $Fields) {
-        Write-Host "  Campi da mostrare nella tabella e nel form (es. titolo:string:required,autore:string,anno:int):" -ForegroundColor DarkGray
-        $Fields = (Read-Host "  Campi (premi Invio se nessuno)").Trim()
-    }
+    # FIELDS verrà chiesto DOPO il rilevamento del Feign Client (potrebbe auto-derivarli).
+    # Marchiamo il flag per ricordarci di chiedere i campi se non vengono auto-derivati.
+    if (-not $Fields) { $script:_fieldsAskedInWizard = $true }
+}
+
+# Se SERVICE e NAME erano gia' noti, il flag non e' stato settato sopra:
+# lo settiamo qui se FIELDS e' vuoto e abbiamo un contesto interattivo.
+if (-not $Fields -and (-not [Console]::IsInputRedirected -or $null -ne $script:_wizAnswers)) {
+    $script:_fieldsAskedInWizard = $true
 }
 
 if ($Name -cnotmatch '^[A-Z][a-zA-Z0-9]*$') {
@@ -87,6 +119,12 @@ if ($Name -cnotmatch '^[A-Z][a-zA-Z0-9]*$') {
 $moduleDir = Join-Path $demoDir $Service
 if (-not (Test-Path (Join-Path $moduleDir 'pom.xml'))) {
     throw "Non trovo il modulo '$Service' in demo/."
+}
+$pomTextSvc = Read-TextFile (Join-Path $moduleDir 'pom.xml')
+if ($pomTextSvc -notmatch 'spring-boot-starter-thymeleaf') {
+    throw "'$Service' non e' un modulo UI (non ha spring-boot-starter-thymeleaf).`n" +
+          "Crea un modulo UI con: task new-service NAME=<nome> UI=1`n" +
+          "oppure usa un modulo gia' creato con UI=1."
 }
 
 $slug = $Name.ToLowerInvariant()
@@ -197,6 +235,63 @@ if ($Client) {
     }
 }
 
+# --- Wizard interattivo per i campi (se non sono stati specificati / auto-derivati) ---
+if ($script:_fieldsAskedInWizard -and -not $Fields) {
+    Write-Host ''
+    Write-Host '  Come vuoi definire i campi del form e della tabella?' -ForegroundColor DarkGray
+    Write-Host '    1) guidato, un campo alla volta (tipo e modificatori da menu)'
+    Write-Host '    2) tutti insieme, in una riga (come FIELDS=... da riga di comando)'
+    $fieldMode = (Read-Answer "  Modalita' [1]").Trim()
+    if ($fieldMode -eq '2') {
+        Write-Host '  Esempio: titolo:string:required,autore:string,anno:int:min(1900)' -ForegroundColor DarkGray
+        $Fields = (Read-Answer '  Campi').Trim()
+        # Invio senza nulla = usa default (nome/descrizione), gestito dopo
+    } else {
+        $fieldTokens = @()
+        while ($true) {
+            $fName = (Read-Answer '  Nome campo (Invio per finire)').Trim()
+            if (-not $fName) { break }
+
+            Write-Host '    1) string      4) long       7) date'
+            Write-Host '    2) string(N)   5) decimal    8) enum(A|B|C)'
+            Write-Host '    3) int         6) bool'
+            $typeChoice = (Read-Answer '    Tipo [1]').Trim()
+            $typeToken = switch ($typeChoice) {
+                '2' { "string(" + (Read-Answer '    Lunghezza massima').Trim() + ")" }
+                '3' { 'int' }
+                '4' { 'long' }
+                '5' { 'decimal' }
+                '6' { 'bool' }
+                '7' { 'date' }
+                '8' { "enum(" + (Read-Answer '    Valori separati da | (es. ROSSO|VERDE|BLU)').Trim() + ")" }
+                default { 'string' }
+            }
+
+            Write-Host '    Modificatori, numeri separati da virgola (Invio per nessuno):'
+            Write-Host '      1) required   2) min(N)   3) max(N)   4) unique'
+            $modChoice = (Read-Answer '    Modificatori').Trim()
+            $mods = @()
+            if ($modChoice) {
+                foreach ($m in ($modChoice -split ',')) {
+                    switch ($m.Trim()) {
+                        '1' { $mods += 'required' }
+                        '2' { $mods += "min(" + (Read-Answer '      Minimo').Trim() + ")" }
+                        '3' { $mods += "max(" + (Read-Answer '      Massimo').Trim() + ")" }
+                        '4' { $mods += 'unique' }
+                    }
+                }
+            }
+
+            $token = "${fName}:${typeToken}"
+            if ($mods.Count -gt 0) { $token += ':' + ($mods -join ':') }
+            $fieldTokens += $token
+            Write-Host "    -> $token" -ForegroundColor DarkGray
+            Write-Host ''
+        }
+        $Fields = $fieldTokens -join ','
+    }
+}
+
 # --- Parsing dei campi ---
 $fieldList = @()
 if ($Fields) {
@@ -206,8 +301,16 @@ if ($Fields) {
         $tokens = $raw -split ':'
         $fName = $tokens[0].Trim()
         $fType = if ($tokens.Count -gt 1) { $tokens[1].Trim().ToLowerInvariant() } else { 'string' }
-        $required = ($tokens.Count -gt 2 -and $tokens[2].Trim() -eq 'required') -or ($tokens.Count -gt 1 -and $tokens[1].Trim() -eq 'required')
+        $required = $false
+        $fMin = $null
+        $fMax = $null
         if ($tokens.Count -eq 2 -and $tokens[1].Trim() -eq 'required') { $fType = 'string'; $required = $true }
+        for ($ti = 2; $ti -lt $tokens.Count; $ti++) {
+            $mod = $tokens[$ti].Trim()
+            if ($mod -eq 'required') { $required = $true }
+            elseif ($mod -match '^min\((-?\d+)\)$') { $fMin = $Matches[1] }
+            elseif ($mod -match '^max\((-?\d+)\)$') { $fMax = $Matches[1] }
+        }
 
         $jType = 'String'
         $htmlInput = 'text'
@@ -223,12 +326,14 @@ if ($Fields) {
             JavaType = $jType
             InputType = $htmlInput
             Required = $required
+            Min = $fMin
+            Max = $fMax
         }
     }
 }
 if ($fieldList.Count -eq 0) {
-    $fieldList += [pscustomobject]@{ Name = 'nome'; JavaType = 'String'; InputType = 'text'; Required = $true }
-    $fieldList += [pscustomobject]@{ Name = 'descrizione'; JavaType = 'String'; InputType = 'text'; Required = $false }
+    $fieldList += [pscustomobject]@{ Name = 'nome'; JavaType = 'String'; InputType = 'text'; Required = $true; Min = $null; Max = $null }
+    $fieldList += [pscustomobject]@{ Name = 'descrizione'; JavaType = 'String'; InputType = 'text'; Required = $false; Min = $null; Max = $null }
 }
 
 $hasClient = $false
@@ -304,9 +409,15 @@ $dtoArgsStr
 
 # --- Form DTO static class dentro il Controller ---
 $formFieldLines = foreach ($f in $fieldList) {
-    $val = if ($f.Required) { "        @jakarta.validation.constraints.NotNull`n" } else { "" }
-    if ($f.Required -and $f.JavaType -eq 'String') { $val = "        @jakarta.validation.constraints.NotBlank(message = `"${f.Name} e' obbligatorio`")`n" }
-    "${val}        private $($f.JavaType) $($f.Name);"
+    $annotations = ''
+    if ($f.Required -and $f.JavaType -eq 'String') {
+        $annotations += "        @NotBlank(message = `"$($f.Name) e' obbligatorio`")`n"
+    } elseif ($f.Required) {
+        $annotations += "        @NotNull`n"
+    }
+    if ($null -ne $f.Min) { $annotations += "        @Min($($f.Min))`n" }
+    if ($null -ne $f.Max) { $annotations += "        @Max($($f.Max))`n" }
+    "${annotations}        private $($f.JavaType) $($f.Name);"
 }
 $formFieldsStr = $formFieldLines -join "`n"
 
@@ -314,6 +425,7 @@ $controllerSrc = @"
 package $package.controller;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -328,6 +440,11 @@ import java.util.List;
 /**
  * Controller Thymeleaf per la vista $Name ($routePath).
  * Generato da task new-view.
+ *
+ * Punti di estensione:
+ *   - GET  index(): aggiungi filtri, paginazione, o carica dati da piu' sorgenti.
+ *   - POST save():  aggiungi logica di business (es. verifica disponibilita', cambio stato).
+ *   - Aggiungi @GetMapping("/{id}") per il dettaglio, o @PostMapping("/{id}/cancella") ecc.
  */
 @Controller
 @RequestMapping("$routePath")$(if ($hasClient) { "`n@RequiredArgsConstructor" })
@@ -352,6 +469,7 @@ $clientCallGetAll
                        Model model) {
 $clientErrorCatch
 $clientCallCreate
+        // TODO: aggiungi qui logica di business specifica della traccia.
         return "redirect:${routePath}?success";
     }
 }

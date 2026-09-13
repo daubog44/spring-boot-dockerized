@@ -457,16 +457,20 @@ tasks:
         2. Il template HTML (templates/<nome>.html) con tabella reattiva e form con validazione
         3. Se specificato CLIENT o presente un Feign client nel modulo, collega automaticamente
            i dati (getAll) e il salvataggio (create) via Feign!
+           Se FIELDS e' omesso, ricava i campi automaticamente dal DTO del Feign client.
 
       Variabili:
         SERVICE=<modulo>   OBBLIGATORIA: modulo UI (es. event-ui)
         NAME=<Nome>        OBBLIGATORIA: PascalCase (es. Libri, Eventi)
         ROUTE=<percorso>   facoltativa: default /<nome>
-        FIELDS=<campi>     facoltativa: nome:tipo[:required]* (string, int, long, decimal, bool, date)
+        FIELDS=<campi>     facoltativa: nome:tipo[:modificatore]* (es. titolo:string:required,anno:int:min(1900)).
+                           Se omesso e c'e' un CLIENT, auto-deriva i campi; altrimenti avvia il wizard
+                           guidato (un campo alla volta o tutti insieme).
         CLIENT=<client>    facoltativa: nome del Feign client da collegare alla vista
 
       Esempio:
         task new-view SERVICE=event-ui NAME=Libri FIELDS=titolo:string:required,autore:string,anno:int
+        task new-view SERVICE=event-ui NAME=Libri CLIENT=LibriClient
     cmds:
       - '{{if eq OS "windows"}}powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/new-view.ps1{{if .SERVICE}} -Service {{.SERVICE}}{{end}}{{if .NAME}} -Name {{.NAME}}{{end}}{{if .ROUTE}} -Route {{.ROUTE}}{{end}}{{if .FIELDS}} -Fields "{{.FIELDS}}"{{end}}{{if .CLIENT}} -Client {{.CLIENT}}{{end}} {{.CLI_ARGS}}{{else}}bash ./scripts/new-view.sh{{if .SERVICE}} --service {{.SERVICE}}{{end}}{{if .NAME}} --name {{.NAME}}{{end}}{{if .ROUTE}} --route {{.ROUTE}}{{end}}{{if .FIELDS}} --fields "{{.FIELDS}}"{{end}}{{if .CLIENT}} --client {{.CLIENT}}{{end}} {{.CLI_ARGS}}{{end}}'
 
